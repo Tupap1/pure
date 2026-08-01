@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  pure-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pure_academic_app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-demo_key}
+    restart: unless-stopped
+
+  pure-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pure_mcp_server
+    command: ["node", "mcp-server/index.js"]
+    restart: unless-stopped
