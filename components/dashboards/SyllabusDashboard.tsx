@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { usePureData } from '@/lib/hooks/usePureData';
+import { pureDB, SyllabusTopicEntity } from '@/lib/db/dexie-schema';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import {
   GitMerge,
-  ChevronRight,
   ChevronDown,
   CheckCircle2,
   Sparkles,
@@ -13,15 +14,47 @@ import {
   Zap,
   BookOpen
 } from 'lucide-react';
+import { calculateSyllabusProgress } from '@/lib/domain/syllabus';
 
 export const SyllabusDashboard: React.FC = () => {
-  const [selectedSubject, setSelectedSubject] = useState<'aero' | 'software'>('aero');
+  const { isLoaded, subjects, syllabusTopics } = usePureData();
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
+  const [rawText, setRawText] = useState('');
   const [synergySynced, setSynergySynced] = useState(false);
+
+  if (!isLoaded) {
+    return <div className="p-8 text-center text-slate-400 font-mono">Cargando temarios...</div>;
+  }
+
+  const activeSubject = subjects.find((s) => s.id === selectedSubjectId) || subjects[0];
+  const activeTopics = syllabusTopics.filter((t) => t.subject_id === (activeSubject?.id || ''));
+  const overallProgress = calculateSyllabusProgress(activeTopics as any);
+
+  const handleUpdateMastery = async (id: string, status: SyllabusTopicEntity['mastery_status']) => {
+    await pureDB.syllabusTopics.update(id, { mastery_status: status });
+  };
+
+  const handleIngestSyllabus = async () => {
+    if (!rawText.trim() || !activeSubject) return;
+
+    const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean);
+    const newTopics: SyllabusTopicEntity[] = lines.map((line, idx) => ({
+      subject_id: activeSubject.id!,
+      title: line.replace(/^[-*•]\s*/, ''),
+      mastery_status: 'no_iniciado',
+      order_index: idx + 1,
+      created_at: new Date().toISOString(),
+    }));
+
+    await pureDB.syllabusTopics.bulkAdd(newTopics);
+    setRawText('');
+    setIsIngestModalOpen(false);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header & Controls */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold font-heading text-slate-50 flex items-center gap-2">
@@ -29,7 +62,7 @@ export const SyllabusDashboard: React.FC = () => {
             Ejes Temáticos & Sinergias (Syllabus Engine)
           </h2>
           <p className="text-xs text-slate-400">
-            Gestiona los temarios de cada carrera y sincroniza automáticamente contenidos duplicados entre ambas ingenierías.
+            Sincronización en tiempo real con IndexedDB. Modifica el dominio de cada tema o ingesta temarios asistidos por IA.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -40,16 +73,16 @@ export const SyllabusDashboard: React.FC = () => {
       </div>
 
       {/* Cross-Degree Synergy Matcher Banner */}
-      <Card glowColor="synergy" className="p-5 border-l-4 border-l-emerald-400 bg-gradient-to-r from-emerald-950/20 via-slate-900/80 to-purple-950/20">
+      <Card className="p-5 bg-gradient-to-r from-emerald-950/20 via-slate-900/80 to-purple-950/20">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <Zap className="w-6 h-6 animate-bounce" />
+              <Zap className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <Badge variant="synergy">92% Similitud Temática Detectada</Badge>
-                <span className="text-xs font-mono text-emerald-400">Ahorro: 1.5 Horas/semana</span>
+                <span className="text-xs font-mono text-emerald-400 font-bold">Ahorro: 1.5 Horas/semana</span>
               </div>
               <h4 className="text-base font-bold text-slate-100 mt-1">
                 Sinergia: <span className="text-sky-300">Resolución de Matrices (Aeroespacial)</span> ↔ <span className="text-purple-300">Algoritmos Numéricos (Software)</span>
@@ -65,113 +98,107 @@ export const SyllabusDashboard: React.FC = () => {
             disabled={synergySynced}
           >
             <CheckCircle2 className="w-4 h-4" />
-            {synergySynced ? 'Dominio Sincronizado en Ambas' : 'Sincronizar Dominio en 1-Clic'}
+            {synergySynced ? 'Dominio Sincronizado' : 'Sincronizar Dominio en 1-Clic'}
           </Button>
         </div>
       </Card>
 
       {/* Subject Filter Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-        <button
-          onClick={() => setSelectedSubject('aero')}
-          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-            selectedSubject === 'aero'
-              ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 glow-aeroespacial'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          🚀 Ing. Aeroespacial: Cálculo & Mecánica
-        </button>
-        <button
-          onClick={() => setSelectedSubject('software')}
-          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-            selectedSubject === 'software'
-              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 glow-software'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-          }`}
-        >
-          💻 Ing. Software: Algoritmos & POO
-        </button>
+        {subjects.map((sub) => (
+          <button
+            key={sub.id}
+            onClick={() => setSelectedSubjectId(sub.id!)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeSubject?.id === sub.id
+                ? sub.modality === 'presencial'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-heading'
+                  : 'bg-purple-500/20 text-purple-300 border border-purple-500/40 font-heading'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+            }`}
+          >
+            {sub.modality === 'presencial' ? '🚀 ' : '💻 '} {sub.name}
+          </button>
+        ))}
       </div>
 
-      {/* Syllabus Interactive Tree View */}
-      <div className="space-y-4">
-        {/* Unit 1 */}
-        <Card className="p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-3">
-              <ChevronDown className="w-5 h-5 text-sky-400" />
-              <div>
-                <h3 className="text-base font-bold text-slate-100 font-heading">
-                  Unidad 1: Álgebra Lineal & Operaciones Matriciales
-                </h3>
-                <p className="text-xs text-slate-400">4 Temas • 100% Dominado</p>
-              </div>
-            </div>
-            <Badge variant="dominado">Dominado</Badge>
+      {/* Syllabus Tree Section */}
+      <Card className="p-5 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-100 font-heading">
+              Syllabus: {activeSubject?.name}
+            </h3>
+            <p className="text-xs text-slate-400">
+              {activeTopics.length} temas registrados • Progreso global: <strong className="text-emerald-400">{overallProgress}%</strong>
+            </p>
           </div>
-
-          {/* Leaf Topics */}
-          <div className="pl-8 space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700">
-              <div className="flex items-center gap-3">
-                <BookOpen className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm text-slate-200">Tema 1.1: Multiplicación de Matrices y Determinantes</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="synergy">Sinergia Activa</Badge>
-                <Badge variant="dominado">Dominado</Badge>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700">
-              <div className="flex items-center gap-3">
-                <BookOpen className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm text-slate-200">Tema 1.2: Inversa de Matrices y Eliminación Gaussiana</span>
-              </div>
-              <Badge variant="dominado">Dominado</Badge>
-            </div>
+          <div className="w-32 bg-slate-800 h-2 rounded-full overflow-hidden">
+            <div className="bg-emerald-400 h-full transition-all duration-500" style={{ width: `${overallProgress}%` }}></div>
           </div>
-        </Card>
+        </div>
 
-        {/* Unit 2 */}
-        <Card className="p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-3">
-              <ChevronRight className="w-5 h-5 text-amber-400" />
-              <div>
-                <h3 className="text-base font-bold text-slate-100 font-heading">
-                  Unidad 2: Ecuaciones Diferenciales Ordinarias (EDO)
-                </h3>
-                <p className="text-xs text-slate-400">3 Temas • 33% En Estudio</p>
-              </div>
+        <div className="space-y-2">
+          {activeTopics.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-xs font-mono">
+              No hay ejes temáticos registrados para esta asignatura. Ingesta el temario con IA usando el botón superior.
             </div>
-            <Badge variant="en_estudio">En Estudio</Badge>
-          </div>
-        </Card>
-      </div>
+          ) : (
+            activeTopics.map((topic) => (
+              <div
+                key={topic.id}
+                className="flex items-center justify-between p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <BookOpen className="w-4 h-4 text-sky-400 shrink-0" />
+                  <span className="text-sm font-medium text-slate-200">{topic.title}</span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Badge variant={topic.mastery_status}>{topic.mastery_status}</Badge>
+
+                  <select
+                    value={topic.mastery_status}
+                    onChange={(e) =>
+                      handleUpdateMastery(topic.id!, e.target.value as SyllabusTopicEntity['mastery_status'])
+                    }
+                    className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs font-mono focus:outline-none focus:border-sky-500"
+                  >
+                    <option value="no_iniciado">No Iniciado</option>
+                    <option value="en_estudio">En Estudio</option>
+                    <option value="repasado">Repasado</option>
+                    <option value="dominado">Dominado ✅</option>
+                  </select>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
 
       {/* AI Syllabus Ingestion Modal */}
       <Modal
         isOpen={isIngestModalOpen}
         onClose={() => setIsIngestModalOpen(false)}
-        title="Ingestar Plan de Estudios con IA (MCP Agent)"
+        title={`Ingestar Syllabus para ${activeSubject?.name}`}
       >
         <div className="space-y-4">
-          <p className="text-xs text-slate-300">
-            Pega aquí el plan de estudios o PDF en texto plano de la materia. El servidor MCP lo convertirá automáticamente en el árbol de ejes temáticos.
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Pega aquí el plan de estudios o PDF en texto plano de la materia. La app creará los temas en IndexedDB en tiempo real.
           </p>
           <textarea
             rows={6}
+            value={rawText}
+            onChange={(e) => setRawText(e.target.value)}
             className="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono focus:outline-none focus:border-sky-500"
-            placeholder="Ejemplo: Unidad 1: Métodos de Integración. Tema 1.1: Integración por Partes. Tema 1.2: Sustitución Trigonométrica..."
+            placeholder="Unidad 1: Integración Vectorial&#10;- Tema 1.1: Campos Escalares&#10;- Tema 1.2: Teorema de Gauss"
           ></textarea>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="ghost" onClick={() => setIsIngestModalOpen(false)}>
               Cancelar
             </Button>
-            <Button variant="aeroespacial" onClick={() => setIsIngestModalOpen(false)}>
-              <Sparkles className="w-4 h-4" /> Parsear e Ingestar
+            <Button variant="aeroespacial" onClick={handleIngestSyllabus}>
+              <Sparkles className="w-4 h-4" /> Ingestar Temario
             </Button>
           </div>
         </div>
