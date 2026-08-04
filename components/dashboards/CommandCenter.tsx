@@ -73,7 +73,7 @@ export const CommandCenter: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Overview Header Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm text-slate-100">
+      <div className="bg-[#090d18] border border-cyan-500/30 rounded-xl p-5 shadow-sm text-slate-100 glow-aeroespacial">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-slate-100 tracking-tight font-heading">

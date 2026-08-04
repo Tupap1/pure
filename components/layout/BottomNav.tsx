@@ -23,7 +23,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) 
   ];
 
   return (
-    <nav aria-label="Navegación Móvil Inferior" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-2xl">
+    <nav aria-label="Navegación Móvil Inferior" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#090d18]/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800/80 px-2 py-1.5 flex items-center justify-around shadow-2xl">
       {menuItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
@@ -33,12 +33,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) 
             onClick={() => onSelectTab(item.id)}
             className={`min-h-[44px] min-w-[44px] flex flex-col items-center justify-center flex-1 px-1 py-1 rounded-xl transition-all duration-200 ${
               isActive
-                ? 'text-sky-400 bg-sky-500/10 font-medium scale-105'
-                : 'text-slate-400 hover:text-slate-200 active:scale-95'
+                ? 'text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 font-heading font-bold scale-105 glow-aeroespacial'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 active:scale-95'
             }`}
           >
-            <Icon className={`w-5 h-5 ${isActive ? 'text-sky-400' : 'text-slate-400'}`} />
-            <span className="text-[10px] mt-0.5 tracking-tight leading-tight">{item.label}</span>
+            <Icon className={`w-5 h-5 ${isActive ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-400'}`} />
+            <span className="text-[10px] mt-0.5 tracking-tight leading-tight font-heading font-bold">{item.label}</span>
           </button>
         );
       })}
