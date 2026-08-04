@@ -1,7 +1,11 @@
 # dependencies
 /node_modules
-/.pnpm
-/.yarn
+/.pnp
+.pnp.js
+
+# testing
+/.vitest
+/coverage
 
 # next.js
 /.next/
@@ -9,7 +13,10 @@
 
 # production
 /build
-/dist
+
+# misc
+.DS_Store
+*.pem
 
 # debug
 npm-debug.log*
@@ -17,12 +24,18 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
-.env*.local
-.env
+.env.local
+.env.*.local
 
-# typescript
-*.tsbuildinfo
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Docker
+.docker/
