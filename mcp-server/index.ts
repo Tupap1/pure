@@ -146,17 +146,23 @@ async function main() {
     const sseTransportsMap = new Map<string, SSEServerTransport>();
 
     app.get('/sse', async (req, res) => {
-      console.log('Conexión MCP SSE recibida desde agente externo');
+      try {
+        console.log('Conexión MCP SSE recibida desde agente externo:', req.ip);
+        const transport = new SSEServerTransport('/message', res);
+        sseTransportsMap.set(transport.sessionId, transport);
 
-      const transport = new SSEServerTransport('/message', res);
-      sseTransportsMap.set(transport.sessionId, transport);
+        req.on('close', () => {
+          console.log(`Sesión MCP SSE cerrada: ${transport.sessionId}`);
+          sseTransportsMap.delete(transport.sessionId);
+        });
 
-      req.on('close', () => {
-        console.log(`Sesión MCP SSE cerrada: ${transport.sessionId}`);
-        sseTransportsMap.delete(transport.sessionId);
-      });
-
-      await server.connect(transport);
+        await server.connect(transport);
+      } catch (err) {
+        console.error('Error fatal al iniciar conexion SSE:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Error al iniciar SSE' });
+        }
+      }
     });
 
     app.post('/message', async (req, res) => {
