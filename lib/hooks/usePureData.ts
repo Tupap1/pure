@@ -1,14 +1,19 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { pureDB } from '../db/dexie-schema';
-import { clearAllData } from '../db/seed';
+import { seedRealSemesterData, clearAllData } from '../db/seed';
 import { useEffect } from 'react';
 
 export function usePureData() {
   useEffect(() => {
-    // Purge legacy mock data if user previously ran mock seed
     pureDB.universities.get('uni-aeroespacial').then((legacyUni) => {
       if (legacyUni) {
-        clearAllData();
+        clearAllData().then(() => seedRealSemesterData());
+      } else {
+        pureDB.universities.count().then((count) => {
+          if (count === 0) {
+            seedRealSemesterData();
+          }
+        });
       }
     });
   }, []);
