@@ -5,37 +5,43 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: 'Inter', sans-serif;
-  --font-heading: 'Outfit', sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Outfit', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
-/* Light Theme Variables */
+/* Light Theme Variables — Calibrated high-contrast academic palette */
 html.light {
-  --bg-main: #f8fafc;
+  --bg-main: #f4f6f9;
   --bg-sidebar: #ffffff;
   --bg-header: #ffffff;
   --bg-card: #ffffff;
+  --bg-surface-subtle: #f8fafc;
   --border-color: #e2e8f0;
   --border-hover: #cbd5e1;
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-muted: #64748b;
-  --accent-color: #0284c7;
+  --accent-aero: #0284c7;
+  --accent-software: #9333ea;
+  --accent-synergy: #059669;
 }
 
-/* Dark Theme Variables (Slate 900/950, not pitch black) */
+/* Dark Theme Variables — Calibrated Deep Obsidian (Not raw slate) */
 html.dark, :root {
-  --bg-main: #0f172a;
-  --bg-sidebar: #1e293b;
-  --bg-header: #1e293b;
-  --bg-card: #1e293b;
-  --border-color: #334155;
-  --border-hover: #475569;
+  --bg-main: #07090e;
+  --bg-sidebar: #0d121d;
+  --bg-header: #0d121d;
+  --bg-card: #111726;
+  --bg-surface-subtle: #172033;
+  --border-color: #1e293d;
+  --border-hover: #33415e;
   --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --accent-color: #38bdf8;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-aero: #38bdf8;
+  --accent-software: #c084fc;
+  --accent-synergy: #34d399;
 }
 
 body {
@@ -45,14 +51,17 @@ body {
   overflow-x: hidden;
   min-height: 100vh;
   transition: background-color 0.2s ease, color 0.2s ease;
+  line-height: 1.5;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
+  letter-spacing: -0.02em;
 }
 
-code, pre {
+code, pre, .font-mono {
   font-family: var(--font-mono);
+  letter-spacing: -0.01em;
 }
 
 /* Custom Scrollbars */
@@ -64,25 +73,35 @@ code, pre {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
+  background: rgba(148, 163, 184, 0.25);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.7);
+  background: rgba(148, 163, 184, 0.5);
 }
 
 /* Card & Surface Utilities */
 .app-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 0.75rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 0.75rem; /* 12px for cards */
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 
-html.light .app-card {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+.app-card:hover {
+  border-color: var(--border-hover);
 }
 
-html.dark .app-card {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+/* Domain Specific Glow Effects */
+.glow-aeroespacial {
+  box-shadow: 0 0 20px -5px rgba(56, 189, 248, 0.15);
 }
+
+.glow-software {
+  box-shadow: 0 0 20px -5px rgba(192, 132, 252, 0.15);
+}
+
+.glow-synergy {
+  box-shadow: 0 0 20px -5px rgba(52, 211, 153, 0.15);
+}
+

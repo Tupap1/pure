@@ -9,41 +9,54 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        background: '#070a12',
+        background: 'var(--bg-main)',
         surface: {
-          DEFAULT: 'rgba(15, 23, 42, 0.75)',
-          hover: 'rgba(30, 41, 59, 0.85)',
-          border: 'rgba(255, 255, 255, 0.08)',
+          DEFAULT: 'var(--bg-card)',
+          subtle: 'var(--bg-surface-subtle)',
+          hover: 'var(--border-hover)',
+          border: 'var(--border-color)',
         },
         aeroespacial: {
-          DEFAULT: '#38bdf8',
-          glow: 'rgba(56, 189, 248, 0.3)',
+          DEFAULT: 'var(--accent-aero)',
+          glow: 'rgba(56, 189, 248, 0.25)',
         },
         software: {
-          DEFAULT: '#a855f7',
-          glow: 'rgba(168, 85, 247, 0.3)',
+          DEFAULT: 'var(--accent-software)',
+          glow: 'rgba(192, 132, 252, 0.25)',
         },
         synergy: {
-          DEFAULT: '#10b981',
-          glow: 'rgba(16, 185, 129, 0.3)',
+          DEFAULT: 'var(--accent-synergy)',
+          glow: 'rgba(52, 211, 153, 0.25)',
         },
-        warning: '#f59e0b',
-        danger: '#ef4444',
+        obsidian: {
+          950: '#07090e',
+          900: '#0d121d',
+          850: '#111726',
+          800: '#172033',
+          700: '#1e293d',
+          600: '#33415e',
+        },
+      },
+      borderRadius: {
+        '2xl': '1rem',      /* 16px - Hero/modals */
+        'xl': '0.75rem',    /* 12px - Cards/containers */
+        'lg': '0.5rem',     /* 8px - Buttons/inputs */
+        'md': '0.25rem',    /* 4px - Badges/micro elements */
       },
       backdropBlur: {
         xs: '2px',
       },
       animation: {
         'pulse-glow': 'pulseGlow 2s infinite ease-in-out',
-        'fade-in': 'fadeIn 0.3s ease-out forwards',
+        'fade-in': 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
       },
       keyframes: {
         pulseGlow: {
-          '0%, 100%': { boxShadow: '0 0 15px rgba(16, 185, 129, 0.2)' },
-          '50%': { boxShadow: '0 0 30px rgba(16, 185, 129, 0.6)' },
+          '0%, 100%': { boxShadow: '0 0 15px rgba(52, 211, 153, 0.2)' },
+          '50%': { boxShadow: '0 0 30px rgba(52, 211, 153, 0.5)' },
         },
         fadeIn: {
-          from: { opacity: '0', transform: 'translateY(8px)' },
+          from: { opacity: '0', transform: 'translateY(6px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
       },
@@ -51,3 +64,4 @@ module.exports = {
   },
   plugins: [],
 };
+
