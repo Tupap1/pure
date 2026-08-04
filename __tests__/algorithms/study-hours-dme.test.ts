@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { calculateDME, calculateNetFreeTime } from '@/lib/algorithms/study-hours-dme';
 
 describe('REQ-06: Algoritmo de Dosis Mínima Eficaz (DME) y Tiempo Libre', () => {
-  it('debe calcular las horas semanales DME para una materia basada en créditos, dificultad y brecha de nota', () => {
+  it('debe calcular las horas semanales DME basadas en el estándar de Educación Superior (2h estudio independiente / crédito)', () => {
     const subject = {
       credits: 3,
       difficulty: 4, // Multiplicador: 0.8 + 4*0.1 = 1.2
@@ -10,12 +10,12 @@ describe('REQ-06: Algoritmo de Dosis Mínima Eficaz (DME) y Tiempo Libre', () =>
       current_grade: 3.5, // Brecha: 4.5 - 3.5 = 1.0 -> Factor margen = 1.0 + 1.0 = 2.0
     };
 
-    // Base: 3 créditos * 1.2 = 3.6 horas
-    // DME Base = 3.6 * 1.2 (dificultad) * 2.0 (margen) * 1.0 (sinergia) = 8.64 horas
+    // Base Estándar Académico = 3 créditos * 2.0h = 6.0 horas estudio independiente
+    // DME Base = 6.0 * 1.2 (dificultad) * 2.0 (margen) * 1.0 (sinergia) = 14.4 horas
     const result = calculateDME(subject, { percentageSharedTopics: 0, upcomingDeliverablesWeight7Days: 0 });
     
-    expect(result.recommendedWeeklyHours).toBeGreaterThan(8.5);
-    expect(result.recommendedWeeklyHours).toBeLessThan(9.0);
+    expect(result.recommendedWeeklyHours).toBeGreaterThan(14.0);
+    expect(result.recommendedWeeklyHours).toBeLessThan(15.0);
   });
 
   it('debe reducir las horas DME cuando la materia tiene alta sinergia temática compartida', () => {
@@ -29,7 +29,6 @@ describe('REQ-06: Algoritmo de Dosis Mínima Eficaz (DME) y Tiempo Libre', () =>
     const withoutSynergy = calculateDME(subject, { percentageSharedTopics: 0, upcomingDeliverablesWeight7Days: 0 });
     const with50PercentSynergy = calculateDME(subject, { percentageSharedTopics: 0.5, upcomingDeliverablesWeight7Days: 0 });
 
-    // La sinergia debe reducir las horas requeridas
     expect(with50PercentSynergy.recommendedWeeklyHours).toBeLessThan(withoutSynergy.recommendedWeeklyHours);
   });
 

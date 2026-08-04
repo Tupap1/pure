@@ -32,8 +32,8 @@ export function calculateDME(
   const percentageSharedTopics = options.percentageSharedTopics || 0;
   const upcomingDeliverablesWeight7Days = options.upcomingDeliverablesWeight7Days || 0;
 
-  // 1. Horas base por crédito
-  const baseHours = subject.credits * 1.2;
+  // 1. Horas base por crédito (Norma Educación Superior: 48h/semestre en 16 semanas = 3h/sem por crédito -> 1h clase + 2h estudio independiente)
+  const baseHours = subject.credits * 2.0;
 
   // 2. Multiplicador por dificultad (1 a 5 -> 0.9 a 1.3)
   const difficultyMultiplier = 0.8 + (subject.difficulty * 0.1);
