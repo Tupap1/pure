@@ -11,7 +11,7 @@ interface HeaderProps {
 }
 
 const TAB_TITLES: Record<DashboardTab, string> = {
-  command: 'Command Center',
+  command: 'Dashboard',
   syllabus: 'Sinergias & Syllabus',
   schedule: 'Master Schedule',
   deliverables: 'Entregables & Evaluaciones',

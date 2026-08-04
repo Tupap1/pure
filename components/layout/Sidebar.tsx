@@ -22,7 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
   const menuItems = [
     {
       id: 'command' as DashboardTab,
-      label: 'Command Center',
+      label: 'Dashboard',
       icon: LayoutDashboard,
     },
     {

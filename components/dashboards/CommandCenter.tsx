@@ -3,8 +3,10 @@ import { usePureData } from '@/lib/hooks/usePureData';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { ProgressRing } from '@/components/ui/ProgressRing';
+import { ProgressRing, MultiProgressRing } from '@/components/ui/ProgressRing';
 import { SemesterProgressChart } from '@/components/ui/SemesterProgressChart';
+import { StudyHeatmap } from '@/components/ui/StudyHeatmap';
+import { DailyLoadStackedBar } from '@/components/ui/DailyLoadStackedBar';
 import {
   Clock,
   BookOpen,
@@ -15,7 +17,9 @@ import {
   Zap,
   TrendingUp,
   ArrowRight,
-  BarChart3
+  BarChart3,
+  Activity,
+  Layers
 } from 'lucide-react';
 import { calculateDME, calculateNetFreeTime } from '@/lib/algorithms/study-hours-dme';
 import { pureDB } from '@/lib/db/dexie-schema';
@@ -59,6 +63,13 @@ export const CommandCenter: React.FC = () => {
     await pureDB.deliverables.update(id, { status: 'entregado' });
   };
 
+  // Concentric multi-rings definition for dashboard
+  const multiRings = [
+    { label: 'Tiempo Libre', progress: Math.min(100, Math.round((Math.max(0, netFreeTime) / 168) * 100)), color: '#10b981' },
+    { label: 'Carga DME', progress: Math.min(100, Math.round((totalDMEHours / 168) * 100)), color: '#a855f7' },
+    { label: 'Horario Clases', progress: Math.min(100, Math.round((classHours / 168) * 100)), color: '#38bdf8' },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Overview Header Banner */}
@@ -66,7 +77,7 @@ export const CommandCenter: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-slate-100 tracking-tight font-heading">
-              Centro de Mando
+              Dashboard Académico
             </h2>
             <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
               {subjects.length > 0
@@ -151,23 +162,23 @@ export const CommandCenter: React.FC = () => {
                 )}
               </Card>
 
-              {/* Asignaturas & Metas */}
+              {/* Asignaturas & Metas de Nota (Radial Target Rings) */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
                     <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    Estado de Asignaturas & Metas de Nota
+                    Estado de Asignaturas & Target Grades
                   </h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {subjects.map((sub) => {
                     const dme = calculateDME(sub as any);
-                    const gradeProgress = ((sub.current_grade || 0) / 5.0) * 100;
+                    const gradePct = Math.round(((sub.current_grade || 0) / (sub.target_grade || 5.0)) * 100);
                     const isAboveTarget = (sub.current_grade || 0) >= sub.target_grade;
 
                     return (
-                      <Card key={sub.id} className="p-4 space-y-3">
+                      <Card key={sub.id} className="p-4 space-y-3 flex flex-col justify-between">
                         <div className="flex items-center justify-between gap-2 text-xs">
                           <div className="min-w-0 flex-1">
                             <h4 className="font-bold text-slate-900 dark:text-slate-100 truncate text-xs" title={sub.name}>
@@ -184,29 +195,27 @@ export const CommandCenter: React.FC = () => {
                           </Badge>
                         </div>
 
-                        <div>
-                          <div className="flex items-baseline justify-between">
-                            <span className="text-xl font-mono font-bold text-slate-900 dark:text-slate-100">
+                        <div className="flex items-center justify-between gap-4 pt-1">
+                          <div className="space-y-1">
+                            <div className="text-2xl font-mono font-bold text-slate-900 dark:text-slate-100">
                               {sub.current_grade ? sub.current_grade.toFixed(2) : '0.00'}
-                            </span>
-                            <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                              Meta: {sub.target_grade.toFixed(2)}
-                            </span>
+                            </div>
+                            <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                              Meta: <span className="font-bold text-slate-800 dark:text-slate-200">{sub.target_grade.toFixed(2)}</span>
+                            </div>
                           </div>
-
-                          <div className="w-full bg-slate-200 dark:bg-slate-800/80 h-1.5 rounded-full overflow-hidden mt-1.5">
-                            <div
-                              className={`h-full transition-all duration-300 ${
-                                isAboveTarget ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-amber-500 dark:bg-amber-400'
-                              }`}
-                              style={{ width: `${Math.min(100, Math.max(5, gradeProgress))}%` }}
-                            ></div>
-                          </div>
+                          <ProgressRing
+                            progress={Math.min(100, gradePct)}
+                            size={56}
+                            strokeWidth={6}
+                            color={isAboveTarget ? '#10b981' : '#f59e0b'}
+                            label={`${gradePct}%`}
+                          />
                         </div>
 
-                        <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800/60">
-                          <span>DME Recomendado:</span>
-                          <span className="text-sky-600 dark:text-sky-400 font-semibold">{dme.recommendedWeeklyHours.toFixed(1)}h / sem</span>
+                        <div className="pt-2 flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800/60">
+                          <span>Estudio DME:</span>
+                          <span className="text-purple-600 dark:text-purple-400 font-semibold">{dme.recommendedWeeklyHours.toFixed(1)}h / sem</span>
                         </div>
                       </Card>
                     );
@@ -215,7 +224,7 @@ export const CommandCenter: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Secondary Column (5/12): Balance de Tiempo */}
+            {/* Right Secondary Column (5/12): Multi-Ring Donut Gauge & Balance */}
             <div className="lg:col-span-5 space-y-6">
               <Card className="p-5 space-y-5">
                 <div className="flex items-center justify-between">
@@ -226,9 +235,9 @@ export const CommandCenter: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {/* Metric Display */}
+                  {/* Concentric Multi-Ring Display */}
                   <div className="p-4 rounded-lg bg-slate-50 dark:bg-[#07090e] border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
-                    <div className="space-y-1">
+                    <div className="space-y-1 min-w-0">
                       <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">
                         Tiempo Libre Neto
                       </div>
@@ -236,88 +245,69 @@ export const CommandCenter: React.FC = () => {
                         {netFreeTime}h
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                        Disponible tras cubrir clases y estudio.
+                        Disponibilidad semanal real.
                       </p>
                     </div>
                     <div className="shrink-0">
-                      <ProgressRing
-                        progress={Math.min(100, Math.round((Math.max(0, netFreeTime) / 168) * 100))}
-                        size={84}
-                        strokeWidth={8}
-                        color="#10b981"
-                        label={`${Math.round((Math.max(0, netFreeTime) / 168) * 100)}%`}
-                        sublabel="Libre"
+                      <MultiProgressRing
+                        rings={multiRings}
+                        size={120}
+                        strokeWidth={7}
+                        centerTitle={`${netFreeTime}h`}
+                        centerSubtitle="Libre"
                       />
-                    </div>
-                  </div>
-
-                  {/* Visual Stacked Progress Bar */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                      <span>Distribución de Carga</span>
-                      <span>168h Totales</span>
-                    </div>
-                    <div className="h-3 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden flex">
-                      <div
-                        className="bg-sky-500 h-full"
-                        style={{ width: `${(classHours / 168) * 100}%` }}
-                        title={`Clases: ${classHours}h`}
-                      ></div>
-                      <div
-                        className="bg-purple-500 h-full"
-                        style={{ width: `${(totalDMEHours / 168) * 100}%` }}
-                        title={`Estudio DME: ${totalDMEHours.toFixed(1)}h`}
-                      ></div>
-                      <div
-                        className="bg-slate-400 dark:bg-slate-700 h-full"
-                        style={{ width: `${(sleepHoursTotal / 168) * 100}%` }}
-                        title={`Sueño: ${sleepHoursTotal}h`}
-                      ></div>
-                      <div
-                        className="bg-emerald-500 h-full"
-                        style={{ width: `${(Math.max(0, netFreeTime) / 168) * 100}%` }}
-                        title={`Tiempo Libre: ${netFreeTime}h`}
-                      ></div>
                     </div>
                   </div>
 
                   {/* Legend Breakdown */}
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800/80 text-xs font-mono">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-sky-500"></span>
+                      <span className="w-2.5 h-2.5 rounded-sm bg-sky-500" />
                       <span className="text-slate-700 dark:text-slate-300">Clases: {classHours}h</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-purple-500"></span>
+                      <span className="w-2.5 h-2.5 rounded-sm bg-purple-500" />
                       <span className="text-slate-700 dark:text-slate-300">DME: {totalDMEHours.toFixed(1)}h</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-slate-400 dark:bg-slate-700"></span>
+                      <span className="w-2.5 h-2.5 rounded-sm bg-slate-400 dark:bg-slate-700" />
                       <span className="text-slate-700 dark:text-slate-300">Sueño: {sleepHoursTotal}h</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>
+                      <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
                       <span className="text-slate-700 dark:text-slate-300 font-bold text-emerald-600 dark:text-emerald-400">Libre: {netFreeTime}h</span>
                     </div>
                   </div>
                 </div>
               </Card>
+
+              {/* Day-by-Day Stacked Load Distribution Bar */}
+              <Card className="p-5">
+                <DailyLoadStackedBar />
+              </Card>
             </div>
           </div>
 
-          {/* Historical GPA & Semester Progress Chart */}
-          <Card className="p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
-                <BarChart3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                Evolución de Promedio Académico
-              </h3>
-            </div>
-            <SemesterProgressChart targetGPA={4.5} />
-          </Card>
+          {/* Heatmap & Historical GPA Analytics Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="p-5 space-y-4">
+              <StudyHeatmap />
+            </Card>
+
+            <Card className="p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
+                  <BarChart3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  Evolución de Promedio Académico
+                </h3>
+              </div>
+              <SemesterProgressChart targetGPA={4.5} />
+            </Card>
+          </div>
         </>
       )}
     </div>
   );
 };
+
 

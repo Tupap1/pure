@@ -29,6 +29,8 @@ import {
 
 export const ConfigDashboard: React.FC = () => {
   const { isLoaded, universities, professors, subjects, schedules } = usePureData();
+  const [activeConfigTab, setActiveConfigTab] = useState<'universities' | 'subjects' | 'professors' | 'maintenance'>('universities');
+
   const [isAddUniOpen, setIsAddUniOpen] = useState(false);
   const [isAddProfOpen, setIsAddProfOpen] = useState(false);
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
@@ -297,17 +299,62 @@ export const ConfigDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Segmented Sub-Tab Navigation (SaaS Settings Benchmark) */}
+      <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-x-auto scrollbar-none">
+        <button
+          onClick={() => setActiveConfigTab('universities')}
+          className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shrink-0 ${
+            activeConfigTab === 'universities'
+              ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4" /> Instituciones ({universities.length})
+        </button>
+        <button
+          onClick={() => setActiveConfigTab('subjects')}
+          className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shrink-0 ${
+            activeConfigTab === 'subjects'
+              ? 'bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 shadow-sm'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" /> Asignaturas ({subjects.length})
+        </button>
+        <button
+          onClick={() => setActiveConfigTab('professors')}
+          className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shrink-0 ${
+            activeConfigTab === 'professors'
+              ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
+          }`}
+        >
+          <UserCheck className="w-4 h-4" /> Docentes ({professors.length})
+        </button>
+        <button
+          onClick={() => setActiveConfigTab('maintenance')}
+          className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shrink-0 ${
+            activeConfigTab === 'maintenance'
+              ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
+          }`}
+        >
+          <RotateCcw className="w-4 h-4" /> Mantenimiento
+        </button>
+      </div>
+
       {/* 1. Universidades Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <GraduationCap className="w-5 h-5 text-sky-600 dark:text-sky-400" />
-            Universidades ({universities.length})
-          </h3>
-          <Button variant="aeroespacial" size="sm" onClick={() => setIsAddUniOpen(true)}>
-            <Plus className="w-3.5 h-3.5" /> Agregar Universidad
-          </Button>
-        </div>
+      {activeConfigTab === 'universities' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <GraduationCap className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+              Instituciones Universitarias ({universities.length})
+            </h3>
+            <Button variant="aeroespacial" size="sm" onClick={() => setIsAddUniOpen(true)}>
+              <Plus className="w-3.5 h-3.5" /> Agregar Universidad
+            </Button>
+          </div>
 
         {universities.length === 0 ? (
           <Card className="p-8 text-center border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
@@ -376,16 +423,18 @@ export const ConfigDashboard: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* 2. Profesores Directory Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-            Directorio de Profesores ({professors.length})
-          </h3>
+      {activeConfigTab === 'professors' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              Directorio de Docentes ({professors.length})
+            </h3>
           <Button
-            variant="primary"
+            variant="software"
             size="sm"
             onClick={() => {
               setEditingProfId(null);
@@ -451,10 +500,13 @@ export const ConfigDashboard: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
-      {/* 3. Materias / Asignaturas Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
+      {/* 3. Asignaturas & Horarios Section */}
+      {activeConfigTab === 'subjects' && (
+        <>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             Asignaturas / Materias ({subjects.length})
@@ -557,7 +609,7 @@ export const ConfigDashboard: React.FC = () => {
             Horarios Semanales Registrados ({schedules.length})
           </h3>
           <Button
-            variant="primary"
+            variant="software"
             size="sm"
             onClick={() => {
               setEditingSchedId(null);
@@ -614,6 +666,43 @@ export const ConfigDashboard: React.FC = () => {
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {/* 4. Mantenimiento & Sistema Section */}
+      {activeConfigTab === 'maintenance' && (
+        <div className="space-y-4">
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <RotateCcw className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            Mantenimiento & Acciones de Base de Datos
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="p-5 space-y-3 border border-amber-200 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/20">
+              <div className="flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-300">
+                <Sparkles className="w-4 h-4 text-amber-500" /> Cargar Matrícula Demo (UdeA + UdeC)
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                Puebla automáticamente la base de datos IndexedDB local con instituciones, asignaturas de doble ingeniería, docentes y horarios de prueba.
+              </p>
+              <Button variant="software" size="sm" onClick={() => seedDemoData()}>
+                Cargar Datos Demo
+              </Button>
+            </Card>
+
+            <Card className="p-5 space-y-3 border border-rose-200 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20">
+              <div className="flex items-center gap-2 text-sm font-bold text-rose-800 dark:text-rose-300">
+                <Trash2 className="w-4 h-4 text-rose-500" /> Resetear Base de Datos Local
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                Elimina permanentemente todos los registros locales guardados (universidades, asignaturas, entregables y horarios).
+              </p>
+              <Button variant="danger" size="sm" onClick={() => clearAllData()}>
+                Vaciar Base de Datos
+              </Button>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* Modal Add / Edit University */}
       <Modal
