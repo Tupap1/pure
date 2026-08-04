@@ -202,7 +202,7 @@ export const CommandCenter: React.FC = () => {
                   </h3>
                 </div>
 
-                <SubjectTelemetryTable subjects={subjects} professors={professors} />
+                <SubjectTelemetryTable subjects={subjects} professors={professors} universities={universities} />
               </div>
             </div>
 
