@@ -7,6 +7,7 @@ import { ProgressRing, MultiProgressRing } from '@/components/ui/ProgressRing';
 import { SemesterProgressChart } from '@/components/ui/SemesterProgressChart';
 import { StudyHeatmap } from '@/components/ui/StudyHeatmap';
 import { DailyLoadStackedBar } from '@/components/ui/DailyLoadStackedBar';
+import { SubjectTelemetryTable } from '@/components/ui/SubjectTelemetryTable';
 import {
   Clock,
   BookOpen,
@@ -25,7 +26,7 @@ import { calculateDME, calculateNetFreeTime } from '@/lib/algorithms/study-hours
 import { pureDB } from '@/lib/db/dexie-schema';
 
 export const CommandCenter: React.FC = () => {
-  const { isLoaded, universities, subjects, deliverables, schedules } = usePureData();
+  const { isLoaded, universities, subjects, deliverables, schedules, professors } = usePureData();
 
   if (!isLoaded) {
     return (
@@ -192,66 +193,16 @@ export const CommandCenter: React.FC = () => {
                 )}
               </Card>
 
-              {/* Asignaturas & Metas de Nota (Radial Target Rings) */}
+              {/* Asignaturas & Metas de Nota (Matriz Telemétrica) */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight font-heading">
                     <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    Estado de Asignaturas & Target Grades
+                    Telemetría Académica & Estado de Asignaturas
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2.5">
-                  {subjects.map((sub) => {
-                    const dme = calculateDME(sub as any);
-                    const gradePct = Math.round(((sub.current_grade || 0) / (sub.target_grade || 5.0)) * 100);
-                    const isAboveTarget = (sub.current_grade || 0) >= sub.target_grade;
-
-                    return (
-                      <Card key={sub.id} className="p-3 hover:border-cyan-500/40 transition-all flex items-center justify-between gap-3">
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs font-heading truncate" title={sub.name}>
-                              {sub.name}
-                            </h4>
-                            {sub.code && (
-                              <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 shrink-0">
-                                [{sub.code}]
-                              </span>
-                            )}
-                            <Badge variant={sub.modality === 'presencial' ? 'aeroespacial' : 'software'}>
-                              {sub.modality}
-                            </Badge>
-                          </div>
-
-                          <div className="flex items-center gap-3 text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                            <span>Créditos: <strong className="text-slate-700 dark:text-slate-300">{sub.credits}</strong></span>
-                            <span>•</span>
-                            <span>Estudio DME: <strong className="text-purple-600 dark:text-purple-400">{dme.recommendedWeeklyHours.toFixed(1)}h/sem</strong></span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4 shrink-0 font-mono text-right">
-                          <div>
-                            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                              {sub.current_grade ? sub.current_grade.toFixed(2) : '0.00'}
-                            </div>
-                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                              Meta: {sub.target_grade.toFixed(2)}
-                            </div>
-                          </div>
-                          <ProgressRing
-                            progress={Math.min(100, gradePct)}
-                            size={42}
-                            strokeWidth={5}
-                            color={isAboveTarget ? '#10b981' : sub.current_grade ? '#38bdf8' : '#64748b'}
-                            label={`${gradePct}%`}
-                          />
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
+                <SubjectTelemetryTable subjects={subjects} professors={professors} />
               </div>
             </div>
 
