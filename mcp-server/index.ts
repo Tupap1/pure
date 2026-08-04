@@ -117,8 +117,9 @@ async function main() {
     const app = express();
     app.use(cors({ origin: '*' }));
     app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
 
-    // OAuth discovery metadata for Claude / Custom Connectors requiring OAuth probing
+    // Status endpoint
     app.get('/', (req, res) => {
       res.json({
         status: 'active',
@@ -131,20 +132,63 @@ async function main() {
       });
     });
 
+    // Zero-Auth Auto-Approval OAuth endpoints for Claude.ai Custom Connectors
+    const getBaseUrl = (req: express.Request) => {
+      const host = req.get('host') || 'mcp.btw-one.com';
+      const protocol = req.get('x-forwarded-proto') || 'https';
+      return `${protocol}://${host}`;
+    };
+
     app.get(['/.well-known/oauth-authorization-server', '/.well-known/openid-configuration'], (req, res) => {
-      const hostUrl = `${req.protocol}://${req.get('host')}`;
+      const baseUrl = getBaseUrl(req);
       res.json({
-        issuer: hostUrl,
-        service_documentation: hostUrl,
-        token_endpoint_auth_methods_supported: ['none'],
-        response_types_supported: [],
-        grant_types_supported: [],
-        code_challenge_methods_supported: [],
-        auth_required: false,
+        issuer: baseUrl,
+        authorization_endpoint: `${baseUrl}/authorize`,
+        token_endpoint: `${baseUrl}/token`,
+        registration_endpoint: `${baseUrl}/register`,
+        response_types_supported: ['code'],
+        grant_types_supported: ['authorization_code'],
+        code_challenge_methods_supported: ['S256', "plain"],
+        token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
       });
     });
 
-    // 1. Streamable HTTP Transport (Modern Claude.ai Remote Connector Standard - JSON-RPC 2.0)
+    // Dynamic Client Registration (RFC 7591)
+    app.post('/register', (req, res) => {
+      res.status(201).json({
+        client_id: 'pure-auto-client-id',
+        client_secret: 'pure-auto-client-secret',
+        client_id_issued_at: Math.floor(Date.now() / 1000),
+        client_name: 'Claude.ai Pure Connector',
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        redirect_uris: req.body?.redirect_uris || [],
+      });
+    });
+
+    // Auto-Approve Authorize Route (No login form needed)
+    app.get('/authorize', (req, res) => {
+      const redirectUri = req.query.redirect_uri as string;
+      const state = req.query.state as string;
+      if (redirectUri) {
+        const separator = redirectUri.includes('?') ? '&' : '?';
+        const targetUrl = `${redirectUri}${separator}code=pure_auto_approved_code&state=${encodeURIComponent(state || '')}`;
+        return res.redirect(302, targetUrl);
+      }
+      return res.send('OAuth Auto-Approved');
+    });
+
+    // Auto-Approve Token Route
+    app.post('/token', (req, res) => {
+      res.json({
+        access_token: 'pure_access_token_granted',
+        token_type: 'Bearer',
+        expires_in: 31536000,
+        scope: 'mcp:full_access',
+      });
+    });
+
+    // 1. Streamable HTTP Transport (JSON-RPC 2.0)
     app.post(['/', '/mcp'], async (req, res) => {
       const { jsonrpc, id, method, params } = req.body || {};
 
