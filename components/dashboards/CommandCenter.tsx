@@ -3,6 +3,8 @@ import { usePureData } from '@/lib/hooks/usePureData';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { ProgressRing } from '@/components/ui/ProgressRing';
+import { SemesterProgressChart } from '@/components/ui/SemesterProgressChart';
 import {
   Clock,
   BookOpen,
@@ -12,7 +14,8 @@ import {
   Sparkles,
   Zap,
   TrendingUp,
-  ArrowRight
+  ArrowRight,
+  BarChart3
 } from 'lucide-react';
 import { calculateDME, calculateNetFreeTime } from '@/lib/algorithms/study-hours-dme';
 import { pureDB } from '@/lib/db/dexie-schema';
@@ -276,17 +279,29 @@ export const CommandCenter: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {/* Big Metric Display */}
-                  <div className="p-4 rounded-lg bg-slate-50 dark:bg-[#07090e] border border-slate-200 dark:border-slate-800 space-y-1">
-                    <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">
-                      Tiempo Libre Neto Disponible
+                  {/* Big Metric Display with Donut Progress Ring */}
+                  <div className="p-4 rounded-lg bg-slate-50 dark:bg-[#07090e] border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">
+                        Tiempo Libre Neto
+                      </div>
+                      <div className="text-3xl font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {netFreeTime}h
+                      </div>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                        Disponible tras cubrir clases y estudio.
+                      </p>
                     </div>
-                    <div className="text-3xl font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                      {netFreeTime}h <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">/ semana</span>
+                    <div className="shrink-0">
+                      <ProgressRing
+                        progress={Math.min(100, Math.round((Math.max(0, netFreeTime) / 168) * 100))}
+                        size={84}
+                        strokeWidth={8}
+                        color="#10b981"
+                        label={`${Math.round((Math.max(0, netFreeTime) / 168) * 100)}%`}
+                        sublabel="Libre"
+                      />
                     </div>
-                    <p className="text-[11px] text-slate-600 dark:text-slate-400 pt-1">
-                      Horas libres tras cubrir clases ({classHours}h), descanso ({sleepHoursTotal}h) y estudio DME ({totalDMEHours.toFixed(1)}h).
-                    </p>
                   </div>
 
                   {/* Visual Stacked Progress Bar */}
@@ -353,8 +368,21 @@ export const CommandCenter: React.FC = () => {
               </Card>
             </div>
           </div>
+
+          {/* New Section: Historical GPA & Semester Progress Chart (Inspo Image 2) */}
+          <Card className="p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
+                <BarChart3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                Analítica de Avance por Semestre (Inspiración Inspo UI)
+              </h3>
+              <Badge variant="software">Curva de Rendimiento</Badge>
+            </div>
+            <SemesterProgressChart targetGPA={4.5} />
+          </Card>
         </>
       )}
     </div>
   );
 };
+
