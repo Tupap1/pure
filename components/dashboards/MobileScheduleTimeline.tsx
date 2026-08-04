@@ -36,7 +36,7 @@ export const MobileScheduleTimeline: React.FC = () => {
 
   const shortDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const fullDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-  const dayNumbers = [18, 19, 20, 21, 22, 23, 24]; // Day dates matching inspo style
+  const dayNumbers = [18, 19, 20, 21, 22, 23, 24];
 
   const daySchedules = sortSchedulesByTime(filterSchedulesByDay(schedules, selectedDay));
 
@@ -59,18 +59,18 @@ export const MobileScheduleTimeline: React.FC = () => {
 
   return (
     <div className="space-y-4 max-w-md mx-auto">
-      {/* Header (Inspo Image 3: SCHEDULE / MONTH) */}
+      {/* Header — PURE OS Titanium Cybernetic Styling */}
       <div className="text-center space-y-0.5 py-1">
-        <h3 className="text-lg font-extrabold font-heading tracking-wider uppercase text-slate-900 dark:text-slate-100">
+        <h3 className="text-base font-extrabold font-heading tracking-wider uppercase text-slate-900 dark:text-slate-100">
           SCHEDULE
         </h3>
-        <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">
+        <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-widest">
           AGOSTO 2026
         </p>
       </div>
 
-      {/* Purple Gradient Day Selector Strip (Inspo Image 3) */}
-      <div className="p-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 shadow-lg">
+      {/* Titanium Cybernetic Day Selector Strip */}
+      <div className="p-2 rounded-2xl bg-white dark:bg-[#090d18] border border-slate-200 dark:border-cyan-500/30 shadow-md">
         <div className="flex items-center justify-between gap-1">
           {shortDays.map((dayName, idx) => {
             const dayNum = idx + 1;
@@ -83,12 +83,12 @@ export const MobileScheduleTimeline: React.FC = () => {
                 onClick={() => setSelectedDay(dayNum)}
                 className={`flex-1 py-2 px-1 rounded-xl flex flex-col items-center justify-center transition-all ${
                   isSelected
-                    ? 'bg-white text-indigo-950 font-bold shadow-md scale-105'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                    ? 'bg-cyan-500 text-slate-950 font-bold shadow-md glow-aeroespacial scale-105'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/40'
                 }`}
               >
                 <span className="text-[10px] uppercase font-mono font-medium leading-none">{dayName}</span>
-                <span className="text-sm font-bold font-mono leading-tight mt-0.5">{dayDate}</span>
+                <span className="text-xs font-bold font-mono leading-tight mt-0.5">{dayDate}</span>
               </button>
             );
           })}
@@ -120,12 +120,12 @@ export const MobileScheduleTimeline: React.FC = () => {
       </div>
 
       {activeTab === 'timeline' ? (
-        /* TIMELINE AGENDA CARDS (Exact match to Inspo Image 3) */
+        /* TIMELINE AGENDA CARDS */
         <div className="space-y-3 pt-1">
           {daySchedules.length === 0 ? (
             <Card className="p-8 text-center border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
               <CalendarIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">Día libre de clases</h4>
+              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 font-heading">Día libre de clases</h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 No hay clases agendadas para este día.
               </p>
@@ -140,42 +140,42 @@ export const MobileScheduleTimeline: React.FC = () => {
                 return (
                   <div
                     key={sched.id}
-                    className="p-4 rounded-xl bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shadow-sm hover:border-cyan-500/40 transition-all"
+                    className="p-4 rounded-xl bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800/90 flex items-center justify-between gap-3 shadow-sm hover:border-cyan-500/40 transition-all"
                   >
-                    {/* Left: Time Slots (Inspo Image 3) */}
+                    {/* Left: Time Slots */}
                     <div className="text-center font-mono shrink-0 pr-3 border-r border-slate-200 dark:border-slate-800">
                       <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
                         {sched.start_time}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
                         {sched.end_time}
                       </div>
                     </div>
 
-                    {/* Center: Course Code & Name & Room Badge (Inspo Image 3) */}
+                    {/* Center: Course Code & Name & Room Badge */}
                     <div className="space-y-1 min-w-0 flex-1">
-                      <div className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                        {sub?.code || 'ED5017'}
+                      <div className="text-[10px] font-mono font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">
+                        {sub?.code || 'ASIGNATURA'}
                       </div>
                       <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate font-heading">
                         {sub?.name || 'Materia'}
                       </h4>
                       <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                        <span className="text-cyan-600 dark:text-cyan-400 font-semibold">
+                        <span className="text-slate-700 dark:text-slate-300 font-semibold">
                           {sched.classroom || (isPresencial ? 'AULA 101' : 'VIRTUAL')}
                         </span>
                         <span>•</span>
-                        <span>{isPresencial ? 'TEORÍA' : 'LAB'}</span>
+                        <span>{isPresencial ? 'PRESENCIAL' : 'VIRTUAL'}</span>
                       </div>
                     </div>
 
-                    {/* Right: Absences Counter (Inspo Image 3) */}
+                    {/* Right: Absences Counter */}
                     <div className="text-right shrink-0 font-mono space-y-0.5 pl-2">
-                      <div className="text-base font-bold text-indigo-600 dark:text-indigo-400 leading-none">
+                      <div className="text-base font-bold text-cyan-600 dark:text-cyan-400 leading-none">
                         0{absences.length}
                       </div>
-                      <div className="text-[9px] text-slate-400 leading-tight">Fallas</div>
-                      <div className="text-[9px] text-cyan-600 dark:text-cyan-400 font-bold cursor-pointer hover:underline pt-0.5">
+                      <div className="text-[9px] text-slate-500 dark:text-slate-400 leading-tight">Fallas</div>
+                      <div className="text-[9px] text-purple-600 dark:text-purple-400 font-bold cursor-pointer hover:underline pt-0.5">
                         DETALLES
                       </div>
                     </div>
@@ -198,7 +198,7 @@ export const MobileScheduleTimeline: React.FC = () => {
                   onClick={() => setSelectedSubjectId(sub.id!)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition-all shrink-0 border ${
                     isSelected
-                      ? 'bg-purple-600 text-white border-purple-500 shadow-sm glow-software'
+                      ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border-cyan-500/40 glow-aeroespacial'
                       : 'bg-white dark:bg-[#0d1322] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-400'
                   }`}
                 >
