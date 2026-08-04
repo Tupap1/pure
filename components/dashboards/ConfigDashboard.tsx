@@ -164,7 +164,7 @@ export const ConfigDashboard: React.FC = () => {
           </Button>
 
           <Button variant="aeroespacial" size="sm" onClick={() => seedDemoData()}>
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Cargar Matrícula Real (UdeA)
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Ingestar Matrícula vía MCP (UdeA + UdeC)
           </Button>
         </div>
       </div>

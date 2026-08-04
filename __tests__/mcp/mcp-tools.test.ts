@@ -11,14 +11,14 @@ describe('REQ-09: Servidor MCP Bidireccional para Antigravity AI Bridge', () => 
     const overview = handleGetAcademicOverview();
     expect(overview.status).toBe('success');
     expect(overview.data.netFreeTimeHours).toBeDefined();
-    expect(overview.data.universities.length).toBeGreaterThanOrEqual(1);
+    expect(overview.data.universities.length).toBeGreaterThanOrEqual(2);
   });
 
   it('debe parsear e ingestar la matrícula académica del estudiante mediante el MCP', () => {
     const enrollment = handleIngestAcademicEnrollment();
     expect(enrollment.status).toBe('success');
-    expect(enrollment.data.subjectsCount).toBe(6);
-    expect(enrollment.data.schedulesCount).toBe(11);
+    expect(enrollment.data.subjectsCount).toBe(13);
+    expect(enrollment.data.schedulesCount).toBe(17);
   });
 
   it('debe parsear un plan de estudios en texto plano y retornar una estructura en árbol jerárquico', () => {
