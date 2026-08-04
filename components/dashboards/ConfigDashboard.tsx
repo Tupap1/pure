@@ -160,11 +160,11 @@ export const ConfigDashboard: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => clearAllData()}>
-            <RotateCcw className="w-3.5 h-3.5" /> Limpiar Todo (Cero Datos)
+            <RotateCcw className="w-3.5 h-3.5" /> Limpiar Todo
           </Button>
 
-          <Button variant="primary" size="sm" onClick={() => seedDemoData()}>
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Cargar Datos Demo
+          <Button variant="aeroespacial" size="sm" onClick={() => seedDemoData()}>
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Cargar Matrícula Real (UdeA)
           </Button>
         </div>
       </div>
