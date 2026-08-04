@@ -1,78 +1,80 @@
 import React from 'react';
-import { Clock, ShieldCheck, Cpu, Wifi } from 'lucide-react';
-import { Badge } from '@/components/ui/Badge';
+import { Clock, Cpu, GitMerge } from 'lucide-react';
+import { usePureData } from '@/lib/hooks/usePureData';
+import { calculateDME, calculateNetFreeTime } from '@/lib/algorithms/study-hours-dme';
 
-interface HeaderProps {
-  netFreeTimeHours?: number;
-  totalDMEHours?: number;
-  synergiesCount?: number;
-  isOnline?: boolean;
-}
+export const Header: React.FC = () => {
+  const { subjects, deliverables, schedules, universities } = usePureData();
 
-export const Header: React.FC<HeaderProps> = ({
-  netFreeTimeHours = 89,
-  totalDMEHours = 12.5,
-  synergiesCount = 3,
-  isOnline = true,
-}) => {
+  const totalDMEHours = subjects.reduce((sum, s) => {
+    return sum + calculateDME(s as any).recommendedWeeklyHours;
+  }, 0);
+
+  const classHours = schedules.reduce((sum, s) => {
+    const startHour = parseInt(s.start_time.split(':')[0], 10);
+    const endHour = parseInt(s.end_time.split(':')[0], 10);
+    return sum + Math.max(0, endHour - startHour);
+  }, 0);
+
+  const netFreeTimeHours = calculateNetFreeTime({
+    classHours,
+    dmeHours: totalDMEHours,
+    sleepHoursPerNight: 7,
+  });
+
   return (
-    <header className="sticky top-0 z-20 glass-panel border-b border-slate-800/80 px-6 py-4 flex items-center justify-between">
+    <header className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-6 py-3.5 flex items-center justify-between">
       {/* Title / Context */}
       <div>
-        <h2 className="text-lg font-bold font-heading text-slate-100 flex items-center gap-2">
-          Dashboard de Eficiencia Académica
-          <Badge variant="synergy">Dosis Mínima Eficaz Active</Badge>
+        <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+          Gestión Académica Multi-Universidad
         </h2>
         <p className="text-xs text-slate-400">
-          Ingeniería Aeroespacial (Presencial) + Ingeniería de Software (Virtual)
+          {universities.length > 0
+            ? `${universities.length} Universidades • ${subjects.length} Asignaturas Registradas`
+            : 'Configura tus universidades y materias para comenzar'}
         </p>
       </div>
 
       {/* Metric Quick Indicators */}
       <div className="flex items-center gap-4">
         {/* Net Free Time Metric */}
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 glow-synergy">
-          <Clock className="w-4 h-4 text-emerald-400 animate-pulse" />
+        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+          <Clock className="w-4 h-4 text-emerald-400" />
           <div>
-            <div className="text-[10px] uppercase font-mono text-emerald-400 font-semibold">
+            <div className="text-[10px] uppercase font-mono text-slate-400 font-medium">
               Tiempo Libre Neto
             </div>
-            <div className="text-sm font-bold text-slate-100 font-heading">
-              {netFreeTimeHours}h / semana
+            <div className="text-xs font-bold text-slate-100">
+              {netFreeTimeHours}h / sem
             </div>
           </div>
         </div>
 
         {/* DME Metric */}
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-sky-500/10 border border-sky-500/25">
+        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
           <Cpu className="w-4 h-4 text-sky-400" />
           <div>
-            <div className="text-[10px] uppercase font-mono text-sky-400 font-semibold">
+            <div className="text-[10px] uppercase font-mono text-slate-400 font-medium">
               DME Estudio
             </div>
-            <div className="text-sm font-bold text-slate-100 font-heading">
-              {totalDMEHours}h
+            <div className="text-xs font-bold text-slate-100">
+              {totalDMEHours.toFixed(1)}h / sem
             </div>
           </div>
         </div>
 
         {/* Synergies Metric */}
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/25">
-          <ShieldCheck className="w-4 h-4 text-purple-400" />
+        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+          <GitMerge className="w-4 h-4 text-indigo-400" />
           <div>
-            <div className="text-[10px] uppercase font-mono text-purple-400 font-semibold">
-              Sinergias
+            <div className="text-[10px] uppercase font-mono text-slate-400 font-medium">
+              Materias Activas
             </div>
-            <div className="text-sm font-bold text-slate-100 font-heading">
-              {synergiesCount} Materias
+            <div className="text-xs font-bold text-slate-100">
+              {subjects.length}
             </div>
           </div>
-        </div>
-
-        {/* Connection Status */}
-        <div className="flex items-center gap-1.5 text-xs text-slate-400 pl-2 border-l border-slate-800">
-          <Wifi className={`w-4 h-4 ${isOnline ? 'text-emerald-400' : 'text-amber-400'}`} />
-          <span className="font-mono text-[11px]">{isOnline ? 'Local-First' : 'Offline'}</span>
         </div>
       </div>
     </header>

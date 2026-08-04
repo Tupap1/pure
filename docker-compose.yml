@@ -1,6 +1,19 @@
 version: '3.8'
 
 services:
+  pure-db:
+    image: postgres:16-alpine
+    container_name: pure_postgres_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pure_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pure_secure_password_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-pure_academic}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   pure-web:
     build:
       context: .
@@ -10,8 +23,11 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-pure_user}:${POSTGRES_PASSWORD:-pure_secure_password_2026}@pure-db:5432/${POSTGRES_DB:-pure_academic}?sslmode=disable
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-demo_key}
+    depends_on:
+      - pure-db
     restart: unless-stopped
 
   pure-mcp:
@@ -20,4 +36,9 @@ services:
       dockerfile: Dockerfile
     container_name: pure_mcp_server
     command: ["node", "mcp-server/index.js"]
+    depends_on:
+      - pure-db
     restart: unless-stopped
+
+volumes:
+  postgres_data:

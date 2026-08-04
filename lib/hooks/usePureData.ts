@@ -1,13 +1,16 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { pureDB } from '../db/dexie-schema';
-import { seedInitialData } from '../db/seed';
-import { useEffect, useState } from 'react';
+import { clearAllData } from '../db/seed';
+import { useEffect } from 'react';
 
 export function usePureData() {
-  const [isSeeded, setIsSeeded] = useState(false);
-
   useEffect(() => {
-    seedInitialData().then(() => setIsSeeded(true));
+    // Purge legacy mock data if user previously ran mock seed
+    pureDB.universities.get('uni-aeroespacial').then((legacyUni) => {
+      if (legacyUni) {
+        clearAllData();
+      }
+    });
   }, []);
 
   const universities = useLiveQuery(() => pureDB.universities.toArray(), [], []);
@@ -19,13 +22,13 @@ export function usePureData() {
   const studySessions = useLiveQuery(() => pureDB.studySessions.toArray(), [], []);
 
   return {
-    isLoaded: isSeeded && universities !== undefined,
-    universities,
-    professors,
-    subjects,
-    schedules,
-    syllabusTopics,
-    deliverables,
-    studySessions,
+    isLoaded: universities !== undefined,
+    universities: universities || [],
+    professors: professors || [],
+    subjects: subjects || [],
+    schedules: schedules || [],
+    syllabusTopics: syllabusTopics || [],
+    deliverables: deliverables || [],
+    studySessions: studySessions || [],
   };
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
-import { pureDB, DeliverableEntity } from '@/lib/db/dexie-schema';
+import { pureDB } from '@/lib/db/dexie-schema';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -10,7 +10,6 @@ import {
   Plus,
   Users,
   User,
-  CheckCircle2,
   Calculator,
   Trash2
 } from 'lucide-react';
@@ -70,36 +69,41 @@ export const DeliverablesDashboard: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
-          <h2 className="text-2xl font-bold font-heading text-slate-50 flex items-center gap-2">
-            <CheckSquare className="w-6 h-6 text-emerald-400" />
-            Entregas, Evaluaciones & Exámenes Finales
+          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <CheckSquare className="w-5 h-5 text-emerald-400" />
+            Entregas, Evaluaciones & Exámenes
           </h2>
           <p className="text-xs text-slate-400">
-            Gestión en tiempo real con soporte para actividades grupales e individuales y calculadora de nota requerida.
+            Registro de actividades con calculadora de nota mínima requerida.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="synergy" onClick={() => setIsAddModalOpen(true)}>
+          <Button
+            variant="synergy"
+            size="sm"
+            onClick={() => setIsAddModalOpen(true)}
+            disabled={subjects.length === 0}
+          >
             <Plus className="w-4 h-4" /> Registrar Actividad
           </Button>
         </div>
       </div>
 
       {/* Required Grade Calculator Card */}
-      {activeSubject && (
-        <Card className="p-5 bg-gradient-to-r from-sky-950/30 via-slate-900/80 to-purple-950/30">
+      {activeSubject && deliverables.length > 0 && (
+        <Card className="p-4 border border-sky-500/30 bg-sky-950/20">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="p-3 rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/20 shrink-0">
-                <Calculator className="w-6 h-6" />
+              <div className="p-2.5 rounded-lg bg-sky-500/20 text-sky-400 shrink-0">
+                <Calculator className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-100 font-heading">
-                  Calculadora de Nota Mínima Requerida en Entregas Restantes
+                <h4 className="text-sm font-bold text-slate-100">
+                  Calculadora de Nota Mínima Requerida
                 </h4>
-                <p className="text-xs text-slate-300 mt-1">
+                <p className="text-xs text-slate-300 mt-0.5">
                   Materia: <strong className="text-slate-100">{activeSubject.name}</strong> • Nota Meta:{' '}
                   <strong className="text-sky-300">{activeSubject.target_grade.toFixed(2)}</strong>.
                   {requiredGrade !== null ? (
@@ -109,7 +113,7 @@ export const DeliverablesDashboard: React.FC = () => {
                       <strong className="text-emerald-400 font-mono text-sm font-bold">
                         {requiredGrade.toFixed(2)}
                       </strong>{' '}
-                      en el porcentaje restante para cumplir la meta.
+                      en los porcentajes restantes.
                     </span>
                   ) : (
                     <span> Ya se evaluó el 100% de la materia.</span>
@@ -117,86 +121,109 @@ export const DeliverablesDashboard: React.FC = () => {
                 </p>
               </div>
             </div>
-            <Badge variant="synergy">Cálculo Automático ✅</Badge>
+            <Badge variant="synergy">Cálculo Automático</Badge>
           </div>
         </Card>
       )}
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-        <button
-          onClick={() => setFilterGroup('all')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-            filterGroup === 'all'
-              ? 'bg-slate-800 text-slate-100 border border-slate-700'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          Todas las Entregas ({deliverables.length})
-        </button>
-        <button
-          onClick={() => setFilterGroup('individual')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            filterGroup === 'individual'
-              ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <User className="w-3.5 h-3.5" /> Individuales
-        </button>
-        <button
-          onClick={() => setFilterGroup('group')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            filterGroup === 'group'
-              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" /> Grupales
-        </button>
-      </div>
+      {deliverables.length === 0 ? (
+        <Card className="p-12 text-center border-dashed border-slate-800 bg-slate-950/40">
+          <CheckSquare className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-200">No hay entregas pendientes</h3>
+          <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+            {subjects.length === 0
+              ? 'Registra primero tus materias para poder agendar evaluaciones y talleres.'
+              : 'Registra tus talleres, parciales y proyectos para realizar seguimiento de tus notas.'}
+          </p>
+          <Button
+            variant="synergy"
+            size="sm"
+            className="mt-4"
+            onClick={() => setIsAddModalOpen(true)}
+            disabled={subjects.length === 0}
+          >
+            <Plus className="w-4 h-4" /> Agregar Entrega
+          </Button>
+        </Card>
+      ) : (
+        <>
+          {/* Filter Tabs */}
+          <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+            <button
+              onClick={() => setFilterGroup('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                filterGroup === 'all'
+                  ? 'bg-slate-800 text-slate-100 border border-slate-700'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Todas ({deliverables.length})
+            </button>
+            <button
+              onClick={() => setFilterGroup('individual')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                filterGroup === 'individual'
+                  ? 'bg-sky-950/80 text-sky-300 border border-sky-800'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" /> Individuales
+            </button>
+            <button
+              onClick={() => setFilterGroup('group')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                filterGroup === 'group'
+                  ? 'bg-indigo-950/80 text-indigo-300 border border-indigo-800'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" /> Grupales
+            </button>
+          </div>
 
-      {/* Deliverable Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredDeliverables.map((deliv) => {
-          const sub = subjects.find((s) => s.id === deliv.subject_id);
-          const isDone = deliv.status === 'calificado' || deliv.status === 'entregado';
+          {/* Deliverable Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredDeliverables.map((deliv) => {
+              const sub = subjects.find((s) => s.id === deliv.subject_id);
+              const isDone = deliv.status === 'calificado' || deliv.status === 'entregado';
 
-          return (
-            <Card key={deliv.id} className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Badge variant={sub?.modality === 'presencial' ? 'aeroespacial' : 'software'}>
-                  {sub?.name || 'Asignatura'}
-                </Badge>
-                <Badge variant={deliv.complexity === 'dificil' ? 'danger' : 'warning'}>
-                  {deliv.complexity}
-                </Badge>
-              </div>
-              <div>
-                <h4 className={`text-base font-bold font-heading text-slate-100 ${isDone ? 'line-through text-slate-400' : ''}`}>
-                  {deliv.title}
-                </h4>
-                {deliv.description && <p className="text-xs text-slate-400 mt-1">{deliv.description}</p>}
-              </div>
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                <span className="text-slate-400 font-mono flex items-center gap-1">
-                  {deliv.is_group ? <Users className="w-3.5 h-3.5 text-purple-400" /> : <User className="w-3.5 h-3.5 text-sky-400" />}
-                  {deliv.is_group ? 'Grupal' : 'Individual'}
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-300 font-mono">Peso: {deliv.weight_percentage}%</span>
-                  <button
-                    onClick={() => handleDeleteDeliverable(deliv.id!)}
-                    className="text-slate-500 hover:text-rose-400 transition-colors p-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+              return (
+                <Card key={deliv.id} className="space-y-3 p-4">
+                  <div className="flex items-center justify-between">
+                    <Badge variant={sub?.modality === 'presencial' ? 'aeroespacial' : 'software'}>
+                      {sub?.name || 'Asignatura'}
+                    </Badge>
+                    <Badge variant={deliv.complexity === 'dificil' ? 'danger' : 'warning'}>
+                      {deliv.complexity}
+                    </Badge>
+                  </div>
+                  <div>
+                    <h4 className={`text-sm font-bold text-slate-100 ${isDone ? 'line-through text-slate-400' : ''}`}>
+                      {deliv.title}
+                    </h4>
+                    {deliv.description && <p className="text-xs text-slate-400 mt-1">{deliv.description}</p>}
+                  </div>
+                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+                    <span className="text-slate-400 font-mono flex items-center gap-1">
+                      {deliv.is_group ? <Users className="w-3.5 h-3.5 text-indigo-400" /> : <User className="w-3.5 h-3.5 text-sky-400" />}
+                      {deliv.is_group ? 'Grupal' : 'Individual'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-300 font-mono">Peso: {deliv.weight_percentage}%</span>
+                      <button
+                        onClick={() => handleDeleteDeliverable(deliv.id!)}
+                        className="text-slate-500 hover:text-rose-400 transition-colors p-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* Modal Add Deliverable */}
       <Modal
@@ -211,7 +238,7 @@ export const DeliverablesDashboard: React.FC = () => {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
               placeholder="Ej: Parcial 2 de Mecánica Orbital"
             />
           </div>
@@ -221,7 +248,7 @@ export const DeliverablesDashboard: React.FC = () => {
             <select
               value={subjectId}
               onChange={(e) => setSubjectId(e.target.value)}
-              className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
             >
               <option value="">Selecciona una asignatura</option>
               {subjects.map((s) => (
@@ -238,7 +265,7 @@ export const DeliverablesDashboard: React.FC = () => {
               <select
                 value={isGroup ? 'group' : 'individual'}
                 onChange={(e) => setIsGroup(e.target.value === 'group')}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
               >
                 <option value="individual">👤 Individual</option>
                 <option value="group">👥 Grupal</option>
@@ -250,7 +277,7 @@ export const DeliverablesDashboard: React.FC = () => {
                 type="number"
                 value={weight}
                 onChange={(e) => setWeight(Number(e.target.value))}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
               />
             </div>
           </div>
@@ -261,7 +288,7 @@ export const DeliverablesDashboard: React.FC = () => {
               type="datetime-local"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
             />
           </div>
 
@@ -270,7 +297,7 @@ export const DeliverablesDashboard: React.FC = () => {
               Cancelar
             </Button>
             <Button variant="synergy" onClick={handleAddDeliverable}>
-              Guardar en IndexedDB
+              Guardar Actividad
             </Button>
           </div>
         </div>

@@ -1,8 +1,31 @@
 import { pureDB } from './dexie-schema';
 
-export async function seedInitialData() {
-  const count = await pureDB.universities.count();
-  if (count > 0) return; // Ya contiene datos
+export async function clearAllData() {
+  await pureDB.transaction(
+    'rw',
+    [
+      pureDB.universities,
+      pureDB.professors,
+      pureDB.subjects,
+      pureDB.schedules,
+      pureDB.syllabusTopics,
+      pureDB.deliverables,
+      pureDB.studySessions,
+    ],
+    async () => {
+      await pureDB.universities.clear();
+      await pureDB.professors.clear();
+      await pureDB.subjects.clear();
+      await pureDB.schedules.clear();
+      await pureDB.syllabusTopics.clear();
+      await pureDB.deliverables.clear();
+      await pureDB.studySessions.clear();
+    }
+  );
+}
+
+export async function seedDemoData() {
+  await clearAllData();
 
   // 1. Universidades
   const uniAeroId = 'uni-aeroespacial';
@@ -16,7 +39,7 @@ export async function seedInitialData() {
       scale_min: 0.0,
       scale_max: 5.0,
       passing_grade: 3.0,
-      color: '#38bdf8',
+      color: '#0ea5e9',
       created_at: new Date().toISOString(),
     },
     {
@@ -26,7 +49,7 @@ export async function seedInitialData() {
       scale_min: 0.0,
       scale_max: 5.0,
       passing_grade: 3.0,
-      color: '#a855f7',
+      color: '#6366f1',
       created_at: new Date().toISOString(),
     },
   ]);
@@ -204,3 +227,4 @@ export async function seedInitialData() {
     },
   ]);
 }
+
