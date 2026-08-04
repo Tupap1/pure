@@ -118,25 +118,42 @@ async function main() {
     app.use(cors({ origin: '*' }));
     app.use(express.json());
 
-    let sseTransport: SSEServerTransport | null = null;
+    const sseTransportsMap = new Map<string, SSEServerTransport>();
 
     app.get('/sse', async (req, res) => {
-      console.log('Conexión MCP SSE iniciada desde Agente Cloud (p.ej. Claude Online)');
-      sseTransport = new SSEServerTransport('/message', res);
-      await server.connect(sseTransport);
+      console.log('Conexión MCP SSE recibida desde agente externo');
+
+      // Prevenir buffering en Nginx Proxy Manager y Cloudflare
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+
+      const transport = new SSEServerTransport('/message', res);
+      sseTransportsMap.set(transport.sessionId, transport);
+
+      req.on('close', () => {
+        console.log(`Sesión MCP SSE cerrada: ${transport.sessionId}`);
+        sseTransportsMap.delete(transport.sessionId);
+      });
+
+      await server.connect(transport);
     });
 
     app.post('/message', async (req, res) => {
-      if (sseTransport) {
-        await sseTransport.handlePostMessage(req, res);
+      const sessionId = req.query.sessionId as string;
+      const transport = sessionId ? sseTransportsMap.get(sessionId) : Array.from(sseTransportsMap.values())[0];
+
+      if (transport) {
+        await transport.handlePostMessage(req, res);
       } else {
-        res.status(400).json({ error: 'No hay conexión SSE activa' });
+        res.status(400).json({ error: 'No hay conexión SSE activa para el sessionId indicado' });
       }
     });
 
     const PORT = process.env.MCP_PORT || 3001;
     app.listen(Number(PORT), '0.0.0.0', () => {
-      console.log(`Servidor MCP HTTP/SSE escuchando en http://0.0.0.0:${PORT}/sse para Agentes Cloud`);
+      console.log(`Servidor MCP HTTP/SSE escuchando en http://0.0.0.0:${PORT}/sse`);
     });
   } else {
     const transport = new StdioServerTransport();
