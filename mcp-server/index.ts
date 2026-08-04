@@ -148,12 +148,6 @@ async function main() {
     app.get('/sse', async (req, res) => {
       console.log('Conexión MCP SSE recibida desde agente externo');
 
-      // Prevenir buffering en Nginx Proxy Manager y Cloudflare
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache, no-transform');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no');
-
       const transport = new SSEServerTransport('/message', res);
       sseTransportsMap.set(transport.sessionId, transport);
 
