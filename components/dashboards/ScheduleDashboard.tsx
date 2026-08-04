@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -18,15 +18,37 @@ import { filterSchedulesByDay, sortSchedulesByTime } from '@/lib/algorithms/sche
 import { ScheduleSchema, validateEntity } from '@/lib/validations/schemas';
 import { pureDB, ScheduleEntity } from '@/lib/db/dexie-schema';
 
+const getTodayDayOfWeek = (): number => {
+  const d = new Date().getDay();
+  return d === 0 ? 7 : d; // Convert Sunday (0) to 7
+};
+
 export const ScheduleDashboard: React.FC = () => {
   const { isLoaded, subjects, schedules, universities } = usePureData();
-  const [selectedMobileDay, setSelectedMobileDay] = useState<number>(1); // 1 = Lunes
+
+  // Today & Live Time State
+  const todayNum = getTodayDayOfWeek();
+  const [selectedMobileDay, setSelectedMobileDay] = useState<number>(todayNum);
+  const [now, setNow] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 30000); // Actualizar cada 30 segundos
+    return () => clearInterval(timer);
+  }, []);
+
+  const currentHourNum = now.getHours();
+  const currentMinNum = now.getMinutes();
+  const currentHourStr = String(currentHourNum).padStart(2, '0');
+  const currentMinStr = String(currentMinNum).padStart(2, '0');
+  const currentTimeFormatted = `${currentHourStr}:${currentMinStr}`;
 
   // Modal State for Schedule Add / Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSchedId, setEditingSchedId] = useState<string | null>(null);
   const [schedSubjectId, setSchedSubjectId] = useState('');
-  const [schedDay, setSchedDay] = useState<number>(1);
+  const [schedDay, setSchedDay] = useState<number>(todayNum);
   const [schedStart, setSchedStart] = useState('08:00');
   const [schedEnd, setSchedEnd] = useState('10:00');
   const [schedClassroom, setSchedClassroom] = useState('');
@@ -124,7 +146,7 @@ export const ScheduleDashboard: React.FC = () => {
             Master Schedule & Matriz de Traslapes
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Vista semanal unificada con detector automático de empalmes entre materias. Haz clic en cualquier clase para editarla.
+            Vista semanal unificada con indicador en tiempo real del día actual y hora en vivo.
           </p>
         </div>
         <Button variant="aeroespacial" onClick={handleOpenAddSchedule} className="shrink-0 flex items-center gap-1.5">
@@ -176,23 +198,38 @@ export const ScheduleDashboard: React.FC = () => {
               {shortDays.map((dayName, idx) => {
                 const dayNum = idx + 1;
                 const isSelected = selectedMobileDay === dayNum;
+                const isToday = todayNum === dayNum;
                 const count = filterSchedulesByDay(schedules, dayNum).length;
                 return (
                   <button
                     key={dayName}
                     onClick={() => setSelectedMobileDay(dayNum)}
-                    className={`min-h-[44px] min-w-[54px] flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all shrink-0 ${
+                    className={`min-h-[44px] min-w-[58px] flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all shrink-0 relative ${
                       isSelected
                         ? 'bg-sky-500 text-slate-950 border-sky-400 font-bold shadow-lg shadow-sky-500/20'
+                        : isToday
+                        ? 'bg-sky-950/60 text-sky-300 border-sky-600/60'
                         : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
                     }`}
                   >
-                    <span>{dayName}</span>
-                    {count > 0 && (
-                      <span className={`text-[10px] px-1 rounded-full ${isSelected ? 'bg-slate-950 text-sky-400 font-bold' : 'bg-slate-700 text-slate-300'}`}>
-                        {count}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      <span>{dayName}</span>
+                      {isToday && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      {isToday && (
+                        <span className={`text-[8px] font-bold px-1 rounded ${isSelected ? 'bg-slate-950 text-rose-400' : 'bg-rose-500/30 text-rose-300'}`}>
+                          HOY
+                        </span>
+                      )}
+                      {count > 0 && (
+                        <span className={`text-[10px] px-1 rounded-full ${isSelected ? 'bg-slate-950 text-sky-400 font-bold' : 'bg-slate-700 text-slate-300'}`}>
+                          {count}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 );
               })}
@@ -201,9 +238,29 @@ export const ScheduleDashboard: React.FC = () => {
             {/* Mobile Day Agenda Cards */}
             <div className="space-y-3">
               <div className="text-xs font-bold font-mono text-slate-400 uppercase tracking-wider flex items-center justify-between px-1">
-                <span>Agenda de {days[selectedMobileDay - 1]}</span>
+                <span className="flex items-center gap-2">
+                  Agenda de {days[selectedMobileDay - 1]}
+                  {selectedMobileDay === todayNum && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40 rounded-md">
+                      HOY
+                    </span>
+                  )}
+                </span>
                 <span>{selectedDaySchedules.length} clases</span>
               </div>
+
+              {/* Live Time Bar on Mobile (Only if viewing Today) */}
+              {selectedMobileDay === todayNum && (
+                <div className="flex items-center justify-between py-2 px-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 font-mono text-xs my-1 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
+                    <span className="font-bold uppercase tracking-wider text-[11px]">Hora Actual</span>
+                  </div>
+                  <span className="text-xs font-bold bg-rose-500 text-white px-2 py-0.5 rounded-md shadow">
+                    {currentTimeFormatted}
+                  </span>
+                </div>
+              )}
 
               {selectedDaySchedules.length === 0 ? (
                 <div className="p-6 text-center bg-slate-900/40 rounded-xl border border-slate-800 text-slate-500 text-xs">
@@ -259,78 +316,123 @@ export const ScheduleDashboard: React.FC = () => {
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/80 text-xs text-slate-700 dark:text-slate-300 font-mono">
                   <th className="p-3 text-center w-20 border-r border-slate-200 dark:border-slate-800">Hora</th>
-                  {days.map((day) => (
-                    <th key={day} className="p-3 text-center border-r border-slate-200 dark:border-slate-800/80 last:border-r-0">
-                      {day}
-                    </th>
-                  ))}
+                  {days.map((day, dIdx) => {
+                    const dayNum = dIdx + 1;
+                    const isToday = todayNum === dayNum;
+                    return (
+                      <th
+                        key={day}
+                        className={`p-3 text-center border-r border-slate-200 dark:border-slate-800/80 last:border-r-0 relative ${
+                          isToday ? 'bg-sky-500/15 dark:bg-sky-500/20 font-bold text-sky-600 dark:text-sky-300' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>{day}</span>
+                          {isToday && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold bg-rose-500 text-white rounded-full shadow-sm animate-pulse">
+                              HOY
+                            </span>
+                          )}
+                        </div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs">
-                {hours.map((hour) => (
-                  <tr key={hour} className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
-                    <td className="p-2.5 font-mono text-center text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
-                      {hour}
-                    </td>
-                    {days.map((day, dIdx) => {
-                      const dayNum = dIdx + 1; // 1 = Lunes
-                      const matchingSchedules = schedules.filter(
-                        (s) => s.day_of_week === dayNum && s.start_time <= hour && s.end_time > hour
-                      );
+                {hours.map((hour) => {
+                  const hourInt = parseInt(hour.split(':')[0], 10);
+                  const isCurrentHourRow = currentHourNum === hourInt;
 
-                      const hasConflict = matchingSchedules.length > 1;
+                  return (
+                    <tr key={hour} className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
+                      <td className="p-2.5 font-mono text-center text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+                        {hour}
+                      </td>
+                      {days.map((day, dIdx) => {
+                        const dayNum = dIdx + 1; // 1 = Lunes
+                        const isTodayColumn = todayNum === dayNum;
+                        const showLiveTimeLine = isTodayColumn && isCurrentHourRow;
+                        const topPercentage = (currentMinNum / 60) * 100;
 
-                      return (
-                        <td key={dIdx} className="p-1 border-r border-slate-200 dark:border-slate-800/40 last:border-r-0 align-top h-14">
-                          {hasConflict ? (
-                            <div
-                              onClick={() => handleOpenEditSchedule(matchingSchedules[0])}
-                              className="p-1.5 rounded bg-rose-100 dark:bg-rose-500/20 border border-rose-300 dark:border-rose-500/80 text-rose-800 dark:text-rose-200 space-y-0.5 cursor-pointer hover:scale-[1.02] transition-transform"
-                            >
-                              <div className="font-bold text-[10px] flex items-center justify-between">
-                                <span className="flex items-center gap-1"><AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400" /> EMPALME</span>
-                                <Pencil className="w-3 h-3 text-rose-500" />
+                        const matchingSchedules = schedules.filter(
+                          (s) => s.day_of_week === dayNum && s.start_time <= hour && s.end_time > hour
+                        );
+
+                        const hasConflict = matchingSchedules.length > 1;
+
+                        return (
+                          <td
+                            key={dIdx}
+                            className={`p-1 border-r border-slate-200 dark:border-slate-800/40 last:border-r-0 align-top h-16 relative ${
+                              isTodayColumn ? 'bg-sky-500/[0.03] dark:bg-sky-500/[0.05]' : ''
+                            }`}
+                          >
+                            {/* Live Current Time Line Indicator */}
+                            {showLiveTimeLine && (
+                              <div
+                                className="absolute left-0 right-0 z-30 flex items-center pointer-events-none"
+                                style={{ top: `${Math.min(Math.max(topPercentage, 5), 95)}%` }}
+                              >
+                                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-md shadow-rose-500/80 -ml-1 shrink-0 animate-ping" />
+                                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-md shadow-rose-500/80 -ml-2.5 shrink-0" />
+                                <div className="h-[2px] w-full bg-rose-500 shadow-sm shadow-rose-500/80" />
+                                <span className="text-[9px] font-mono font-bold bg-rose-500 text-white px-1.5 py-0.5 rounded ml-1 shadow-md shrink-0">
+                                  {currentTimeFormatted}
+                                </span>
                               </div>
-                              <div className="text-[9px] truncate">{matchingSchedules[0]?.classroom || 'Conflicto'}</div>
-                            </div>
-                          ) : (
-                            matchingSchedules.map((sched) => {
-                              const sub = subjects.find((sb) => sb.id === sched.subject_id);
-                              const isPresencial = sub?.modality === 'presencial';
-                              return (
-                                <div
-                                  key={sched.id}
-                                  onClick={() => handleOpenEditSchedule(sched)}
-                                  className={`p-1.5 rounded text-xs space-y-0.5 border cursor-pointer hover:scale-[1.02] hover:shadow-md transition-all group ${
-                                    isPresencial
-                                      ? 'bg-sky-50 dark:bg-sky-950/60 border-sky-200 dark:border-sky-600/50 text-sky-900 dark:text-sky-200'
-                                      : 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200 dark:border-indigo-600/50 text-indigo-900 dark:text-indigo-200'
-                                  }`}
-                                >
-                                  <div className="font-bold text-[11px] flex items-center justify-between">
-                                    <span className="truncate">{sub?.name || 'Clase'}</span>
-                                    <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 text-sky-400 transition-opacity shrink-0" />
-                                  </div>
-                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
-                                    {isPresencial ? <MapPin className="w-2.5 h-2.5 shrink-0" /> : <Clock className="w-2.5 h-2.5 shrink-0" />}
-                                    <span className="truncate">{sched.classroom || (isPresencial ? 'Presencial' : 'Virtual')}</span>
-                                  </div>
+                            )}
+
+                            {hasConflict ? (
+                              <div
+                                onClick={() => handleOpenEditSchedule(matchingSchedules[0])}
+                                className="p-1.5 rounded bg-rose-100 dark:bg-rose-500/20 border border-rose-300 dark:border-rose-500/80 text-rose-800 dark:text-rose-200 space-y-0.5 cursor-pointer hover:scale-[1.02] transition-transform"
+                              >
+                                <div className="font-bold text-[10px] flex items-center justify-between">
+                                  <span className="flex items-center gap-1"><AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400" /> EMPALME</span>
+                                  <Pencil className="w-3 h-3 text-rose-500" />
                                 </div>
-                              );
-                            })
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                                <div className="text-[9px] truncate">{matchingSchedules[0]?.classroom || 'Conflicto'}</div>
+                              </div>
+                            ) : (
+                              matchingSchedules.map((sched) => {
+                                const sub = subjects.find((sb) => sb.id === sched.subject_id);
+                                const isPresencial = sub?.modality === 'presencial';
+                                return (
+                                  <div
+                                    key={sched.id}
+                                    onClick={() => handleOpenEditSchedule(sched)}
+                                    className={`p-1.5 rounded text-xs space-y-0.5 border cursor-pointer hover:scale-[1.02] hover:shadow-md transition-all group ${
+                                      isPresencial
+                                        ? 'bg-sky-50 dark:bg-sky-950/60 border-sky-200 dark:border-sky-600/50 text-sky-900 dark:text-sky-200'
+                                        : 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200 dark:border-indigo-600/50 text-indigo-900 dark:text-indigo-200'
+                                    }`}
+                                  >
+                                    <div className="font-bold text-[11px] flex items-center justify-between">
+                                      <span className="truncate">{sub?.name || 'Clase'}</span>
+                                      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 text-sky-400 transition-opacity shrink-0" />
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
+                                      {isPresencial ? <MapPin className="w-2.5 h-2.5 shrink-0" /> : <Clock className="w-2.5 h-2.5 shrink-0" />}
+                                      <span className="truncate">{sched.classroom || (isPresencial ? 'Presencial' : 'Virtual')}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </>
       )}
 
-      {/* Modal Add / Edit Schedule in Schedule Dashboard */}
+      {/* Modal Add / Edit Schedule */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
