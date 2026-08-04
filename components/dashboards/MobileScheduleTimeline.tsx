@@ -196,13 +196,13 @@ export const MobileScheduleTimeline: React.FC = () => {
                 <button
                   key={sub.id}
                   onClick={() => setSelectedSubjectId(sub.id!)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all shrink-0 border ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition-all shrink-0 border ${
                     isSelected
-                      ? 'bg-purple-600 text-white border-purple-500 shadow-sm'
-                      : 'bg-white dark:bg-[#0d1322] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800'
+                      ? 'bg-purple-600 text-white border-purple-500 shadow-sm glow-software'
+                      : 'bg-white dark:bg-[#0d1322] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-400'
                   }`}
                 >
-                  {sub.code || sub.name}
+                  {sub.name}
                 </button>
               );
             })}
