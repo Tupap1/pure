@@ -4,9 +4,25 @@ import { usePureData } from '@/lib/hooks/usePureData';
 import { useTheme } from '@/lib/hooks/useTheme';
 import { calculateDME, calculateNetFreeTime } from '@/lib/algorithms/study-hours-dme';
 
-export const Header: React.FC = () => {
-  const { subjects, schedules, universities } = usePureData();
+import { DashboardTab } from './Sidebar';
+
+interface HeaderProps {
+  activeTab?: DashboardTab;
+}
+
+const TAB_TITLES: Record<DashboardTab, string> = {
+  command: 'Command Center',
+  syllabus: 'Sinergias & Syllabus',
+  schedule: 'Master Schedule',
+  deliverables: 'Entregables & Evaluaciones',
+  config: 'Configuración',
+};
+
+export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
+  const { subjects, schedules } = usePureData();
   const { theme, toggleTheme } = useTheme();
+
+  const title = TAB_TITLES[activeTab] || TAB_TITLES.command;
 
   const totalDMEHours = subjects.reduce((sum, s) => {
     return sum + calculateDME(s as any).recommendedWeeklyHours;
@@ -25,26 +41,21 @@ export const Header: React.FC = () => {
   });
 
   return (
-    <header className="sticky top-0 z-20 bg-white/90 dark:bg-[#0d121d]/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 sm:px-6 py-3 flex items-center justify-between transition-colors">
+    <header className="sticky top-0 z-20 bg-white/90 dark:bg-[#0d121d]/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 sm:px-6 py-3.5 flex items-center justify-between transition-colors">
       {/* Title / Context */}
       <div className="min-w-0 pr-2">
-        <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 truncate tracking-tight">
-          PURE <span className="text-xs font-mono font-normal text-slate-400 hidden sm:inline">• Academic OS</span>
+        <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 truncate tracking-tight font-heading">
+          {title}
         </h2>
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-          {universities.length > 0
-            ? `${universities.length} Universidades • ${subjects.length} Asignaturas Activas`
-            : 'Sistema de Eficiencia Académica Multi-Universidad'}
-        </p>
       </div>
 
       {/* Metric Quick Indicators & Theme Toggle */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Net Free Time Metric (Compact on mobile) */}
+        {/* Net Free Time Metric */}
         <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
-          <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+          <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <div>
-            <div className="text-[9px] sm:text-[10px] uppercase font-mono text-slate-400 font-medium leading-none">
+            <div className="text-[9px] sm:text-[10px] uppercase font-mono text-slate-500 dark:text-slate-400 font-medium leading-none">
               Libre Net
             </div>
             <div className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 leading-tight">
@@ -55,9 +66,9 @@ export const Header: React.FC = () => {
 
         {/* DME Metric */}
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
-          <Cpu className="w-4 h-4 text-sky-400 shrink-0" />
+          <Cpu className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
           <div>
-            <div className="text-[10px] uppercase font-mono text-slate-400 font-medium leading-none">
+            <div className="text-[10px] uppercase font-mono text-slate-500 dark:text-slate-400 font-medium leading-none">
               DME Semanal
             </div>
             <div className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 leading-tight">
@@ -78,4 +89,5 @@ export const Header: React.FC = () => {
     </header>
   );
 };
+
 

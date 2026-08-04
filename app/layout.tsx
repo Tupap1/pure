@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'PURE — Sistema de Eficiencia Académica Multi-Universidad',
+  title: 'PURE OS',
   description:
-    'Dashboard de gestión para doble ingeniería: Aeroespacial + Software con Dosis Mínima Eficaz, Sinergias Temáticas e IA MCP.',
+    'Sistema de gestión académica multi-institución para ingeniería.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,

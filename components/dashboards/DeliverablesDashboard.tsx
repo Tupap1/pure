@@ -111,13 +111,10 @@ export const DeliverablesDashboard: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 font-heading tracking-tight">
             <CheckSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             Entregas, Evaluaciones & Exámenes
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Registro de actividades con calculadora de nota mínima requerida.
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <Button

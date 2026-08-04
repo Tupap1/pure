@@ -62,80 +62,33 @@ export const CommandCenter: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Overview Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-[#0d121d] to-[#111726] border border-slate-800 rounded-xl p-6 shadow-sm transition-all relative overflow-hidden text-slate-100">
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-sky-500/5 blur-3xl pointer-events-none"></div>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm text-slate-100">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <Badge variant="aeroespacial">PURE OS • Eficiencia Académica</Badge>
-              {subjects.length > 0 && (
-                <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                  Semestre Activo
-                </span>
-              )}
-            </div>
-            <h2 className="text-2xl font-extrabold text-slate-100 tracking-tight font-heading">
-              Centro de Mando & Foco Semanal
+            <h2 className="text-xl font-bold text-slate-100 tracking-tight font-heading">
+              Centro de Mando
             </h2>
             <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
               {subjects.length > 0
-                ? `Monitoreando ${subjects.length} asignatura(s) en ${universities.length} institución(es). Calculado con Dosis Mínima Eficaz (DME) para maximizar tu tiempo libre neto.`
-                : 'Gestión integrada para carreras concurrentes: optimiza tu carga académica sin sobreestudio.'}
+                ? `${subjects.length} asignatura(s) activas en ${universities.length} institución(es).`
+                : 'Configura tus instituciones y materias para iniciar la gestión.'}
             </p>
           </div>
         </div>
       </div>
 
       {subjects.length === 0 ? (
-        /* Empty State with Rich Product Preview */
+        /* Empty State */
         <Card className="p-8 border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 space-y-6">
           <div className="max-w-xl mx-auto text-center space-y-3">
             <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto shadow-sm">
               <GraduationCap className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-              Sin materias registradas en la base de datos local
+              Sin materias registradas
             </h3>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Configura tu primera universidad y asignaturas para activar el motor de cálculo de tiempo libre, detector de traslapes y sinergias temáticas.
-            </p>
-          </div>
-
-          {/* Interactive Feature Demo Preview Card */}
-          <div className="bg-white dark:bg-[#07090e] border border-slate-200 dark:border-slate-800 rounded-lg p-5 max-w-2xl mx-auto space-y-3 text-left shadow-sm">
-            <div className="text-[11px] uppercase font-mono text-slate-500 dark:text-slate-400 flex items-center justify-between">
-              <span>Vista previa del panel configurado</span>
-              <span className="text-sky-600 dark:text-sky-400 flex items-center gap-1 font-semibold"><Sparkles className="w-3 h-3" /> PURE Algorithm</span>
-            </div>
-            <div className="grid grid-cols-3 gap-3 pt-1">
-              <div className="bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80 p-3 rounded-md space-y-1">
-                <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">TIEMPO LIBRE NETO</div>
-                <div className="text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400">38.5h / sem</div>
-                <div className="w-full bg-slate-200 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
-                  <div className="bg-emerald-500 dark:bg-emerald-400 h-full w-[75%]"></div>
-                </div>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80 p-3 rounded-md space-y-1">
-                <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">ESTUDIO DME</div>
-                <div className="text-lg font-mono font-bold text-sky-600 dark:text-sky-400">14.0h / sem</div>
-                <div className="w-full bg-slate-200 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
-                  <div className="bg-sky-500 dark:bg-sky-400 h-full w-[40%]"></div>
-                </div>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80 p-3 rounded-md space-y-1">
-                <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">OVERLAP SINÉRGICO</div>
-                <div className="text-lg font-mono font-bold text-purple-600 dark:text-purple-400">74.2% match</div>
-                <div className="w-full bg-slate-200 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
-                  <div className="bg-purple-500 dark:bg-purple-400 h-full w-[74%]"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center pt-2">
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mb-3">
-              Paso 1: Agrega tu Institución y Materias en la sección de configuración.
+              Agrega tu primera universidad y materias en Configuración para activar el horario, balance de tiempo y sinergias.
             </p>
           </div>
         </Card>
@@ -143,23 +96,21 @@ export const CommandCenter: React.FC = () => {
         <>
           {/* Asymmetric Command Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Primary Hero Block (7/12): Foco y Próximas Entregas */}
+            {/* Left Primary Hero Block (7/12): Entregas y Asignaturas */}
             <div className="lg:col-span-7 space-y-6">
-              {/* Deliverables Urgency Card */}
+              {/* Deliverables Card */}
               <Card className="space-y-4 p-5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
                     <CalendarDays className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                     Entregas & Parciales Próximos ({urgentDeliverables.length})
                   </h3>
-                  <Badge variant="outline">Foco Finito</Badge>
                 </div>
 
                 {urgentDeliverables.length === 0 ? (
                   <div className="p-6 text-center border border-dashed border-slate-200 dark:border-slate-800/80 rounded-lg text-xs text-slate-500 dark:text-slate-400 space-y-1">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mx-auto mb-1" />
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">Sin evaluaciones pendientes registradas</p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Tu tiempo libre proyectado se mantiene intacto.</p>
+                    <p className="font-semibold text-slate-800 dark:text-slate-200">Sin evaluaciones pendientes</p>
                   </div>
                 ) : (
                   <div className="space-y-2.5">
@@ -200,7 +151,7 @@ export const CommandCenter: React.FC = () => {
                 )}
               </Card>
 
-              {/* Asignaturas & Rendimiento Acumulado */}
+              {/* Asignaturas & Metas */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
@@ -264,22 +215,18 @@ export const CommandCenter: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Secondary Column (5/12): Gauge & Balance de Tiempo */}
+            {/* Right Secondary Column (5/12): Balance de Tiempo */}
             <div className="lg:col-span-5 space-y-6">
-              {/* Balance Semanal Integrado */}
-              <Card className="p-5 space-y-5 bg-white dark:bg-gradient-to-b dark:from-[#111726] dark:to-[#0d121d]">
+              <Card className="p-5 space-y-5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
                     <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     Balance de Tiempo Semanal (168h)
                   </h3>
-                  <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 rounded-md font-semibold">
-                    Algoritmo DME
-                  </span>
                 </div>
 
                 <div className="space-y-4">
-                  {/* Big Metric Display with Donut Progress Ring */}
+                  {/* Metric Display */}
                   <div className="p-4 rounded-lg bg-slate-50 dark:bg-[#07090e] border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
                     <div className="space-y-1">
                       <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">
@@ -355,28 +302,16 @@ export const CommandCenter: React.FC = () => {
                   </div>
                 </div>
               </Card>
-
-              {/* Quick Principle Recommendation Card */}
-              <Card className="p-4 space-y-2 bg-slate-50 dark:bg-[#07090e] border border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-2 text-xs font-bold text-sky-700 dark:text-sky-400 font-mono">
-                  <Zap className="w-3.5 h-3.5" />
-                  REGLA DE ECOSISTEMA PURE
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  "No estudies más horas por defecto. Ajusta el tiempo de estudio según la complejidad de la entrega y el beneficio decreciente."
-                </p>
-              </Card>
             </div>
           </div>
 
-          {/* New Section: Historical GPA & Semester Progress Chart (Inspo Image 2) */}
+          {/* Historical GPA & Semester Progress Chart */}
           <Card className="p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
                 <BarChart3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                Analítica de Avance por Semestre (Inspiración Inspo UI)
+                Evolución de Promedio Académico
               </h3>
-              <Badge variant="software">Curva de Rendimiento</Badge>
             </div>
             <SemesterProgressChart targetGPA={4.5} />
           </Card>

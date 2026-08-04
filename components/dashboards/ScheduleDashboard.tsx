@@ -173,13 +173,10 @@ export const ScheduleDashboard: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 font-heading tracking-tight">
             <CalendarIcon className="w-5 h-5 text-sky-600 dark:text-sky-400" />
             Master Schedule & Matriz de Traslapes
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Vista semanal unificada con interfaz estilo Google Calendar e indicador de hora en vivo.
-          </p>
         </div>
         <Button variant="aeroespacial" onClick={handleOpenAddSchedule} className="shrink-0 flex items-center gap-1.5">
           <Plus className="w-4 h-4" /> Asignar Horario

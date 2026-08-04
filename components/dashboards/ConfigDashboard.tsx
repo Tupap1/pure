@@ -279,23 +279,20 @@ export const ConfigDashboard: React.FC = () => {
   return (
     <div className="space-y-8 animate-fade-in pb-12">
       {/* Header & Global Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2 font-heading tracking-tight">
             <Building2 className="w-5 h-5 text-sky-600 dark:text-sky-400" />
             Configuración & Directorio Base
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Administra universidades, profesores, asignaturas y clases guardados en tu base de datos local.
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => clearAllData()}>
             <RotateCcw className="w-3.5 h-3.5" /> Limpiar Todo
           </Button>
 
-          <Button variant="aeroespacial" size="sm" onClick={() => seedDemoData()}>
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Ingestar Matrícula vía MCP (UdeA + UdeC)
+          <Button variant="software" size="sm" onClick={() => seedDemoData()}>
+            <Sparkles className="w-3.5 h-3.5" /> Cargar Matrícula Demo
           </Button>
         </div>
       </div>
