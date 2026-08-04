@@ -35,7 +35,8 @@ export const SubjectSchema = z.object({
   difficulty: z.number().int().min(1, { message: 'Dificultad mínima 1' }).max(5, { message: 'Dificultad máxima 5' }),
   modality: z.enum(['presencial', 'virtual', 'hibrida']).optional(),
   target_grade: z.number().optional(),
-  current_grade: z.number().optional()
+  current_grade: z.number().optional(),
+  max_absences: z.number().int().min(0, { message: 'Las inasistencias permitidas no pueden ser negativas' }).optional()
 });
 
 const formatTimeStr = (t: string) => {
@@ -80,9 +81,10 @@ export const DeliverableSchema = z.object({
   due_date: z.string().optional(),
   weight_percentage: z.number().gt(0, { message: 'El peso debe ser mayor al 0%' }).lte(100, { message: 'El peso no puede superar el 100%' }),
   grade: z.number().optional(),
-  type: z.enum(['Taller', 'Proyecto', 'Parcial', 'Quiz', 'Examen Final']),
+  type: z.enum(['Taller', 'Proyecto', 'Parcial', 'Quiz', 'Laboratorio', 'Examen Final', 'taller', 'proyecto', 'parcial', 'quiz', 'laboratorio', 'examen_final']),
+  location_modality: z.enum(['presencial', 'virtual']).optional(),
   is_group: z.boolean().optional(),
-  complexity: z.enum(['Fácil', 'Medio', 'Difícil']),
+  complexity: z.enum(['Fácil', 'Medio', 'Difícil', 'facil', 'medio', 'dificil']),
   status: z.enum(['pendiente', 'entregado', 'calificado']).optional()
 });
 

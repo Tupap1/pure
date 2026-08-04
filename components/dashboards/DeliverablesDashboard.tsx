@@ -12,7 +12,13 @@ import {
   User,
   Calculator,
   Trash2,
-  Pencil
+  Pencil,
+  MapPin,
+  Laptop,
+  FileText,
+  FlaskConical,
+  Award,
+  Layers
 } from 'lucide-react';
 import { calculateRequiredGradeForRemaining } from '@/lib/domain/subject';
 import { DeliverableSchema, validateEntity } from '@/lib/validations/schemas';
@@ -20,11 +26,15 @@ import { DeliverableSchema, validateEntity } from '@/lib/validations/schemas';
 export const DeliverablesDashboard: React.FC = () => {
   const { isLoaded, subjects, deliverables } = usePureData();
   const [filterGroup, setFilterGroup] = useState<'all' | 'individual' | 'group'>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterModality, setFilterModality] = useState<'all' | 'presencial' | 'virtual'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Form states
   const [title, setTitle] = useState('');
   const [subjectId, setSubjectId] = useState('');
+  const [activityType, setActivityType] = useState<string>('Parcial');
+  const [locationModality, setLocationModality] = useState<'presencial' | 'virtual'>('presencial');
   const [weight, setWeight] = useState(20);
   const [isGroup, setIsGroup] = useState(false);
   const [complexity, setComplexity] = useState<'facil' | 'medio' | 'dificil'>('medio');
@@ -38,9 +48,25 @@ export const DeliverablesDashboard: React.FC = () => {
     return <div className="p-8 text-center text-slate-400 font-mono">Cargando entregas...</div>;
   }
 
+  // Handle subject change to auto-suggest subject's default modality
+  const handleSubjectChange = (newSubjectId: string) => {
+    setSubjectId(newSubjectId);
+    const selectedSub = subjects.find((s) => s.id === newSubjectId);
+    if (selectedSub) {
+      setLocationModality(selectedSub.modality === 'presencial' ? 'presencial' : 'virtual');
+    }
+  };
+
   const filteredDeliverables = deliverables.filter((item) => {
-    if (filterGroup === 'group') return item.is_group;
-    if (filterGroup === 'individual') return !item.is_group;
+    if (filterGroup === 'group' && !item.is_group) return false;
+    if (filterGroup === 'individual' && item.is_group) return false;
+
+    if (filterType !== 'all' && item.type.toLowerCase() !== filterType.toLowerCase()) return false;
+
+    const sub = subjects.find((s) => s.id === item.subject_id);
+    const itemModality = item.location_modality || (sub?.modality === 'presencial' ? 'presencial' : 'virtual');
+    if (filterModality !== 'all' && itemModality !== filterModality) return false;
+
     return true;
   });
 
@@ -53,10 +79,14 @@ export const DeliverablesDashboard: React.FC = () => {
     setEditingDelivId(deliv.id);
     setTitle(deliv.title);
     setSubjectId(deliv.subject_id);
+    setActivityType(deliv.type || 'Parcial');
+    const sub = subjects.find((s) => s.id === deliv.subject_id);
+    setLocationModality(deliv.location_modality || (sub?.modality === 'presencial' ? 'presencial' : 'virtual'));
     setWeight(deliv.weight_percentage);
     setIsGroup(deliv.is_group || false);
     setComplexity(deliv.complexity as any);
     setDueDate(deliv.due_date ? deliv.due_date.substring(0, 10) : '');
+    setDelivErrors({});
     setIsAddModalOpen(true);
   };
 
@@ -66,7 +96,8 @@ export const DeliverablesDashboard: React.FC = () => {
       title,
       due_date: dueDate ? new Date(dueDate).toISOString() : new Date().toISOString(),
       weight_percentage: Number(weight),
-      type: 'Parcial',
+      type: activityType,
+      location_modality: locationModality,
       is_group: isGroup,
       complexity: complexity === 'dificil' ? 'Difícil' : complexity === 'facil' ? 'Fácil' : 'Medio',
       status: 'pendiente',
@@ -82,13 +113,15 @@ export const DeliverablesDashboard: React.FC = () => {
     if (editingDelivId) {
       await pureDB.deliverables.update(editingDelivId, {
         ...validation.data as any,
-        type: 'Parcial',
+        type: activityType,
+        location_modality: locationModality,
         complexity: complexity,
       });
     } else {
       await pureDB.deliverables.add({
         ...validation.data as any,
-        type: 'Parcial',
+        type: activityType,
+        location_modality: locationModality,
         complexity: complexity,
         created_at: new Date().toISOString(),
       });
@@ -115,12 +148,20 @@ export const DeliverablesDashboard: React.FC = () => {
             <CheckSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             Entregas, Evaluaciones & Exámenes
           </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Registro clasificado por tipo (Parciales, Talleres, Quices) y modalidad (Presencial vs Virtual).
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <Button
             variant="synergy"
             size="sm"
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => {
+              setEditingDelivId(null);
+              setTitle('');
+              if (subjects.length > 0) handleSubjectChange(subjects[0].id!);
+              setIsAddModalOpen(true);
+            }}
             disabled={subjects.length === 0}
           >
             <Plus className="w-4 h-4" /> Registrar Actividad
@@ -184,38 +225,103 @@ export const DeliverablesDashboard: React.FC = () => {
         </Card>
       ) : (
         <>
-          {/* Filter Tabs */}
-          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-            <button
-              onClick={() => setFilterGroup('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                filterGroup === 'all'
-                  ? 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              Todas ({deliverables.length})
-            </button>
-            <button
-              onClick={() => setFilterGroup('individual')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                filterGroup === 'individual'
-                  ? 'bg-sky-100 dark:bg-sky-950/80 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-800'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <User className="w-3.5 h-3.5" /> Individuales
-            </button>
-            <button
-              onClick={() => setFilterGroup('group')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                filterGroup === 'group'
-                  ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" /> Grupales
-            </button>
+          {/* Multi-Dimensional Filter Controls */}
+          <div className="space-y-2 bg-slate-100 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800/80">
+            {/* Row 1: Tipo de Actividad Filter */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+              <span className="text-[10px] font-mono uppercase font-bold text-slate-400 mr-1 shrink-0">Tipo:</span>
+              {[
+                { id: 'all', label: 'Todas las Actividades' },
+                { id: 'parcial', label: '📝 Parciales' },
+                { id: 'taller', label: '🛠️ Talleres' },
+                { id: 'proyecto', label: '🚀 Proyectos' },
+                { id: 'quiz', label: '⏱️ Quices' },
+                { id: 'laboratorio', label: '🧪 Laboratorios' },
+                { id: 'examen_final', label: '🎯 Exámenes Finales' },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setFilterType(t.id)}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all shrink-0 ${
+                    filterType === t.id
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Row 2: Modalidad & Formato Filters */}
+            <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-200 dark:border-slate-800/80">
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-[10px] font-mono uppercase font-bold text-slate-400 mr-1 shrink-0">Modalidad:</span>
+                <button
+                  onClick={() => setFilterModality('all')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+                    filterModality === 'all'
+                      ? 'bg-cyan-600 text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => setFilterModality('presencial')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all flex items-center gap-1 ${
+                    filterModality === 'presencial'
+                      ? 'bg-sky-600 text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  <MapPin className="w-3 h-3 text-sky-400" /> Presenciales
+                </button>
+                <button
+                  onClick={() => setFilterModality('virtual')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all flex items-center gap-1 ${
+                    filterModality === 'virtual'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  <Laptop className="w-3 h-3 text-purple-400" /> Virtuales
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs">
+                <button
+                  onClick={() => setFilterGroup('all')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+                    filterGroup === 'all'
+                      ? 'bg-slate-800 text-slate-100 shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  Todos
+                </button>
+                <button
+                  onClick={() => setFilterGroup('individual')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all flex items-center gap-1 ${
+                    filterGroup === 'individual'
+                      ? 'bg-slate-700 text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  <User className="w-3 h-3" /> Individual
+                </button>
+                <button
+                  onClick={() => setFilterGroup('group')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all flex items-center gap-1 ${
+                    filterGroup === 'group'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  <Users className="w-3 h-3" /> Grupal
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Deliverable Cards Grid */}
@@ -223,30 +329,63 @@ export const DeliverablesDashboard: React.FC = () => {
             {filteredDeliverables.map((deliv) => {
               const sub = subjects.find((s) => s.id === deliv.subject_id);
               const isDone = deliv.status === 'calificado' || deliv.status === 'entregado';
+              const actualModality = deliv.location_modality || (sub?.modality === 'presencial' ? 'presencial' : 'virtual');
 
               return (
-                <Card key={deliv.id} className="space-y-3 p-4">
-                  <div className="flex items-center justify-between">
-                    <Badge variant={sub?.modality === 'presencial' ? 'aeroespacial' : 'software'}>
-                      {sub?.name || 'Asignatura'}
-                    </Badge>
-                    <Badge variant={deliv.complexity === 'dificil' ? 'danger' : 'warning'}>
-                      {deliv.complexity}
-                    </Badge>
+                <Card key={deliv.id} className="space-y-3 p-4 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    {/* Top Badges: Subject Name + Modality (Presencial vs Virtual) + Type */}
+                    <div className="flex items-center justify-between gap-1 flex-wrap">
+                      <Badge variant={sub?.modality === 'presencial' ? 'aeroespacial' : 'software'}>
+                        {sub?.name || 'Asignatura'}
+                      </Badge>
+
+                      <div className="flex items-center gap-1">
+                        <span
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 ${
+                            actualModality === 'presencial'
+                              ? 'bg-sky-950/80 text-sky-400 border border-sky-500/30'
+                              : 'bg-purple-950/80 text-purple-400 border border-purple-500/30'
+                          }`}
+                        >
+                          {actualModality === 'presencial' ? (
+                            <>
+                              <MapPin className="w-3 h-3 text-sky-400" /> Presencial
+                            </>
+                          ) : (
+                            <>
+                              <Laptop className="w-3 h-3 text-purple-400" /> Virtual
+                            </>
+                          )}
+                        </span>
+
+                        <Badge variant={deliv.complexity === 'dificil' ? 'danger' : 'warning'}>
+                          {deliv.complexity}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Title & Type Badge */}
+                    <div className="pt-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 bg-slate-800 text-purple-300 font-bold rounded-md border border-slate-700">
+                          {deliv.type || 'Parcial'}
+                        </span>
+                      </div>
+                      <h4 className={`text-sm font-bold text-slate-900 dark:text-slate-100 ${isDone ? 'line-through text-slate-400' : ''}`}>
+                        {deliv.title}
+                      </h4>
+                      {deliv.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{deliv.description}</p>}
+                    </div>
                   </div>
-                  <div>
-                    <h4 className={`text-sm font-bold text-slate-900 dark:text-slate-100 ${isDone ? 'line-through text-slate-400' : ''}`}>
-                      {deliv.title}
-                    </h4>
-                    {deliv.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{deliv.description}</p>}
-                  </div>
+
                   <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
                     <span className="text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
                       {deliv.is_group ? <Users className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> : <User className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />}
                       {deliv.is_group ? 'Grupal' : 'Individual'}
                     </span>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-slate-700 dark:text-slate-300 font-mono">Peso: {deliv.weight_percentage}%</span>
+                      <span className="text-slate-700 dark:text-slate-300 font-mono font-bold">Peso: {deliv.weight_percentage}%</span>
                       <button
                         onClick={() => handleOpenEditDeliverable(deliv)}
                         title="Editar entrega"
@@ -270,11 +409,11 @@ export const DeliverablesDashboard: React.FC = () => {
         </>
       )}
 
-      {/* Modal Add Deliverable */}
+      {/* Modal Add / Edit Deliverable */}
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        title="Registrar Nueva Actividad / Evaluación"
+        title={editingDelivId ? 'Editar Actividad / Evaluación' : 'Registrar Nueva Actividad / Evaluación'}
       >
         <div className="space-y-4">
           <div>
@@ -286,27 +425,59 @@ export const DeliverablesDashboard: React.FC = () => {
               className={inputClass}
               placeholder="Ej: Parcial 2 de Mecánica Orbital"
             />
+            {delivErrors.title && <p className="text-xs text-rose-500 mt-1">{delivErrors.title}</p>}
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Asignatura</label>
-            <select
-              value={subjectId}
-              onChange={(e) => setSubjectId(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Selecciona una asignatura</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.code})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Modalidad</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Asignatura</label>
+              <select
+                value={subjectId}
+                onChange={(e) => handleSubjectChange(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Selecciona una asignatura</option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.code})
+                  </option>
+                ))}
+              </select>
+              {delivErrors.subject_id && <p className="text-xs text-rose-500 mt-1">{delivErrors.subject_id}</p>}
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Tipo de Actividad / Evaluación</label>
+              <select
+                value={activityType}
+                onChange={(e) => setActivityType(e.target.value)}
+                className={inputClass}
+              >
+                <option value="Parcial">📝 Parcial</option>
+                <option value="Taller">🛠️ Taller</option>
+                <option value="Proyecto">🚀 Proyecto Integrador</option>
+                <option value="Quiz">⏱️ Quiz / Prueba Corta</option>
+                <option value="Laboratorio">🧪 Laboratorio / Práctica</option>
+                <option value="Examen Final">🎯 Examen Final</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Ubicación / Modalidad</label>
+              <select
+                value={locationModality}
+                onChange={(e) => setLocationModality(e.target.value as any)}
+                className={inputClass}
+              >
+                <option value="presencial">🏫 Presencial (Campus)</option>
+                <option value="virtual">💻 Virtual (En Línea)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Formato</label>
               <select
                 value={isGroup ? 'group' : 'individual'}
                 onChange={(e) => setIsGroup(e.target.value === 'group')}
@@ -316,6 +487,7 @@ export const DeliverablesDashboard: React.FC = () => {
                 <option value="group">👥 Grupal</option>
               </select>
             </div>
+
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Peso % en la Nota</label>
               <input
@@ -324,11 +496,12 @@ export const DeliverablesDashboard: React.FC = () => {
                 onChange={(e) => setWeight(Number(e.target.value))}
                 className={inputClass}
               />
+              {delivErrors.weight_percentage && <p className="text-xs text-rose-500 mt-1">{delivErrors.weight_percentage}</p>}
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Fecha Límite</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Fecha y Hora Límite</label>
             <input
               type="datetime-local"
               value={dueDate}
@@ -342,7 +515,7 @@ export const DeliverablesDashboard: React.FC = () => {
               Cancelar
             </Button>
             <Button variant="synergy" onClick={handleAddDeliverable}>
-              Guardar Actividad
+              {editingDelivId ? 'Guardar Cambios' : 'Guardar Actividad'}
             </Button>
           </div>
         </div>

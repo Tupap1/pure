@@ -7,7 +7,8 @@ export interface Deliverable {
   due_date: string; // ISO String
   weight_percentage: number;
   grade?: number;
-  type: 'taller' | 'proyecto' | 'parcial' | 'quiz' | 'examen_final';
+  type: 'taller' | 'proyecto' | 'parcial' | 'quiz' | 'laboratorio' | 'examen_final' | string;
+  location_modality?: 'presencial' | 'virtual';
   is_group: boolean;
   complexity: 'facil' | 'medio' | 'dificil';
   status: 'pendiente' | 'entregado' | 'calificado';
@@ -17,7 +18,8 @@ export interface DeliverableFilterOptions {
   is_group?: boolean;
   status?: 'pendiente' | 'entregado' | 'calificado';
   complexity?: 'facil' | 'medio' | 'dificil';
-  type?: 'taller' | 'proyecto' | 'parcial' | 'quiz' | 'examen_final';
+  type?: 'taller' | 'proyecto' | 'parcial' | 'quiz' | 'laboratorio' | 'examen_final' | string;
+  location_modality?: 'presencial' | 'virtual';
   subject_id?: string;
 }
 
@@ -38,7 +40,10 @@ export function filterDeliverables(
     if (options.complexity && item.complexity !== options.complexity) {
       return false;
     }
-    if (options.type && item.type !== options.type) {
+    if (options.type && item.type.toLowerCase() !== options.type.toLowerCase()) {
+      return false;
+    }
+    if (options.location_modality && item.location_modality !== options.location_modality) {
       return false;
     }
     if (options.subject_id && item.subject_id !== options.subject_id) {

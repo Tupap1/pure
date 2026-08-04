@@ -32,6 +32,7 @@ export interface SubjectEntity {
   modality: 'presencial' | 'virtual';
   target_grade: number;
   current_grade: number;
+  max_absences?: number;
   created_at?: string;
 }
 
@@ -65,7 +66,8 @@ export interface DeliverableEntity {
   due_date: string;
   weight_percentage: number;
   grade?: number;
-  type: 'taller' | 'proyecto' | 'parcial' | 'quiz' | 'examen_final';
+  type: 'taller' | 'proyecto' | 'parcial' | 'quiz' | 'laboratorio' | 'examen_final';
+  location_modality?: 'presencial' | 'virtual';
   is_group: boolean;
   complexity: 'facil' | 'medio' | 'dificil';
   status: 'pendiente' | 'entregado' | 'calificado';
