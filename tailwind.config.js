@@ -8,6 +8,12 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-sans)', 'Inter', 'sans-serif'],
+        heading: ['var(--font-heading)', 'Space Grotesk', 'sans-serif'],
+        display: ['Space Grotesk', 'sans-serif'],
+        mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
+      },
       colors: {
         background: 'var(--bg-main)',
         surface: {
