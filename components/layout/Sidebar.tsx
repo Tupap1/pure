@@ -53,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
   ];
 
   return (
-    <aside className="w-64 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between h-screen sticky top-0 z-30 transition-colors">
+    <aside className="hidden md:flex w-64 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex-col justify-between h-screen sticky top-0 z-30 transition-colors">
       {/* Brand / Logo */}
       <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
         <div className="w-9 h-9 rounded-lg bg-sky-600 text-slate-50 flex items-center justify-center font-bold">

@@ -2,6 +2,13 @@ import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
 import { pureDB } from '@/lib/db/dexie-schema';
 import { clearAllData, seedDemoData } from '@/lib/db/seed';
+import {
+  UniversitySchema,
+  ProfessorSchema,
+  SubjectSchema,
+  ScheduleSchema,
+  validateEntity
+} from '@/lib/validations/schemas';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -55,20 +62,36 @@ export const ConfigDashboard: React.FC = () => {
   const [schedEnd, setSchedEnd] = useState('10:00');
   const [schedClassroom, setSchedClassroom] = useState('');
 
+  // Form Error States
+  const [uniErrors, setUniErrors] = useState<Record<string, string>>({});
+  const [profErrors, setProfErrors] = useState<Record<string, string>>({});
+  const [subErrors, setSubErrors] = useState<Record<string, string>>({});
+  const [schedErrors, setSchedErrors] = useState<Record<string, string>>({});
+
   if (!isLoaded) {
     return <div className="p-8 text-center text-slate-400 font-mono">Cargando directorio...</div>;
   }
 
   const handleAddUni = async () => {
-    if (!uniName.trim()) return;
-
-    await pureDB.universities.add({
+    const uniData = {
       name: uniName,
       modality: uniModality,
       scale_min: Number(uniMin),
       scale_max: Number(uniMax),
       passing_grade: Number(uniPassing),
       color: uniModality === 'presencial' ? '#0ea5e9' : '#6366f1',
+    };
+
+    const validation = validateEntity(UniversitySchema, uniData);
+    if (!validation.success) {
+      setUniErrors(validation.errors);
+      return;
+    }
+
+    setUniErrors({});
+    await pureDB.universities.add({
+      ...validation.data,
+      color: validation.data.color || (uniModality === 'presencial' ? '#0ea5e9' : '#6366f1'),
       created_at: new Date().toISOString(),
     });
 
@@ -81,16 +104,26 @@ export const ConfigDashboard: React.FC = () => {
   };
 
   const handleAddProf = async () => {
-    if (!profName.trim() || !profUniId) return;
-
-    await pureDB.professors.add({
+    const profData = {
       university_id: profUniId,
       name: profName,
       email: profEmail,
+    };
+
+    const validation = validateEntity(ProfessorSchema, profData);
+    if (!validation.success) {
+      setProfErrors(validation.errors);
+      return;
+    }
+
+    setProfErrors({});
+    await pureDB.professors.add({
+      ...validation.data,
       created_at: new Date().toISOString(),
     });
 
     setProfName('');
+    setProfEmail('');
     setIsAddProfOpen(false);
   };
 
@@ -99,9 +132,7 @@ export const ConfigDashboard: React.FC = () => {
   };
 
   const handleAddSubject = async () => {
-    if (!subName.trim() || !subUniId) return;
-
-    await pureDB.subjects.add({
+    const subData = {
       university_id: subUniId,
       professor_id: subProfId || undefined,
       name: subName,
@@ -111,6 +142,20 @@ export const ConfigDashboard: React.FC = () => {
       modality: subModality,
       target_grade: Number(subTargetGrade),
       current_grade: 0,
+    };
+
+    const validation = validateEntity(SubjectSchema, subData);
+    if (!validation.success) {
+      setSubErrors(validation.errors);
+      return;
+    }
+
+    setSubErrors({});
+    await pureDB.subjects.add({
+      ...validation.data,
+      modality: validation.data.modality === 'virtual' ? 'virtual' : 'presencial',
+      target_grade: validation.data.target_grade ?? Number(subTargetGrade) ?? 3.0,
+      current_grade: validation.data.current_grade ?? 0,
       created_at: new Date().toISOString(),
     });
 
@@ -124,14 +169,23 @@ export const ConfigDashboard: React.FC = () => {
   };
 
   const handleAddSchedule = async () => {
-    if (!schedSubjectId) return;
-
-    await pureDB.schedules.add({
+    const schedData = {
       subject_id: schedSubjectId,
       day_of_week: Number(schedDay),
       start_time: schedStart,
       end_time: schedEnd,
       classroom: schedClassroom || 'Aula por definir',
+    };
+
+    const validation = validateEntity(ScheduleSchema, schedData);
+    if (!validation.success) {
+      setSchedErrors(validation.errors);
+      return;
+    }
+
+    setSchedErrors({});
+    await pureDB.schedules.add({
+      ...validation.data,
       created_at: new Date().toISOString(),
     });
 

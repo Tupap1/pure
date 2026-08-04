@@ -14,6 +14,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { calculateRequiredGradeForRemaining } from '@/lib/domain/subject';
+import { DeliverableSchema, validateEntity } from '@/lib/validations/schemas';
 
 export const DeliverablesDashboard: React.FC = () => {
   const { isLoaded, subjects, deliverables } = usePureData();
@@ -27,6 +28,8 @@ export const DeliverablesDashboard: React.FC = () => {
   const [isGroup, setIsGroup] = useState(false);
   const [complexity, setComplexity] = useState<'facil' | 'medio' | 'dificil'>('medio');
   const [dueDate, setDueDate] = useState('');
+
+  const [delivErrors, setDelivErrors] = useState<Record<string, string>>({});
 
   if (!isLoaded) {
     return <div className="p-8 text-center text-slate-400 font-mono">Cargando entregas...</div>;
@@ -44,17 +47,28 @@ export const DeliverablesDashboard: React.FC = () => {
     : null;
 
   const handleAddDeliverable = async () => {
-    if (!title.trim() || !subjectId) return;
-
-    await pureDB.deliverables.add({
+    const delivData = {
       subject_id: subjectId,
       title,
       due_date: dueDate ? new Date(dueDate).toISOString() : new Date().toISOString(),
       weight_percentage: Number(weight),
-      type: 'taller',
+      type: 'Parcial',
       is_group: isGroup,
-      complexity,
+      complexity: complexity === 'dificil' ? 'Difícil' : complexity === 'facil' ? 'Fácil' : 'Medio',
       status: 'pendiente',
+    };
+
+    const validation = validateEntity(DeliverableSchema, delivData as any);
+    if (!validation.success) {
+      setDelivErrors(validation.errors);
+      return;
+    }
+
+    setDelivErrors({});
+    await pureDB.deliverables.add({
+      ...validation.data as any,
+      type: 'Parcial',
+      complexity: complexity,
       created_at: new Date().toISOString(),
     });
 

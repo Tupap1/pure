@@ -1,0 +1,17 @@
+{
+  "name": "PURE — Academic Management OS",
+  "short_name": "PURE",
+  "description": "Sistema de gestión académica multi-universidad para doble ingeniería.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070a12",
+  "theme_color": "#070a12",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

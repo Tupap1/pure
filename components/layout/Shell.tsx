@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Sidebar, DashboardTab } from './Sidebar';
+import { BottomNav } from './BottomNav';
 import { Header } from './Header';
 
 interface ShellProps {
@@ -10,17 +11,20 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('command');
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-sky-500/30 selection:text-sky-900 dark:selection:text-sky-200 transition-colors">
-      {/* Navigation Sidebar */}
+    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-sky-500/30 selection:text-sky-900 dark:selection:text-sky-200 transition-colors">
+      {/* Desktop Navigation Sidebar */}
       <Sidebar activeTab={activeTab} onSelectTab={setActiveTab} />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
         <Header />
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto space-y-6">
+        <main className="flex-1 p-3 sm:p-6 md:p-8 overflow-y-auto space-y-6">
           {children(activeTab)}
         </main>
       </div>
+
+      {/* Mobile Navigation Bottom Bar */}
+      <BottomNav activeTab={activeTab} onSelectTab={setActiveTab} />
     </div>
   );
 };
