@@ -301,7 +301,7 @@ export const CommandCenter: React.FC = () => {
                   Evolución de Promedio Académico
                 </h3>
               </div>
-              <SemesterProgressChart targetGPA={4.5} />
+              <SemesterProgressChart data={subjects.map((s) => ({ semester: s.code || s.name.substring(0, 6), gpa: s.current_grade || 0, credits: s.credits }))} targetGPA={4.5} />
             </Card>
           </div>
         </>

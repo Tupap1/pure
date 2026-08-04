@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 export interface SemesterData {
-  semester: string; // e.g. "Smt 1"
+  semester: string; // e.g. "Smt 1" or subject code
   gpa: number;      // e.g. 4.2
   credits: number;  // e.g. 18
 }
@@ -11,22 +11,37 @@ interface SemesterProgressChartProps {
   targetGPA?: number;
 }
 
-const defaultData: SemesterData[] = [
-  { semester: 'Smt 1', gpa: 4.1, credits: 16 },
-  { semester: 'Smt 2', gpa: 4.3, credits: 18 },
-  { semester: 'Smt 3', gpa: 3.9, credits: 17 },
-  { semester: 'Smt 4', gpa: 4.4, credits: 19 },
-  { semester: 'Smt 5', gpa: 4.6, credits: 18 },
-  { semester: 'Smt 6', gpa: 4.5, credits: 16 },
-  { semester: 'Smt 7', gpa: 4.7, credits: 15 },
-  { semester: 'Smt 8', gpa: 4.8, credits: 14 },
-];
-
 export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
-  data = defaultData,
+  data = [],
   targetGPA = 4.5,
 }) => {
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(4); // Default hover on Smt 5 like inspo
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(data.length > 0 ? data.length - 1 : null);
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="w-full space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 font-heading tracking-tight">
+              Evolución de Promedio Académico por Asignatura
+            </h4>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Histórico ponderado de calificaciones en escala 0.0 - 5.0
+            </p>
+          </div>
+        </div>
+
+        <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/40 space-y-2">
+          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+            Sin notas o asignaturas registradas
+          </p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+            Ingresa a la pestaña <span className="font-mono text-cyan-600 dark:text-cyan-400">Configuración</span> o carga la matrícula demo para proyectar la evolución del promedio académico.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const maxGPA = 5.0;
   const height = 180;
@@ -44,15 +59,15 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 font-heading tracking-tight">
-            Evolución de Promedio Académico por Semestre
+            Evolución de Promedio Académico por Asignatura
           </h4>
           <p className="text-[11px] text-slate-500 dark:text-slate-400">
             Histórico acumulado sobre escala 0.0 - 5.0
           </p>
         </div>
         <div className="flex items-center gap-3 text-[11px] font-mono">
-          <span className="flex items-center gap-1.5 text-sky-600 dark:text-sky-400">
-            <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-t from-purple-500 to-sky-400"></span>
+          <span className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400">
+            <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-t from-purple-500 to-cyan-400"></span>
             Promedio Real
           </span>
           <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
@@ -65,10 +80,9 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
       <div className="relative w-full bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800/80 rounded-xl p-4 shadow-inner">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto overflow-visible">
           <defs>
-            {/* Gradient definition matching inspo Cyan to Purple */}
             <linearGradient id="barGradient" x1="0" y1="1" x2="0" y2="0">
               <stop offset="0%" stopColor="#a855f7" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#38bdf8" stopOpacity="1" />
+              <stop offset="100%" stopColor="#00f0ff" stopOpacity="1" />
             </linearGradient>
 
             <linearGradient id="barGradientHover" x1="0" y1="1" x2="0" y2="0">
@@ -129,9 +143,9 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
           {/* Bars */}
           {data.map((item, idx) => {
             const cx = paddingX + idx * stepX;
-            const barWidth = 16;
+            const barWidth = 18;
             const x = cx - barWidth / 2;
-            const barHeight = (item.gpa / maxGPA) * chartHeight;
+            const barHeight = (Math.max(0.1, item.gpa) / maxGPA) * chartHeight;
             const y = height - paddingBottom - barHeight;
             const isHovered = hoveredIdx === idx;
 
@@ -158,7 +172,7 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
                   y={y}
                   width={barWidth}
                   height={barHeight}
-                  rx="8"
+                  rx="6"
                   fill={isHovered ? 'url(#barGradientHover)' : 'url(#barGradient)'}
                   filter={isHovered ? 'url(#glow)' : undefined}
                   className="transition-all duration-300"
@@ -171,27 +185,25 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
                   textAnchor="middle"
                   className={`text-[9px] font-mono transition-colors ${
                     isHovered
-                      ? 'fill-sky-600 dark:fill-sky-400 font-bold'
+                      ? 'fill-cyan-600 dark:fill-cyan-400 font-bold'
                       : 'fill-slate-500 dark:fill-slate-400'
                   }`}
                 >
                   {item.semester}
                 </text>
 
-                {/* Floating Tooltip Pill (matching Image 2 inspo) */}
+                {/* Floating Tooltip Pill */}
                 {isHovered && (
                   <g transform={`translate(${cx}, ${Math.max(12, y - 24)})`}>
-                    {/* Tooltip Background Pill */}
                     <rect
                       x="-32"
                       y="-14"
                       width="64"
                       height="20"
                       rx="10"
-                      className="fill-slate-900 dark:fill-slate-100 stroke-sky-400 shadow-lg"
+                      className="fill-slate-900 dark:fill-slate-100 stroke-cyan-400 shadow-lg"
                       strokeWidth="1"
                     />
-                    {/* Tooltip Text */}
                     <text
                       x="0"
                       y="0"
