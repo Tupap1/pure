@@ -33,9 +33,12 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: pure_mcp_server
-    command: ["npx", "tsx", "mcp-server/index.ts"]
-    stdin_open: true
-    tty: true
+    command: ["npx", "tsx", "mcp-server/index.ts", "--http"]
+    ports:
+      - "3001:3001"
+    environment:
+      - MCP_PORT=3001
+      - NODE_ENV=production
     depends_on:
       - pure-db
     restart: unless-stopped

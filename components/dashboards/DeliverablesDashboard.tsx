@@ -11,7 +11,8 @@ import {
   Users,
   User,
   Calculator,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { calculateRequiredGradeForRemaining } from '@/lib/domain/subject';
 import { DeliverableSchema, validateEntity } from '@/lib/validations/schemas';
@@ -29,6 +30,8 @@ export const DeliverablesDashboard: React.FC = () => {
   const [complexity, setComplexity] = useState<'facil' | 'medio' | 'dificil'>('medio');
   const [dueDate, setDueDate] = useState('');
 
+  // Editing ID
+  const [editingDelivId, setEditingDelivId] = useState<string | null>(null);
   const [delivErrors, setDelivErrors] = useState<Record<string, string>>({});
 
   if (!isLoaded) {
@@ -45,6 +48,17 @@ export const DeliverablesDashboard: React.FC = () => {
   const requiredGrade = activeSubject
     ? calculateRequiredGradeForRemaining(deliverables as any, activeSubject.target_grade)
     : null;
+
+  const handleOpenEditDeliverable = (deliv: any) => {
+    setEditingDelivId(deliv.id);
+    setTitle(deliv.title);
+    setSubjectId(deliv.subject_id);
+    setWeight(deliv.weight_percentage);
+    setIsGroup(deliv.is_group || false);
+    setComplexity(deliv.complexity as any);
+    setDueDate(deliv.due_date ? deliv.due_date.substring(0, 10) : '');
+    setIsAddModalOpen(true);
+  };
 
   const handleAddDeliverable = async () => {
     const delivData = {
@@ -65,14 +79,23 @@ export const DeliverablesDashboard: React.FC = () => {
     }
 
     setDelivErrors({});
-    await pureDB.deliverables.add({
-      ...validation.data as any,
-      type: 'Parcial',
-      complexity: complexity,
-      created_at: new Date().toISOString(),
-    });
+    if (editingDelivId) {
+      await pureDB.deliverables.update(editingDelivId, {
+        ...validation.data as any,
+        type: 'Parcial',
+        complexity: complexity,
+      });
+    } else {
+      await pureDB.deliverables.add({
+        ...validation.data as any,
+        type: 'Parcial',
+        complexity: complexity,
+        created_at: new Date().toISOString(),
+      });
+    }
 
     setTitle('');
+    setEditingDelivId(null);
     setIsAddModalOpen(false);
   };
 
@@ -225,10 +248,18 @@ export const DeliverablesDashboard: React.FC = () => {
                       {deliv.is_group ? <Users className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> : <User className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />}
                       {deliv.is_group ? 'Grupal' : 'Individual'}
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <span className="text-slate-700 dark:text-slate-300 font-mono">Peso: {deliv.weight_percentage}%</span>
                       <button
+                        onClick={() => handleOpenEditDeliverable(deliv)}
+                        title="Editar entrega"
+                        className="text-slate-400 hover:text-emerald-500 transition-colors p-1"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
                         onClick={() => handleDeleteDeliverable(deliv.id!)}
+                        title="Eliminar entrega"
                         className="text-slate-400 hover:text-rose-500 transition-colors p-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

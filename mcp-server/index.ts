@@ -1,9 +1,12 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import express from 'express';
+import cors from 'cors';
 import {
   handleGetAcademicOverview,
   handleParseAndIngestSyllabus,
@@ -108,9 +111,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error('Servidor MCP de Pure conectado exitosamente vía stdio');
+  const isHttpMode = process.argv.includes('--http') || Boolean(process.env.MCP_PORT);
+
+  if (isHttpMode) {
+    const app = express();
+    app.use(cors({ origin: '*' }));
+    app.use(express.json());
+
+    let sseTransport: SSEServerTransport | null = null;
+
+    app.get('/sse', async (req, res) => {
+      console.log('Conexión MCP SSE iniciada desde Agente Cloud (p.ej. Claude Online)');
+      sseTransport = new SSEServerTransport('/message', res);
+      await server.connect(sseTransport);
+    });
+
+    app.post('/message', async (req, res) => {
+      if (sseTransport) {
+        await sseTransport.handlePostMessage(req, res);
+      } else {
+        res.status(400).json({ error: 'No hay conexión SSE activa' });
+      }
+    });
+
+    const PORT = process.env.MCP_PORT || 3001;
+    app.listen(Number(PORT), '0.0.0.0', () => {
+      console.log(`Servidor MCP HTTP/SSE escuchando en http://0.0.0.0:${PORT}/sse para Agentes Cloud`);
+    });
+  } else {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error('Servidor MCP de Pure conectado exitosamente vía stdio');
+  }
 }
 
 main().catch((err) => {

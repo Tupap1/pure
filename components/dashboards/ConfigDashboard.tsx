@@ -23,7 +23,8 @@ import {
   BookOpen,
   Calendar,
   RotateCcw,
-  Sparkles
+  Sparkles,
+  Pencil
 } from 'lucide-react';
 
 export const ConfigDashboard: React.FC = () => {
@@ -62,6 +63,12 @@ export const ConfigDashboard: React.FC = () => {
   const [schedEnd, setSchedEnd] = useState('10:00');
   const [schedClassroom, setSchedClassroom] = useState('');
 
+  // Editing IDs
+  const [editingUniId, setEditingUniId] = useState<string | null>(null);
+  const [editingProfId, setEditingProfId] = useState<string | null>(null);
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [editingSchedId, setEditingSchedId] = useState<string | null>(null);
+
   // Form Error States
   const [uniErrors, setUniErrors] = useState<Record<string, string>>({});
   const [profErrors, setProfErrors] = useState<Record<string, string>>({});
@@ -72,6 +79,49 @@ export const ConfigDashboard: React.FC = () => {
     return <div className="p-8 text-center text-slate-400 font-mono">Cargando directorio...</div>;
   }
 
+  // --- EDIT OPEN HANDLERS ---
+  const handleOpenEditUni = (uni: any) => {
+    setEditingUniId(uni.id);
+    setUniName(uni.name);
+    setUniModality(uni.modality);
+    setUniMin(uni.scale_min);
+    setUniMax(uni.scale_max);
+    setUniPassing(uni.passing_grade);
+    setIsAddUniOpen(true);
+  };
+
+  const handleOpenEditProf = (prof: any) => {
+    setEditingProfId(prof.id);
+    setProfName(prof.name);
+    setProfUniId(prof.university_id);
+    setProfEmail(prof.email || '');
+    setIsAddProfOpen(true);
+  };
+
+  const handleOpenEditSubject = (sub: any) => {
+    setEditingSubId(sub.id);
+    setSubName(sub.name);
+    setSubCode(sub.code || '');
+    setSubUniId(sub.university_id);
+    setSubProfId(sub.professor_id || '');
+    setSubCredits(sub.credits || 3);
+    setSubDifficulty(sub.difficulty || 3);
+    setSubModality(sub.modality || 'presencial');
+    setSubTargetGrade(sub.target_grade || 4.5);
+    setIsAddSubjectOpen(true);
+  };
+
+  const handleOpenEditSchedule = (sched: any) => {
+    setEditingSchedId(sched.id);
+    setSchedSubjectId(sched.subject_id);
+    setSchedDay(sched.day_of_week);
+    setSchedStart(sched.start_time);
+    setSchedEnd(sched.end_time);
+    setSchedClassroom(sched.classroom || '');
+    setIsAddScheduleOpen(true);
+  };
+
+  // --- SAVE HANDLERS (ADD OR UPDATE) ---
   const handleAddUni = async () => {
     const uniData = {
       name: uniName,
@@ -89,13 +139,21 @@ export const ConfigDashboard: React.FC = () => {
     }
 
     setUniErrors({});
-    await pureDB.universities.add({
-      ...validation.data,
-      color: validation.data.color || (uniModality === 'presencial' ? '#0ea5e9' : '#6366f1'),
-      created_at: new Date().toISOString(),
-    });
+    if (editingUniId) {
+      await pureDB.universities.update(editingUniId, {
+        ...validation.data,
+        color: validation.data.color || (uniModality === 'presencial' ? '#0ea5e9' : '#6366f1'),
+      });
+    } else {
+      await pureDB.universities.add({
+        ...validation.data,
+        color: validation.data.color || (uniModality === 'presencial' ? '#0ea5e9' : '#6366f1'),
+        created_at: new Date().toISOString(),
+      });
+    }
 
     setUniName('');
+    setEditingUniId(null);
     setIsAddUniOpen(false);
   };
 
@@ -117,13 +175,18 @@ export const ConfigDashboard: React.FC = () => {
     }
 
     setProfErrors({});
-    await pureDB.professors.add({
-      ...validation.data,
-      created_at: new Date().toISOString(),
-    });
+    if (editingProfId) {
+      await pureDB.professors.update(editingProfId, validation.data);
+    } else {
+      await pureDB.professors.add({
+        ...validation.data,
+        created_at: new Date().toISOString(),
+      });
+    }
 
     setProfName('');
     setProfEmail('');
+    setEditingProfId(null);
     setIsAddProfOpen(false);
   };
 
@@ -151,16 +214,25 @@ export const ConfigDashboard: React.FC = () => {
     }
 
     setSubErrors({});
-    await pureDB.subjects.add({
+    const finalData = {
       ...validation.data,
-      modality: validation.data.modality === 'virtual' ? 'virtual' : 'presencial',
+      modality: (validation.data.modality === 'virtual' ? 'virtual' : 'presencial') as 'presencial' | 'virtual',
       target_grade: validation.data.target_grade ?? Number(subTargetGrade) ?? 3.0,
       current_grade: validation.data.current_grade ?? 0,
-      created_at: new Date().toISOString(),
-    });
+    };
+
+    if (editingSubId) {
+      await pureDB.subjects.update(editingSubId, finalData);
+    } else {
+      await pureDB.subjects.add({
+        ...finalData,
+        created_at: new Date().toISOString(),
+      });
+    }
 
     setSubName('');
     setSubCode('');
+    setEditingSubId(null);
     setIsAddSubjectOpen(false);
   };
 
@@ -184,11 +256,16 @@ export const ConfigDashboard: React.FC = () => {
     }
 
     setSchedErrors({});
-    await pureDB.schedules.add({
-      ...validation.data,
-      created_at: new Date().toISOString(),
-    });
+    if (editingSchedId) {
+      await pureDB.schedules.update(editingSchedId, validation.data);
+    } else {
+      await pureDB.schedules.add({
+        ...validation.data,
+        created_at: new Date().toISOString(),
+      });
+    }
 
+    setEditingSchedId(null);
     setIsAddScheduleOpen(false);
   };
 
@@ -265,12 +342,22 @@ export const ConfigDashboard: React.FC = () => {
                       </Badge>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDeleteUni(uni.id!)}
-                    className="text-slate-400 hover:text-rose-500 transition-colors p-1"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenEditUni(uni)}
+                      title="Editar universidad"
+                      className="text-slate-400 hover:text-sky-500 transition-colors p-1"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUni(uni.id!)}
+                      title="Eliminar universidad"
+                      className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-slate-100 dark:bg-slate-900 text-center text-xs font-mono">
@@ -303,7 +390,12 @@ export const ConfigDashboard: React.FC = () => {
           <Button
             variant="primary"
             size="sm"
-            onClick={() => setIsAddProfOpen(true)}
+            onClick={() => {
+              setEditingProfId(null);
+              setProfName('');
+              setProfEmail('');
+              setIsAddProfOpen(true);
+            }}
             disabled={universities.length === 0}
           >
             <Plus className="w-3.5 h-3.5" /> Registrar Profesor
@@ -340,12 +432,22 @@ export const ConfigDashboard: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDeleteProf(prof.id!)}
-                    className="text-slate-400 hover:text-rose-500 transition-colors p-1"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenEditProf(prof)}
+                      title="Editar profesor"
+                      className="text-slate-400 hover:text-indigo-500 transition-colors p-1"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteProf(prof.id!)}
+                      title="Eliminar profesor"
+                      className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </Card>
               );
             })}
@@ -363,7 +465,12 @@ export const ConfigDashboard: React.FC = () => {
           <Button
             variant="aeroespacial"
             size="sm"
-            onClick={() => setIsAddSubjectOpen(true)}
+            onClick={() => {
+              setEditingSubId(null);
+              setSubName('');
+              setSubCode('');
+              setIsAddSubjectOpen(true);
+            }}
             disabled={universities.length === 0}
           >
             <Plus className="w-3.5 h-3.5" /> Registrar Materia
@@ -381,7 +488,12 @@ export const ConfigDashboard: React.FC = () => {
               variant="aeroespacial"
               size="sm"
               className="mt-4"
-              onClick={() => setIsAddSubjectOpen(true)}
+              onClick={() => {
+                setEditingSubId(null);
+                setSubName('');
+                setSubCode('');
+                setIsAddSubjectOpen(true);
+              }}
               disabled={universities.length === 0}
             >
               <Plus className="w-3.5 h-3.5" /> Registrar Primera Materia
@@ -409,12 +521,22 @@ export const ConfigDashboard: React.FC = () => {
                         {uni?.name} {prof ? `• Profe: ${prof.name}` : ''}
                       </p>
                     </div>
-                    <button
-                      onClick={() => handleDeleteSubject(sub.id!)}
-                      className="text-slate-400 hover:text-rose-500 transition-colors p-1"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEditSubject(sub)}
+                        title="Editar asignatura"
+                        className="text-slate-400 hover:text-sky-500 transition-colors p-1"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSubject(sub.id!)}
+                        title="Eliminar asignatura"
+                        className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800 pt-2 font-mono">
@@ -440,7 +562,10 @@ export const ConfigDashboard: React.FC = () => {
           <Button
             variant="primary"
             size="sm"
-            onClick={() => setIsAddScheduleOpen(true)}
+            onClick={() => {
+              setEditingSchedId(null);
+              setIsAddScheduleOpen(true);
+            }}
             disabled={subjects.length === 0}
           >
             <Plus className="w-3.5 h-3.5" /> Asignar Horario
@@ -470,12 +595,22 @@ export const ConfigDashboard: React.FC = () => {
                     </div>
                     <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{sched.classroom}</div>
                   </div>
-                  <button
-                    onClick={() => handleDeleteSchedule(sched.id!)}
-                    className="text-slate-400 hover:text-rose-500 transition-colors p-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenEditSchedule(sched)}
+                      title="Editar horario"
+                      className="text-slate-400 hover:text-amber-500 transition-colors p-1"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteSchedule(sched.id!)}
+                      title="Eliminar horario"
+                      className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </Card>
               );
             })}
