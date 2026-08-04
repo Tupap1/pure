@@ -11,7 +11,11 @@ import {
   MapPin,
   Pencil,
   Trash2,
-  Plus
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Grid,
+  List
 } from 'lucide-react';
 import { detectScheduleConflicts } from '@/lib/algorithms/conflict-detector';
 import { filterSchedulesByDay, sortSchedulesByTime } from '@/lib/algorithms/schedule-mobile-transformer';
@@ -29,6 +33,7 @@ export const ScheduleDashboard: React.FC = () => {
   // Today & Live Time State
   const todayNum = getTodayDayOfWeek();
   const [selectedMobileDay, setSelectedMobileDay] = useState<number>(todayNum);
+  const [mobileViewMode, setMobileViewMode] = useState<'grid' | 'list'>('grid'); // 'grid' = Google Calendar style
   const [now, setNow] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -76,7 +81,25 @@ export const ScheduleDashboard: React.FC = () => {
   const shortDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
 
+  const gridHours = [
+    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+    '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+    '18:00', '19:00', '20:00', '21:00', '22:00'
+  ];
+
   const selectedDaySchedules = sortSchedulesByTime(filterSchedulesByDay(schedules, selectedMobileDay));
+
+  const handlePrevDay = () => {
+    setSelectedMobileDay((prev) => (prev > 1 ? prev - 1 : 7));
+  };
+
+  const handleNextDay = () => {
+    setSelectedMobileDay((prev) => (prev < 7 ? prev + 1 : 1));
+  };
+
+  const handleGoToday = () => {
+    setSelectedMobileDay(todayNum);
+  };
 
   const handleOpenAddSchedule = () => {
     setEditingSchedId(null);
@@ -133,6 +156,14 @@ export const ScheduleDashboard: React.FC = () => {
     await pureDB.schedules.delete(id);
   };
 
+  const parseTimeToMinutes = (timeStr: string) => {
+    const [h, m] = timeStr.split(':').map(Number);
+    return h * 60 + (m || 0);
+  };
+
+  const gridStartMins = 6 * 60; // 06:00
+  const hourRowHeight = 60; // 60px por hora
+
   const inputClass =
     'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
 
@@ -146,7 +177,7 @@ export const ScheduleDashboard: React.FC = () => {
             Master Schedule & Matriz de Traslapes
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Vista semanal unificada con indicador en tiempo real del día actual y hora en vivo.
+            Vista semanal unificada con interfaz estilo Google Calendar e indicador de hora en vivo.
           </p>
         </div>
         <Button variant="aeroespacial" onClick={handleOpenAddSchedule} className="shrink-0 flex items-center gap-1.5">
@@ -191,10 +222,64 @@ export const ScheduleDashboard: React.FC = () => {
         </Card>
       ) : (
         <>
-          {/* MOBILE VIEW: Day Selector + Agenda List (visible on screens < 640px) */}
-          <div className="block sm:hidden space-y-4">
-            {/* Day Selector Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+          {/* MOBILE VIEW: Google Calendar Style & Day Agenda (< 640px) */}
+          <div className="block sm:hidden space-y-3">
+            {/* Google Calendar Header Bar */}
+            <div className="flex items-center justify-between bg-slate-900/80 p-2.5 rounded-2xl border border-slate-800 shadow-sm">
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleGoToday}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                    selectedMobileDay === todayNum
+                      ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
+                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                  }`}
+                >
+                  Hoy
+                </button>
+                <button
+                  onClick={handlePrevDay}
+                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-xl bg-slate-800 text-slate-300 border border-slate-700 active:scale-95 transition-all"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleNextDay}
+                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-xl bg-slate-800 text-slate-300 border border-slate-700 active:scale-95 transition-all"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* View Switcher: Grid (Google Calendar) vs List */}
+              <div className="flex items-center p-0.5 bg-slate-950 rounded-xl border border-slate-800">
+                <button
+                  onClick={() => setMobileViewMode('grid')}
+                  title="Vista Cuadrícula Día (Google Calendar)"
+                  className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                    mobileViewMode === 'grid'
+                      ? 'bg-sky-500 text-slate-950 font-bold shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Grid className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setMobileViewMode('list')}
+                  title="Vista Agenda Lista"
+                  className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                    mobileViewMode === 'list'
+                      ? 'bg-sky-500 text-slate-950 font-bold shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Day Selector Pills Bar */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
               {shortDays.map((dayName, idx) => {
                 const dayNum = idx + 1;
                 const isSelected = selectedMobileDay === dayNum;
@@ -204,19 +289,17 @@ export const ScheduleDashboard: React.FC = () => {
                   <button
                     key={dayName}
                     onClick={() => setSelectedMobileDay(dayNum)}
-                    className={`min-h-[44px] min-w-[58px] flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all shrink-0 relative ${
+                    className={`min-h-[44px] min-w-[56px] flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-xs font-semibold transition-all shrink-0 relative ${
                       isSelected
                         ? 'bg-sky-500 text-slate-950 border-sky-400 font-bold shadow-lg shadow-sky-500/20'
                         : isToday
-                        ? 'bg-sky-950/60 text-sky-300 border-sky-600/60'
+                        ? 'bg-sky-950/70 text-sky-300 border-sky-500/60'
                         : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
                     }`}
                   >
                     <div className="flex items-center gap-1">
                       <span>{dayName}</span>
-                      {isToday && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                      )}
+                      {isToday && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />}
                     </div>
                     <div className="flex items-center gap-1 mt-0.5">
                       {isToday && (
@@ -235,79 +318,163 @@ export const ScheduleDashboard: React.FC = () => {
               })}
             </div>
 
-            {/* Mobile Day Agenda Cards */}
-            <div className="space-y-3">
-              <div className="text-xs font-bold font-mono text-slate-400 uppercase tracking-wider flex items-center justify-between px-1">
-                <span className="flex items-center gap-2">
-                  Agenda de {days[selectedMobileDay - 1]}
-                  {selectedMobileDay === todayNum && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40 rounded-md">
-                      HOY
-                    </span>
-                  )}
-                </span>
-                <span>{selectedDaySchedules.length} clases</span>
-              </div>
-
-              {/* Live Time Bar on Mobile (Only if viewing Today) */}
-              {selectedMobileDay === todayNum && (
-                <div className="flex items-center justify-between py-2 px-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 font-mono text-xs my-1 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
-                    <span className="font-bold uppercase tracking-wider text-[11px]">Hora Actual</span>
-                  </div>
-                  <span className="text-xs font-bold bg-rose-500 text-white px-2 py-0.5 rounded-md shadow">
-                    {currentTimeFormatted}
+            {/* Title Bar for Selected Day */}
+            <div className="text-xs font-bold font-mono text-slate-300 uppercase tracking-wider flex items-center justify-between px-2 py-1 bg-slate-900/60 rounded-lg border border-slate-800">
+              <span className="flex items-center gap-2">
+                📅 {days[selectedMobileDay - 1]}
+                {selectedMobileDay === todayNum && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold bg-rose-500 text-white rounded-md animate-pulse">
+                    HOY ({currentTimeFormatted})
                   </span>
-                </div>
-              )}
-
-              {selectedDaySchedules.length === 0 ? (
-                <div className="p-6 text-center bg-slate-900/40 rounded-xl border border-slate-800 text-slate-500 text-xs">
-                  Sin clases programadas para este día 🎉
-                </div>
-              ) : (
-                selectedDaySchedules.map((sched) => {
-                  const sub = subjects.find((s) => s.id === sched.subject_id);
-                  const isPresencial = sub?.modality === 'presencial';
-                  return (
-                    <Card
-                      key={sched.id}
-                      onClick={() => handleOpenEditSchedule(sched)}
-                      className="p-3.5 border-l-4 border-l-sky-500 bg-slate-900/60 flex items-center justify-between gap-3 cursor-pointer hover:border-sky-400 active:scale-[0.99] transition-all"
-                    >
-                      <div className="space-y-1 min-w-0">
-                        <div className="text-xs font-mono text-sky-400 font-semibold flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 shrink-0" />
-                          <span>{sched.start_time} - {sched.end_time}</span>
-                        </div>
-                        <h4 className="text-sm font-bold text-slate-100 truncate">{sub?.name || 'Materia'}</h4>
-                        <div className="text-xs text-slate-400 flex items-center gap-1.5 truncate">
-                          <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                          <span className="truncate">{sched.classroom || (isPresencial ? 'Presencial' : 'Virtual')}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleOpenEditSchedule(sched); }}
-                          title="Editar horario"
-                          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => handleDeleteSchedule(sched.id!, e)}
-                          title="Eliminar horario"
-                          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </Card>
-                  );
-                })
-              )}
+                )}
+              </span>
+              <span>{selectedDaySchedules.length} clases</span>
             </div>
+
+            {/* GOOGLE CALENDAR VERTICAL TIME GRID (When mobileViewMode === 'grid') */}
+            {mobileViewMode === 'grid' ? (
+              <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-y-auto max-h-[65vh] p-2 relative shadow-inner">
+                <div className="flex relative" style={{ height: `${gridHours.length * hourRowHeight}px` }}>
+                  {/* Left Time Axis (06:00 .. 22:00) */}
+                  <div className="w-14 shrink-0 border-r border-slate-800/80 pr-2 select-none">
+                    {gridHours.map((h, i) => (
+                      <div
+                        key={h}
+                        className="text-[10px] font-mono text-slate-400 font-medium"
+                        style={{ height: `${hourRowHeight}px` }}
+                      >
+                        {h}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Right Event Grid Area */}
+                  <div className="flex-1 relative pl-2">
+                    {/* Hour Horizontal Grid Lines */}
+                    {gridHours.map((h, i) => (
+                      <div
+                        key={h}
+                        className="border-b border-slate-800/50 absolute left-0 right-0 pointer-events-none"
+                        style={{ top: `${i * hourRowHeight}px`, height: `${hourRowHeight}px` }}
+                      />
+                    ))}
+
+                    {/* RED LIVE TIME LINE (Google Calendar Style) */}
+                    {selectedMobileDay === todayNum && (() => {
+                      const currentMinsFromStart = (currentHourNum * 60 + currentMinNum) - gridStartMins;
+                      if (currentMinsFromStart >= 0 && currentMinsFromStart <= (gridHours.length * 60)) {
+                        const lineTopPx = (currentMinsFromStart / 60) * hourRowHeight;
+                        return (
+                          <div
+                            className="absolute left-0 right-0 z-30 flex items-center pointer-events-none"
+                            style={{ top: `${lineTopPx}px` }}
+                          >
+                            {/* Red circle dot on left time axis */}
+                            <div className="w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-slate-950 shadow-md shadow-rose-500/80 -ml-3.5 shrink-0 animate-pulse" />
+                            {/* Glowing Red Line across grid */}
+                            <div className="h-[2px] w-full bg-rose-500 shadow-sm shadow-rose-500/80" />
+                            {/* Time Badge */}
+                            <span className="text-[9px] font-mono font-bold bg-rose-500 text-white px-1.5 py-0.5 rounded shadow shrink-0 ml-1">
+                              {currentTimeFormatted}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* Class Blocks in Grid */}
+                    {selectedDaySchedules.map((sched) => {
+                      const sub = subjects.find((s) => s.id === sched.subject_id);
+                      const isPresencial = sub?.modality === 'presencial';
+                      const startMins = parseTimeToMinutes(sched.start_time) - gridStartMins;
+                      const endMins = parseTimeToMinutes(sched.end_time) - gridStartMins;
+                      const durationMins = Math.max(endMins - startMins, 30);
+
+                      const topPx = (startMins / 60) * hourRowHeight;
+                      const heightPx = (durationMins / 60) * hourRowHeight;
+
+                      return (
+                        <div
+                          key={sched.id}
+                          onClick={() => handleOpenEditSchedule(sched)}
+                          style={{
+                            top: `${topPx}px`,
+                            height: `${heightPx - 4}px`,
+                          }}
+                          className={`absolute left-2 right-2 rounded-xl p-2 z-20 cursor-pointer border shadow-lg flex flex-col justify-between transition-all active:scale-[0.98] ${
+                            isPresencial
+                              ? 'bg-sky-900/80 border-sky-500/70 text-sky-100 shadow-sky-950/50'
+                              : 'bg-indigo-900/80 border-indigo-500/70 text-indigo-100 shadow-indigo-950/50'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-1 min-w-0">
+                            <div className="font-bold text-xs truncate leading-tight">{sub?.name || 'Materia'}</div>
+                            <Pencil className="w-3 h-3 text-slate-300 opacity-80 shrink-0 mt-0.5" />
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] font-mono opacity-90 mt-1">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {sched.start_time} - {sched.end_time}
+                            </span>
+                            <span className="truncate max-w-[90px]">{sched.classroom || (isPresencial ? 'Presencial' : 'Virtual')}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* LIST AGENDA VIEW (When mobileViewMode === 'list') */
+              <div className="space-y-3">
+                {selectedDaySchedules.length === 0 ? (
+                  <div className="p-6 text-center bg-slate-900/40 rounded-xl border border-slate-800 text-slate-500 text-xs">
+                    Sin clases programadas para este día 🎉
+                  </div>
+                ) : (
+                  selectedDaySchedules.map((sched) => {
+                    const sub = subjects.find((s) => s.id === sched.subject_id);
+                    const isPresencial = sub?.modality === 'presencial';
+                    return (
+                      <Card
+                        key={sched.id}
+                        onClick={() => handleOpenEditSchedule(sched)}
+                        className="p-3.5 border-l-4 border-l-sky-500 bg-slate-900/60 flex items-center justify-between gap-3 cursor-pointer hover:border-sky-400 active:scale-[0.99] transition-all"
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <div className="text-xs font-mono text-sky-400 font-semibold flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 shrink-0" />
+                            <span>{sched.start_time} - {sched.end_time}</span>
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-100 truncate">{sub?.name || 'Materia'}</h4>
+                          <div className="text-xs text-slate-400 flex items-center gap-1.5 truncate">
+                            <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <span className="truncate">{sched.classroom || (isPresencial ? 'Presencial' : 'Virtual')}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleOpenEditSchedule(sched); }}
+                            title="Editar horario"
+                            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteSchedule(sched.id!, e)}
+                            title="Eliminar horario"
+                            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </Card>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
 
           {/* DESKTOP VIEW: Full 7-Day Matrix Table (visible on screens >= 640px) */}
