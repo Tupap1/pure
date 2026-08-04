@@ -59,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
               Libre Net
             </div>
             <div className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 leading-tight">
-              {netFreeTimeHours}h
+              {netFreeTimeHours.toFixed(1)}h
             </div>
           </div>
         </div>

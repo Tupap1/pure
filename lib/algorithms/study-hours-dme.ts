@@ -92,5 +92,6 @@ export function calculateNetFreeTime(params: NetFreeTimeParams): number {
   const totalSleepHours = params.sleepHoursPerNight * 7;
   const occupiedHours = params.classHours + params.dmeHours + totalSleepHours;
 
-  return Math.max(0, totalWeeklyHours - occupiedHours);
+  const raw = totalWeeklyHours - occupiedHours;
+  return Math.max(0, Math.round(raw * 10) / 10);
 }

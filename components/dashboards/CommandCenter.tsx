@@ -242,7 +242,7 @@ export const CommandCenter: React.FC = () => {
                         Tiempo Libre Neto
                       </div>
                       <div className="text-3xl font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        {netFreeTime}h
+                        {netFreeTime.toFixed(1)}h
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400">
                         Disponibilidad semanal real.
@@ -253,7 +253,7 @@ export const CommandCenter: React.FC = () => {
                         rings={multiRings}
                         size={120}
                         strokeWidth={7}
-                        centerTitle={`${netFreeTime}h`}
+                        centerTitle={`${netFreeTime.toFixed(1)}h`}
                         centerSubtitle="Libre"
                       />
                     </div>
