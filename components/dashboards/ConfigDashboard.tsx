@@ -618,11 +618,11 @@ export const ConfigDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Modal Add University */}
+      {/* Modal Add / Edit University */}
       <Modal
         isOpen={isAddUniOpen}
         onClose={() => setIsAddUniOpen(false)}
-        title="Configurar Nueva Universidad"
+        title={editingUniId ? 'Editar Universidad' : 'Configurar Nueva Universidad'}
       >
         <div className="space-y-4">
           <div>
@@ -634,6 +634,7 @@ export const ConfigDashboard: React.FC = () => {
               className={inputClass}
               placeholder="Ej: Universidad EAFIT"
             />
+            {uniErrors.name && <p className="text-xs text-rose-500 font-medium mt-1">{uniErrors.name}</p>}
           </div>
 
           <div>
@@ -678,22 +679,25 @@ export const ConfigDashboard: React.FC = () => {
               />
             </div>
           </div>
+          {uniErrors.scale_max && <p className="text-xs text-rose-500 font-medium mt-1">{uniErrors.scale_max}</p>}
+          {uniErrors.passing_grade && <p className="text-xs text-rose-500 font-medium mt-1">{uniErrors.passing_grade}</p>}
+
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="ghost" onClick={() => setIsAddUniOpen(false)}>
               Cancelar
             </Button>
             <Button variant="aeroespacial" onClick={handleAddUni}>
-              Guardar Universidad
+              {editingUniId ? 'Guardar Cambios' : 'Guardar Universidad'}
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* Modal Add Professor */}
+      {/* Modal Add / Edit Professor */}
       <Modal
         isOpen={isAddProfOpen}
         onClose={() => setIsAddProfOpen(false)}
-        title="Registrar Nuevo Profesor"
+        title={editingProfId ? 'Editar Profesor' : 'Registrar Nuevo Profesor'}
       >
         <div className="space-y-4">
           <div>
@@ -705,6 +709,7 @@ export const ConfigDashboard: React.FC = () => {
               className={inputClass}
               placeholder="Ej: Dr. Carlos Pérez"
             />
+            {profErrors.name && <p className="text-xs text-rose-500 font-medium mt-1">{profErrors.name}</p>}
           </div>
 
           <div>
@@ -721,6 +726,7 @@ export const ConfigDashboard: React.FC = () => {
                 </option>
               ))}
             </select>
+            {profErrors.university_id && <p className="text-xs text-rose-500 font-medium mt-1">{profErrors.university_id}</p>}
           </div>
 
           <div>
@@ -732,6 +738,7 @@ export const ConfigDashboard: React.FC = () => {
               className={inputClass}
               placeholder="cperez@universidad.edu"
             />
+            {profErrors.email && <p className="text-xs text-rose-500 font-medium mt-1">{profErrors.email}</p>}
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
@@ -739,17 +746,17 @@ export const ConfigDashboard: React.FC = () => {
               Cancelar
             </Button>
             <Button variant="synergy" onClick={handleAddProf}>
-              Guardar Profesor
+              {editingProfId ? 'Guardar Cambios' : 'Guardar Profesor'}
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* Modal Add Subject */}
+      {/* Modal Add / Edit Subject */}
       <Modal
         isOpen={isAddSubjectOpen}
         onClose={() => setIsAddSubjectOpen(false)}
-        title="Registrar Nueva Asignatura"
+        title={editingSubId ? 'Editar Asignatura' : 'Registrar Nueva Asignatura'}
       >
         <div className="space-y-4">
           <div>
@@ -761,6 +768,7 @@ export const ConfigDashboard: React.FC = () => {
               className={inputClass}
               placeholder="Ej: Cálculo Vectorial y Geometría"
             />
+            {subErrors.name && <p className="text-xs text-rose-500 font-medium mt-1">{subErrors.name}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -773,6 +781,7 @@ export const ConfigDashboard: React.FC = () => {
                 className={inputClass}
                 placeholder="MAT-201"
               />
+              {subErrors.code && <p className="text-xs text-rose-500 font-medium mt-1">{subErrors.code}</p>}
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Universidad</label>
@@ -788,6 +797,7 @@ export const ConfigDashboard: React.FC = () => {
                   </option>
                 ))}
               </select>
+              {subErrors.university_id && <p className="text-xs text-rose-500 font-medium mt-1">{subErrors.university_id}</p>}
             </div>
           </div>
 
@@ -858,17 +868,17 @@ export const ConfigDashboard: React.FC = () => {
               Cancelar
             </Button>
             <Button variant="aeroespacial" onClick={handleAddSubject}>
-              Guardar Materia
+              {editingSubId ? 'Guardar Cambios' : 'Guardar Materia'}
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* Modal Add Schedule */}
+      {/* Modal Add / Edit Schedule */}
       <Modal
         isOpen={isAddScheduleOpen}
         onClose={() => setIsAddScheduleOpen(false)}
-        title="Asignar Horario a Materia"
+        title={editingSchedId ? 'Editar Horario de Clase' : 'Asignar Horario a Materia'}
       >
         <div className="space-y-4">
           <div>
@@ -885,6 +895,7 @@ export const ConfigDashboard: React.FC = () => {
                 </option>
               ))}
             </select>
+            {schedErrors.subject_id && <p className="text-xs text-rose-500 font-medium mt-1">{schedErrors.subject_id}</p>}
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -913,6 +924,7 @@ export const ConfigDashboard: React.FC = () => {
                 className={inputClass}
                 placeholder="08:00"
               />
+              {schedErrors.start_time && <p className="text-xs text-rose-500 font-medium mt-1">{schedErrors.start_time}</p>}
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Hora Fin</label>
@@ -923,6 +935,7 @@ export const ConfigDashboard: React.FC = () => {
                 className={inputClass}
                 placeholder="10:00"
               />
+              {schedErrors.end_time && <p className="text-xs text-rose-500 font-medium mt-1">{schedErrors.end_time}</p>}
             </div>
           </div>
 
@@ -942,7 +955,7 @@ export const ConfigDashboard: React.FC = () => {
               Cancelar
             </Button>
             <Button variant="aeroespacial" onClick={handleAddSchedule}>
-              Guardar Horario
+              {editingSchedId ? 'Guardar Cambios' : 'Guardar Horario'}
             </Button>
           </div>
         </div>

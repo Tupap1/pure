@@ -38,12 +38,27 @@ export const SubjectSchema = z.object({
   current_grade: z.number().optional()
 });
 
+const formatTimeStr = (t: string) => {
+  if (!t) return t;
+  const parts = t.trim().split(':');
+  if (parts.length === 2) {
+    const h = parts[0].padStart(2, '0');
+    const m = parts[1].padStart(2, '0');
+    return `${h}:${m}`;
+  }
+  return t;
+};
+
 export const ScheduleSchema = z.object({
   id: z.string().optional(),
   subject_id: z.string().min(1, { message: 'Debe seleccionar una asignatura' }),
   day_of_week: z.number().int().min(1).max(7),
-  start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Formato de hora inicio inválido (HH:mm)' }),
-  end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Formato de hora fin inválido (HH:mm)' }),
+  start_time: z.string().transform(formatTimeStr).pipe(
+    z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Formato de hora inicio inválido (ej: 08:00)' })
+  ),
+  end_time: z.string().transform(formatTimeStr).pipe(
+    z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Formato de hora fin inválido (ej: 10:00)' })
+  ),
   classroom: z.string().optional()
 }).refine(data => {
   const [startH, startM] = data.start_time.split(':').map(Number);
