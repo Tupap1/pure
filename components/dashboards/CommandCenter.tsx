@@ -201,51 +201,52 @@ export const CommandCenter: React.FC = () => {
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-2.5">
                   {subjects.map((sub) => {
                     const dme = calculateDME(sub as any);
                     const gradePct = Math.round(((sub.current_grade || 0) / (sub.target_grade || 5.0)) * 100);
                     const isAboveTarget = (sub.current_grade || 0) >= sub.target_grade;
 
                     return (
-                      <Card key={sub.id} className="p-4 space-y-3 flex flex-col justify-between">
-                        <div className="flex items-center justify-between gap-2 text-xs">
-                          <div className="min-w-0 flex-1">
-                            <h4 className="font-bold text-slate-900 dark:text-slate-100 truncate text-xs" title={sub.name}>
+                      <Card key={sub.id} className="p-3 hover:border-cyan-500/40 transition-all flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs font-heading truncate" title={sub.name}>
                               {sub.name}
                             </h4>
                             {sub.code && (
-                              <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 block truncate">
-                                {sub.code}
+                              <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 shrink-0">
+                                [{sub.code}]
                               </span>
                             )}
+                            <Badge variant={sub.modality === 'presencial' ? 'aeroespacial' : 'software'}>
+                              {sub.modality}
+                            </Badge>
                           </div>
-                          <Badge variant={sub.modality === 'presencial' ? 'aeroespacial' : 'software'}>
-                            {sub.modality}
-                          </Badge>
+
+                          <div className="flex items-center gap-3 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                            <span>Créditos: <strong className="text-slate-700 dark:text-slate-300">{sub.credits}</strong></span>
+                            <span>•</span>
+                            <span>Estudio DME: <strong className="text-purple-600 dark:text-purple-400">{dme.recommendedWeeklyHours.toFixed(1)}h/sem</strong></span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center justify-between gap-4 pt-1">
-                          <div className="space-y-1">
-                            <div className="text-2xl font-mono font-bold text-slate-900 dark:text-slate-100">
+                        <div className="flex items-center gap-4 shrink-0 font-mono text-right">
+                          <div>
+                            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
                               {sub.current_grade ? sub.current_grade.toFixed(2) : '0.00'}
                             </div>
-                            <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                              Meta: <span className="font-bold text-slate-800 dark:text-slate-200">{sub.target_grade.toFixed(2)}</span>
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                              Meta: {sub.target_grade.toFixed(2)}
                             </div>
                           </div>
                           <ProgressRing
                             progress={Math.min(100, gradePct)}
-                            size={56}
-                            strokeWidth={6}
-                            color={isAboveTarget ? '#10b981' : '#f59e0b'}
+                            size={42}
+                            strokeWidth={5}
+                            color={isAboveTarget ? '#10b981' : sub.current_grade ? '#38bdf8' : '#64748b'}
                             label={`${gradePct}%`}
                           />
-                        </div>
-
-                        <div className="pt-2 flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800/60">
-                          <span>Estudio DME:</span>
-                          <span className="text-purple-600 dark:text-purple-400 font-semibold">{dme.recommendedWeeklyHours.toFixed(1)}h / sem</span>
                         </div>
                       </Card>
                     );

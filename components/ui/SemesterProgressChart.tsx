@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Badge } from './Badge';
 
 export interface SemesterData {
-  semester: string; // e.g. "Smt 1" or subject code
-  gpa: number;      // e.g. 4.2
-  credits: number;  // e.g. 18
+  semester: string; // e.g. "Cálculo Diferencial" or "2585132"
+  name?: string;     // Full name if available
+  gpa: number;      // Current grade e.g. 0.00 or 4.20
+  credits: number;  // e.g. 3
 }
 
 interface SemesterProgressChartProps {
@@ -15,210 +17,108 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
   data = [],
   targetGPA = 4.5,
 }) => {
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(data.length > 0 ? data.length - 1 : null);
-
   if (!data || data.length === 0) {
     return (
       <div className="w-full space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 font-heading tracking-tight">
-              Evolución de Promedio Académico por Asignatura
+              Desempeño Académico por Asignatura
             </h4>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Histórico ponderado de calificaciones en escala 0.0 - 5.0
+              Progreso ponderado sobre escala 0.0 - 5.0
             </p>
           </div>
         </div>
 
         <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/40 space-y-2">
           <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-            Sin notas o asignaturas registradas
+            Sin notas registradas aún
           </p>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
-            Ingresa a la pestaña <span className="font-mono text-cyan-600 dark:text-cyan-400">Configuración</span> o carga la matrícula demo para proyectar la evolución del promedio académico.
+            Ingresa a <span className="font-mono text-cyan-600 dark:text-cyan-400">Configuración</span> para registrar tus asignaturas y calificaciones.
           </p>
         </div>
       </div>
     );
   }
 
-  const maxGPA = 5.0;
-  const height = 180;
-  const width = 500;
-  const paddingX = 30;
-  const paddingTop = 30;
-  const paddingBottom = 30;
-
-  const chartHeight = height - paddingTop - paddingBottom;
-  const availableWidth = width - paddingX * 2;
-  const stepX = availableWidth / (data.length - 1 || 1);
-
   return (
     <div className="w-full space-y-3">
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 font-heading tracking-tight">
-            Evolución de Promedio Académico por Asignatura
+            Desempeño & Proyección por Asignatura
           </h4>
           <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            Histórico acumulado sobre escala 0.0 - 5.0
+            Calificaciones actuales respecto a la meta ({targetGPA.toFixed(1)})
           </p>
         </div>
         <div className="flex items-center gap-3 text-[11px] font-mono">
-          <span className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400">
-            <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-t from-purple-500 to-cyan-400"></span>
-            Promedio Real
+          <span className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400">
+            <span className="w-2.5 h-2.5 rounded-sm bg-cyan-500"></span> Nota
           </span>
-          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-            <span className="w-2.5 h-0.5 bg-emerald-400"></span>
-            Meta ({targetGPA.toFixed(1)})
+          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+            <span className="w-2.5 h-0.5 bg-emerald-400"></span> Meta
           </span>
         </div>
       </div>
 
-      <div className="relative w-full bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800/80 rounded-xl p-4 shadow-inner">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto overflow-visible">
-          <defs>
-            <linearGradient id="barGradient" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0%" stopColor="#a855f7" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#00f0ff" stopOpacity="1" />
-            </linearGradient>
+      <div className="p-4 bg-slate-50/50 dark:bg-[#07090e] border border-slate-200 dark:border-slate-800 rounded-xl space-y-3 max-h-[320px] overflow-y-auto pr-1 scrollbar-none">
+        {data.map((item, idx) => {
+          const maxGrade = 5.0;
+          const currentPct = Math.min(100, Math.max(0, (item.gpa / maxGrade) * 100));
+          const targetPct = Math.min(100, Math.max(0, (targetGPA / maxGrade) * 100));
+          const isAboveTarget = item.gpa >= targetGPA;
 
-            <linearGradient id="barGradientHover" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0%" stopColor="#c084fc" stopOpacity="1" />
-              <stop offset="100%" stopColor="#00f0ff" stopOpacity="1" />
-            </linearGradient>
+          return (
+            <div
+              key={idx}
+              className="p-3 rounded-lg bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800/80 space-y-2 hover:border-cyan-500/40 transition-colors"
+            >
+              <div className="flex items-center justify-between text-xs gap-2">
+                <div className="min-w-0 flex-1 flex items-center gap-2">
+                  <span className="font-bold text-slate-900 dark:text-slate-100 truncate text-xs font-heading">
+                    {item.name || item.semester}
+                  </span>
+                  {item.semester && item.name && (
+                    <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 shrink-0">
+                      [{item.semester}]
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 font-mono text-xs shrink-0">
+                  <span className="text-slate-500 dark:text-slate-400 text-[10px]">{item.credits} crd</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                    {item.gpa.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400">/ 5.0</span>
+                </div>
+              </div>
 
-            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-          </defs>
-
-          {/* Y Axis Guide Lines */}
-          {[1.0, 2.0, 3.0, 4.0, 5.0].map((val) => {
-            const y = height - paddingBottom - (val / maxGPA) * chartHeight;
-            return (
-              <g key={val}>
-                <line
-                  x1={paddingX}
-                  y1={y}
-                  x2={width - paddingX}
-                  y2={y}
-                  stroke="currentColor"
-                  className="text-slate-200 dark:text-slate-800/80"
-                  strokeDasharray="3 3"
-                  strokeWidth="1"
+              {/* Horizontal Bar with Target Marker Line */}
+              <div className="relative h-2.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                {/* Target Marker Indicator */}
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-emerald-400 z-10 opacity-80"
+                  style={{ left: `${targetPct}%` }}
+                  title={`Meta: ${targetGPA.toFixed(1)}`}
                 />
-                <text
-                  x={12}
-                  y={y + 3}
-                  className="fill-slate-400 dark:fill-slate-500 text-[9px] font-mono"
-                  textAnchor="end"
-                >
-                  {val.toFixed(1)}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Target GPA Line */}
-          {(() => {
-            const targetY = height - paddingBottom - (targetGPA / maxGPA) * chartHeight;
-            return (
-              <line
-                x1={paddingX}
-                y1={targetY}
-                x2={width - paddingX}
-                y2={targetY}
-                stroke="#10b981"
-                strokeWidth="1.5"
-                strokeDasharray="4 4"
-                className="opacity-75"
-              />
-            );
-          })()}
-
-          {/* Bars */}
-          {data.map((item, idx) => {
-            const cx = paddingX + idx * stepX;
-            const barWidth = 18;
-            const x = cx - barWidth / 2;
-            const barHeight = (Math.max(0.1, item.gpa) / maxGPA) * chartHeight;
-            const y = height - paddingBottom - barHeight;
-            const isHovered = hoveredIdx === idx;
-
-            return (
-              <g
-                key={item.semester}
-                className="cursor-pointer transition-all duration-200"
-                onMouseEnter={() => setHoveredIdx(idx)}
-                onClick={() => setHoveredIdx(idx)}
-              >
-                {/* Background Track Column */}
-                <rect
-                  x={x - 2}
-                  y={paddingTop}
-                  width={barWidth + 4}
-                  height={chartHeight}
-                  rx="6"
-                  className="fill-transparent hover:fill-slate-100 dark:hover:fill-slate-900/60 transition-colors"
-                />
-
-                {/* Main Bar */}
-                <rect
-                  x={x}
-                  y={y}
-                  width={barWidth}
-                  height={barHeight}
-                  rx="6"
-                  fill={isHovered ? 'url(#barGradientHover)' : 'url(#barGradient)'}
-                  filter={isHovered ? 'url(#glow)' : undefined}
-                  className="transition-all duration-300"
-                />
-
-                {/* X Axis Label */}
-                <text
-                  x={cx}
-                  y={height - 8}
-                  textAnchor="middle"
-                  className={`text-[9px] font-mono transition-colors ${
-                    isHovered
-                      ? 'fill-cyan-600 dark:fill-cyan-400 font-bold'
-                      : 'fill-slate-500 dark:fill-slate-400'
+                {/* Filled Progress Bar */}
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    isAboveTarget
+                      ? 'bg-emerald-500'
+                      : item.gpa > 0
+                      ? 'bg-cyan-500'
+                      : 'bg-slate-400 dark:bg-slate-700'
                   }`}
-                >
-                  {item.semester}
-                </text>
-
-                {/* Floating Tooltip Pill */}
-                {isHovered && (
-                  <g transform={`translate(${cx}, ${Math.max(12, y - 24)})`}>
-                    <rect
-                      x="-32"
-                      y="-14"
-                      width="64"
-                      height="20"
-                      rx="10"
-                      className="fill-slate-900 dark:fill-slate-100 stroke-cyan-400 shadow-lg"
-                      strokeWidth="1"
-                    />
-                    <text
-                      x="0"
-                      y="0"
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      className="fill-slate-100 dark:fill-slate-900 text-[10px] font-mono font-bold"
-                    >
-                      Nota {item.gpa.toFixed(2)}
-                    </text>
-                  </g>
-                )}
-              </g>
-            );
-          })}
-        </svg>
+                  style={{ width: `${Math.max(2, currentPct)}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
