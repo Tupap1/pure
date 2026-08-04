@@ -2,30 +2,20 @@ import React from 'react';
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   hoverEffect?: boolean;
-  glowColor?: 'aeroespacial' | 'software' | 'synergy' | 'warning' | 'none';
   children: React.ReactNode;
 }
 
 export const Card: React.FC<CardProps> = ({
   hoverEffect = true,
-  glowColor = 'none',
   className = '',
   children,
   ...props
 }) => {
-  const glowClasses = {
-    aeroespacial: 'glow-aeroespacial border-aeroespacial/30',
-    software: 'glow-software border-software/30',
-    synergy: 'glow-synergy border-synergy/30',
-    warning: 'box-shadow-warning border-amber-500/30',
-    none: '',
-  };
-
   return (
     <div
-      className={`glass-panel rounded-2xl p-5 ${
-        hoverEffect ? 'glass-panel-hover' : ''
-      } ${glowClasses[glowColor]} ${className}`}
+      className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/90 rounded-xl p-5 shadow-sm ${
+        hoverEffect ? 'hover:border-slate-300 dark:hover:border-slate-700 hover:shadow transition-all duration-200' : ''
+      } ${className}`}
       {...props}
     >
       {children}

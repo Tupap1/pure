@@ -10,7 +10,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('command');
 
   return (
-    <div className="min-h-screen flex bg-[#070a12] text-slate-100 selection:bg-sky-500/30 selection:text-sky-200">
+    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-sky-500/30 selection:text-sky-900 dark:selection:text-sky-200 transition-colors">
       {/* Navigation Sidebar */}
       <Sidebar activeTab={activeTab} onSelectTab={setActiveTab} />
 

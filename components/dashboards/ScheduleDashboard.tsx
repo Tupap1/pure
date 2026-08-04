@@ -37,13 +37,13 @@ export const ScheduleDashboard: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <CalendarIcon className="w-5 h-5 text-sky-400" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <CalendarIcon className="w-5 h-5 text-sky-600 dark:text-sky-400" />
             Master Schedule & Matriz de Traslapes
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Vista semanal unificada con detector automático de empalmes entre materias.
           </p>
         </div>
@@ -51,21 +51,21 @@ export const ScheduleDashboard: React.FC = () => {
 
       {/* Conflict Warning Banner */}
       {conflicts.length > 0 && (
-        <Card className="p-4 border border-rose-500/40 bg-rose-950/20">
+        <Card className="p-4 border border-rose-400 dark:border-rose-500/40 bg-rose-50 dark:bg-rose-950/20">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-rose-500/20 text-rose-400 shrink-0">
+              <div className="p-2 rounded-lg bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <Badge variant="danger">⚠️ Traslape Detectado</Badge>
-                  <span className="text-xs font-mono text-rose-300">
+                  <span className="text-xs font-mono text-rose-600 dark:text-rose-300 font-bold">
                     Empalme de {conflicts[0].overlapMinutes} mins
                   </span>
                 </div>
-                <h4 className="text-sm font-bold text-slate-100 mt-1">
-                  Conflicto entre <span className="text-sky-300">{conflicts[0].slotA.subjectName}</span> y <span className="text-indigo-300">{conflicts[0].slotB.subjectName}</span>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-1">
+                  Conflicto entre <span className="text-sky-600 dark:text-sky-300">{conflicts[0].slotA.subjectName}</span> y <span className="text-indigo-600 dark:text-indigo-300">{conflicts[0].slotB.subjectName}</span>
                 </h4>
               </div>
             </div>
@@ -74,31 +74,31 @@ export const ScheduleDashboard: React.FC = () => {
       )}
 
       {schedules.length === 0 ? (
-        <Card className="p-12 text-center border-dashed border-slate-800 bg-slate-950/40">
-          <CalendarIcon className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-200">No hay horarios registrados</h3>
-          <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+        <Card className="p-12 text-center border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+          <CalendarIcon className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No hay horarios registrados</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
             Ve a la pestaña <strong>Configuración & CRUD</strong> para asignar los horarios (días, hora inicio/fin y aula) a tus materias.
           </p>
         </Card>
       ) : (
         /* Weekly Grid */
-        <div className="bg-slate-950 rounded-xl overflow-x-auto border border-slate-800">
+        <div className="bg-white dark:bg-slate-950 rounded-xl overflow-x-auto border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
-              <tr className="border-b border-slate-800 bg-slate-900/80 text-xs text-slate-300 font-mono">
-                <th className="p-3 text-center w-20 border-r border-slate-800">Hora</th>
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/80 text-xs text-slate-700 dark:text-slate-300 font-mono">
+                <th className="p-3 text-center w-20 border-r border-slate-200 dark:border-slate-800">Hora</th>
                 {days.map((day) => (
-                  <th key={day} className="p-3 text-center border-r border-slate-800/80 last:border-r-0">
+                  <th key={day} className="p-3 text-center border-r border-slate-200 dark:border-slate-800/80 last:border-r-0">
                     {day}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 text-xs">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs">
               {hours.map((hour) => (
-                <tr key={hour} className="hover:bg-slate-900/30">
-                  <td className="p-2.5 font-mono text-center text-slate-400 border-r border-slate-800 bg-slate-900/40">
+                <tr key={hour} className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
+                  <td className="p-2.5 font-mono text-center text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
                     {hour}
                   </td>
                   {days.map((day, dIdx) => {
@@ -110,11 +110,11 @@ export const ScheduleDashboard: React.FC = () => {
                     const hasConflict = matchingSchedules.length > 1;
 
                     return (
-                      <td key={dIdx} className="p-1 border-r border-slate-800/40 last:border-r-0 align-top h-14">
+                      <td key={dIdx} className="p-1 border-r border-slate-200 dark:border-slate-800/40 last:border-r-0 align-top h-14">
                         {hasConflict ? (
-                          <div className="p-1.5 rounded bg-rose-500/20 border border-rose-500/80 text-rose-200 space-y-0.5">
+                          <div className="p-1.5 rounded bg-rose-100 dark:bg-rose-500/20 border border-rose-300 dark:border-rose-500/80 text-rose-800 dark:text-rose-200 space-y-0.5">
                             <div className="font-bold text-[10px] flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-rose-400" /> EMPALME
+                              <AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400" /> EMPALME
                             </div>
                             <div className="text-[9px] truncate">{matchingSchedules[0]?.classroom || 'Conflicto'}</div>
                           </div>
@@ -127,12 +127,12 @@ export const ScheduleDashboard: React.FC = () => {
                                 key={sched.id}
                                 className={`p-1.5 rounded text-xs space-y-0.5 border ${
                                   isPresencial
-                                    ? 'bg-sky-950/60 border-sky-600/50 text-sky-200'
-                                    : 'bg-indigo-950/60 border-indigo-600/50 text-indigo-200'
+                                    ? 'bg-sky-50 dark:bg-sky-950/60 border-sky-200 dark:border-sky-600/50 text-sky-900 dark:text-sky-200'
+                                    : 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200 dark:border-indigo-600/50 text-indigo-900 dark:text-indigo-200'
                                 }`}
                               >
                                 <div className="font-bold text-[11px] truncate">{sub?.name || 'Clase'}</div>
-                                <div className="text-[10px] text-slate-400 flex items-center gap-1 truncate">
+                                <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
                                   {isPresencial ? <MapPin className="w-2.5 h-2.5 shrink-0" /> : <Clock className="w-2.5 h-2.5 shrink-0" />}
                                   <span className="truncate">{sched.classroom || (isPresencial ? 'Presencial' : 'Virtual')}</span>
                                 </div>

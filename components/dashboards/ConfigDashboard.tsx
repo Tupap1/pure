@@ -142,26 +142,29 @@ export const ConfigDashboard: React.FC = () => {
     await pureDB.schedules.delete(id);
   };
 
+  const inputClass =
+    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
+
   return (
     <div className="space-y-8 animate-fade-in pb-12">
       {/* Header & Global Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
         <div>
-          <h2 className="text-2xl font-bold font-heading text-slate-50 flex items-center gap-2">
-            <Building2 className="w-6 h-6 text-sky-400" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-sky-600 dark:text-sky-400" />
             Configuración & Directorio Base
           </h2>
-          <p className="text-xs text-slate-400">
-            Administra universidades, profesores, asignaturas y clases guardados en tu base de datos local (IndexedDB).
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Administra universidades, profesores, asignaturas y clases guardados en tu base de datos local.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => clearAllData()}>
-            <RotateCcw className="w-3.5 h-3.5" /> Limpiar Base de Datos
+            <RotateCcw className="w-3.5 h-3.5" /> Limpiar Todo (Cero Datos)
           </Button>
 
           <Button variant="primary" size="sm" onClick={() => seedDemoData()}>
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Cargar Datos Demo
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Cargar Datos Demo
           </Button>
         </div>
       </div>
@@ -169,8 +172,8 @@ export const ConfigDashboard: React.FC = () => {
       {/* 1. Universidades Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold font-heading text-slate-100 flex items-center gap-2">
-            <GraduationCap className="w-5 h-5 text-sky-400" />
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <GraduationCap className="w-5 h-5 text-sky-600 dark:text-sky-400" />
             Universidades ({universities.length})
           </h3>
           <Button variant="aeroespacial" size="sm" onClick={() => setIsAddUniOpen(true)}>
@@ -179,10 +182,10 @@ export const ConfigDashboard: React.FC = () => {
         </div>
 
         {universities.length === 0 ? (
-          <Card className="p-8 text-center border-dashed border-slate-800 bg-slate-950/40">
-            <GraduationCap className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-slate-300">No hay universidades registradas</p>
-            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+          <Card className="p-8 text-center border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+            <GraduationCap className="w-8 h-8 text-slate-400 dark:text-slate-600 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-300">No hay universidades registradas</p>
+            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1 max-w-md mx-auto">
               Crea tu primera universidad para comenzar a organizar tus carreras y asignaturas.
             </p>
             <Button variant="aeroespacial" size="sm" className="mt-4" onClick={() => setIsAddUniOpen(true)}>
@@ -202,7 +205,7 @@ export const ConfigDashboard: React.FC = () => {
                       {uni.name.substring(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <h4 className="text-base font-bold text-slate-100">{uni.name}</h4>
+                      <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">{uni.name}</h4>
                       <Badge variant={uni.modality === 'presencial' ? 'aeroespacial' : 'software'} className="mt-1">
                         Modalidad {uni.modality}
                       </Badge>
@@ -210,24 +213,24 @@ export const ConfigDashboard: React.FC = () => {
                   </div>
                   <button
                     onClick={() => handleDeleteUni(uni.id!)}
-                    className="text-slate-500 hover:text-rose-400 transition-colors p-1"
+                    className="text-slate-400 hover:text-rose-500 transition-colors p-1"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-slate-900/80 text-center text-xs font-mono">
+                <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-slate-100 dark:bg-slate-900 text-center text-xs font-mono">
                   <div>
-                    <div className="text-slate-400 text-[10px]">Min</div>
-                    <div className="text-slate-200 font-bold">{uni.scale_min.toFixed(1)}</div>
+                    <div className="text-slate-500 dark:text-slate-400 text-[10px]">Min</div>
+                    <div className="text-slate-800 dark:text-slate-200 font-bold">{uni.scale_min.toFixed(1)}</div>
                   </div>
                   <div>
-                    <div className="text-slate-400 text-[10px]">Max</div>
-                    <div className="text-slate-200 font-bold">{uni.scale_max.toFixed(1)}</div>
+                    <div className="text-slate-500 dark:text-slate-400 text-[10px]">Max</div>
+                    <div className="text-slate-800 dark:text-slate-200 font-bold">{uni.scale_max.toFixed(1)}</div>
                   </div>
                   <div>
-                    <div className="text-slate-400 text-[10px]">Aprobatorio</div>
-                    <div className="text-emerald-400 font-bold">{uni.passing_grade.toFixed(1)}</div>
+                    <div className="text-slate-500 dark:text-slate-400 text-[10px]">Aprobatorio</div>
+                    <div className="text-emerald-600 dark:text-emerald-400 font-bold">{uni.passing_grade.toFixed(1)}</div>
                   </div>
                 </div>
               </Card>
@@ -239,8 +242,8 @@ export const ConfigDashboard: React.FC = () => {
       {/* 2. Profesores Directory Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold font-heading text-slate-100 flex items-center gap-2">
-            <UserCheck className="w-5 h-5 text-indigo-400" />
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             Directorio de Profesores ({professors.length})
           </h3>
           <Button
@@ -254,10 +257,10 @@ export const ConfigDashboard: React.FC = () => {
         </div>
 
         {professors.length === 0 ? (
-          <Card className="p-6 text-center border-dashed border-slate-800 bg-slate-950/40">
-            <UserCheck className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-slate-300">No hay profesores registrados</p>
-            <p className="text-xs text-slate-500 mt-1">
+          <Card className="p-6 text-center border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+            <UserCheck className="w-8 h-8 text-slate-400 dark:text-slate-600 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-300">No hay profesores registrados</p>
+            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
               {universities.length === 0
                 ? 'Registra primero una Universidad para vincular profesores.'
                 : 'Agrega a los profesores a cargo de tus asignaturas.'}
@@ -270,22 +273,22 @@ export const ConfigDashboard: React.FC = () => {
               return (
                 <Card key={prof.id} className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-slate-800 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                    <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
                       {prof.name.substring(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-slate-100">{prof.name}</h4>
-                      <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                        <Mail className="w-3 h-3 text-slate-500" /> {prof.email || 'Sin correo registrado'}
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">{prof.name}</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                        <Mail className="w-3 h-3 text-slate-400" /> {prof.email || 'Sin correo registrado'}
                       </p>
-                      <span className="text-[11px] text-sky-400 mt-0.5 block">
+                      <span className="text-[11px] text-sky-600 dark:text-sky-400 mt-0.5 block">
                         {uni?.name || 'Universidad'}
                       </span>
                     </div>
                   </div>
                   <button
                     onClick={() => handleDeleteProf(prof.id!)}
-                    className="text-slate-500 hover:text-rose-400 transition-colors p-1"
+                    className="text-slate-400 hover:text-rose-500 transition-colors p-1"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -299,8 +302,8 @@ export const ConfigDashboard: React.FC = () => {
       {/* 3. Materias / Asignaturas Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold font-heading text-slate-100 flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-emerald-400" />
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             Asignaturas / Materias ({subjects.length})
           </h3>
           <Button
@@ -314,10 +317,10 @@ export const ConfigDashboard: React.FC = () => {
         </div>
 
         {subjects.length === 0 ? (
-          <Card className="p-8 text-center border-dashed border-slate-800 bg-slate-950/40">
-            <BookOpen className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-slate-300">No hay materias registradas</p>
-            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+          <Card className="p-8 text-center border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+            <BookOpen className="w-8 h-8 text-slate-400 dark:text-slate-600 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-300">No hay materias registradas</p>
+            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1 max-w-md mx-auto">
               Registra tus asignaturas para ver el horario unificado, calcular tu Dosis Mínima Eficaz (DME) y buscar sinergias.
             </p>
             <Button
@@ -342,25 +345,25 @@ export const ConfigDashboard: React.FC = () => {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-sky-400 font-bold">{sub.code}</span>
+                        <span className="text-xs font-mono text-sky-600 dark:text-sky-400 font-bold">{sub.code}</span>
                         <Badge variant={sub.modality === 'presencial' ? 'aeroespacial' : 'software'}>
                           {sub.modality}
                         </Badge>
                       </div>
-                      <h4 className="text-base font-bold text-slate-100 mt-1">{sub.name}</h4>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-1">{sub.name}</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         {uni?.name} {prof ? `• Profe: ${prof.name}` : ''}
                       </p>
                     </div>
                     <button
                       onClick={() => handleDeleteSubject(sub.id!)}
-                      className="text-slate-500 hover:text-rose-400 transition-colors p-1"
+                      className="text-slate-400 hover:text-rose-500 transition-colors p-1"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-slate-400 border-t border-slate-800 pt-2 font-mono">
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800 pt-2 font-mono">
                     <span>Créditos: {sub.credits}</span>
                     <span>Dificultad: {sub.difficulty}/5</span>
                     <span>Nota Meta: {sub.target_grade}</span>
@@ -376,8 +379,8 @@ export const ConfigDashboard: React.FC = () => {
       {/* 4. Horarios de Clases Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold font-heading text-slate-100 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-amber-400" />
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             Horarios Semanales Registrados ({schedules.length})
           </h3>
           <Button
@@ -391,10 +394,10 @@ export const ConfigDashboard: React.FC = () => {
         </div>
 
         {schedules.length === 0 ? (
-          <Card className="p-6 text-center border-dashed border-slate-800 bg-slate-950/40">
-            <Calendar className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-slate-300">No hay horarios asignados</p>
-            <p className="text-xs text-slate-500 mt-1">
+          <Card className="p-6 text-center border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+            <Calendar className="w-8 h-8 text-slate-400 dark:text-slate-600 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-300">No hay horarios asignados</p>
+            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
               Asigna los días, horas y salones de tus asignaturas para generar tu Master Schedule.
             </p>
           </Card>
@@ -407,15 +410,15 @@ export const ConfigDashboard: React.FC = () => {
               return (
                 <Card key={sched.id} className="p-3.5 flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-bold text-slate-200">{sub?.name || 'Materia'}</div>
-                    <div className="text-[11px] text-sky-400 font-mono mt-0.5">
+                    <div className="text-xs font-bold text-slate-900 dark:text-slate-200">{sub?.name || 'Materia'}</div>
+                    <div className="text-[11px] text-sky-600 dark:text-sky-400 font-mono mt-0.5">
                       {days[sched.day_of_week]} • {sched.start_time} - {sched.end_time}
                     </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">{sched.classroom}</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{sched.classroom}</div>
                   </div>
                   <button
                     onClick={() => handleDeleteSchedule(sched.id!)}
-                    className="text-slate-500 hover:text-rose-400 transition-colors p-1"
+                    className="text-slate-400 hover:text-rose-500 transition-colors p-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -434,22 +437,22 @@ export const ConfigDashboard: React.FC = () => {
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">Nombre de la Institución</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Nombre de la Institución</label>
             <input
               type="text"
               value={uniName}
               onChange={(e) => setUniName(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className={inputClass}
               placeholder="Ej: Universidad EAFIT"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">Modalidad</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Modalidad</label>
             <select
               value={uniModality}
               onChange={(e) => setUniModality(e.target.value as any)}
-              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className={inputClass}
             >
               <option value="presencial">Presencial</option>
               <option value="virtual">Virtual</option>
@@ -459,30 +462,30 @@ export const ConfigDashboard: React.FC = () => {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Escala Min</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Escala Min</label>
               <input
                 type="number"
                 value={uniMin}
                 onChange={(e) => setUniMin(Number(e.target.value))}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Escala Max</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Escala Max</label>
               <input
                 type="number"
                 value={uniMax}
                 onChange={(e) => setUniMax(Number(e.target.value))}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Aprobación</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Aprobación</label>
               <input
                 type="number"
                 value={uniPassing}
                 onChange={(e) => setUniPassing(Number(e.target.value))}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               />
             </div>
           </div>
@@ -505,22 +508,22 @@ export const ConfigDashboard: React.FC = () => {
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">Nombre Completo</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Nombre Completo</label>
             <input
               type="text"
               value={profName}
               onChange={(e) => setProfName(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className={inputClass}
               placeholder="Ej: Dr. Carlos Pérez"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">Universidad Asignada</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Universidad Asignada</label>
             <select
               value={profUniId}
               onChange={(e) => setProfUniId(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className={inputClass}
             >
               <option value="">Selecciona una universidad</option>
               {universities.map((u) => (
@@ -532,12 +535,12 @@ export const ConfigDashboard: React.FC = () => {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">Correo Electrónico</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Correo Electrónico</label>
             <input
               type="email"
               value={profEmail}
               onChange={(e) => setProfEmail(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className={inputClass}
               placeholder="cperez@universidad.edu"
             />
           </div>
@@ -561,33 +564,33 @@ export const ConfigDashboard: React.FC = () => {
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">Nombre de la Materia</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Nombre de la Materia</label>
             <input
               type="text"
               value={subName}
               onChange={(e) => setSubName(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className={inputClass}
               placeholder="Ej: Cálculo Vectorial y Geometría"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Código</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Código</label>
               <input
                 type="text"
                 value={subCode}
                 onChange={(e) => setSubCode(e.target.value)}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
                 placeholder="MAT-201"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Universidad</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Universidad</label>
               <select
                 value={subUniId}
                 onChange={(e) => setSubUniId(e.target.value)}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               >
                 <option value="">Selecciona institución</option>
                 {universities.map((u) => (
@@ -601,11 +604,11 @@ export const ConfigDashboard: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Profesor Asignado</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Profesor Asignado</label>
               <select
                 value={subProfId}
                 onChange={(e) => setSubProfId(e.target.value)}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               >
                 <option value="">Sin profesor asignado</option>
                 {professors.map((p) => (
@@ -616,11 +619,11 @@ export const ConfigDashboard: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Modalidad</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Modalidad</label>
               <select
                 value={subModality}
                 onChange={(e) => setSubModality(e.target.value as any)}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               >
                 <option value="presencial">Presencial</option>
                 <option value="virtual">Virtual</option>
@@ -630,33 +633,33 @@ export const ConfigDashboard: React.FC = () => {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Créditos</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Créditos</label>
               <input
                 type="number"
                 value={subCredits}
                 onChange={(e) => setSubCredits(Number(e.target.value))}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Dificultad (1-5)</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Dificultad (1-5)</label>
               <input
                 type="number"
                 min={1}
                 max={5}
                 value={subDifficulty}
                 onChange={(e) => setSubDifficulty(Number(e.target.value))}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Nota Meta</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Nota Meta</label>
               <input
                 type="number"
                 step="0.1"
                 value={subTargetGrade}
                 onChange={(e) => setSubTargetGrade(Number(e.target.value))}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               />
             </div>
           </div>
@@ -680,11 +683,11 @@ export const ConfigDashboard: React.FC = () => {
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">Asignatura</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Asignatura</label>
             <select
               value={schedSubjectId}
               onChange={(e) => setSchedSubjectId(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className={inputClass}
             >
               <option value="">Selecciona una asignatura</option>
               {subjects.map((s) => (
@@ -697,11 +700,11 @@ export const ConfigDashboard: React.FC = () => {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Día</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Día</label>
               <select
                 value={schedDay}
                 onChange={(e) => setSchedDay(Number(e.target.value))}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               >
                 <option value={1}>Lunes</option>
                 <option value={2}>Martes</option>
@@ -713,34 +716,34 @@ export const ConfigDashboard: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Hora Inicio</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Hora Inicio</label>
               <input
                 type="text"
                 value={schedStart}
                 onChange={(e) => setSchedStart(e.target.value)}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono focus:outline-none focus:border-sky-500"
+                className={inputClass}
                 placeholder="08:00"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Hora Fin</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Hora Fin</label>
               <input
                 type="text"
                 value={schedEnd}
                 onChange={(e) => setSchedEnd(e.target.value)}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono focus:outline-none focus:border-sky-500"
+                className={inputClass}
                 placeholder="10:00"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">Aula / Salón / Enlace</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Aula / Salón / Enlace</label>
             <input
               type="text"
               value={schedClassroom}
               onChange={(e) => setSchedClassroom(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className={inputClass}
               placeholder="Ej: Salón 301 - Edificio Tecnológico"
             />
           </div>

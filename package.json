@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "mcp:start": "tsx mcp-server/index.ts",
     "lint": "next lint",
     "test": "vitest run"
   },
@@ -19,7 +20,8 @@
     "@modelcontextprotocol/sdk": "^1.0.1",
     "lucide-react": "^0.424.0",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.4.0"
+    "tailwind-merge": "^2.4.0",
+    "tsx": "^4.19.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.12",

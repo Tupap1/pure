@@ -66,16 +66,19 @@ export const DeliverablesDashboard: React.FC = () => {
     await pureDB.deliverables.delete(id);
   };
 
+  const inputClass =
+    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <CheckSquare className="w-5 h-5 text-emerald-400" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <CheckSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             Entregas, Evaluaciones & Exámenes
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Registro de actividades con calculadora de nota mínima requerida.
           </p>
         </div>
@@ -93,24 +96,24 @@ export const DeliverablesDashboard: React.FC = () => {
 
       {/* Required Grade Calculator Card */}
       {activeSubject && deliverables.length > 0 && (
-        <Card className="p-4 border border-sky-500/30 bg-sky-950/20">
+        <Card className="p-4 border border-sky-300 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-950/20">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-lg bg-sky-500/20 text-sky-400 shrink-0">
+              <div className="p-2.5 rounded-lg bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 shrink-0">
                 <Calculator className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-100">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                   Calculadora de Nota Mínima Requerida
                 </h4>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  Materia: <strong className="text-slate-100">{activeSubject.name}</strong> • Nota Meta:{' '}
-                  <strong className="text-sky-300">{activeSubject.target_grade.toFixed(2)}</strong>.
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                  Materia: <strong className="text-slate-900 dark:text-slate-100">{activeSubject.name}</strong> • Nota Meta:{' '}
+                  <strong className="text-sky-600 dark:text-sky-300">{activeSubject.target_grade.toFixed(2)}</strong>.
                   {requiredGrade !== null ? (
                     <span>
                       {' '}
                       Necesitas promediar{' '}
-                      <strong className="text-emerald-400 font-mono text-sm font-bold">
+                      <strong className="text-emerald-600 dark:text-emerald-400 font-mono text-sm font-bold">
                         {requiredGrade.toFixed(2)}
                       </strong>{' '}
                       en los porcentajes restantes.
@@ -127,10 +130,10 @@ export const DeliverablesDashboard: React.FC = () => {
       )}
 
       {deliverables.length === 0 ? (
-        <Card className="p-12 text-center border-dashed border-slate-800 bg-slate-950/40">
-          <CheckSquare className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-200">No hay entregas pendientes</h3>
-          <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+        <Card className="p-12 text-center border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+          <CheckSquare className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No hay entregas pendientes</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
             {subjects.length === 0
               ? 'Registra primero tus materias para poder agendar evaluaciones y talleres.'
               : 'Registra tus talleres, parciales y proyectos para realizar seguimiento de tus notas.'}
@@ -148,13 +151,13 @@ export const DeliverablesDashboard: React.FC = () => {
       ) : (
         <>
           {/* Filter Tabs */}
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
             <button
               onClick={() => setFilterGroup('all')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 filterGroup === 'all'
-                  ? 'bg-slate-800 text-slate-100 border border-slate-700'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               Todas ({deliverables.length})
@@ -163,8 +166,8 @@ export const DeliverablesDashboard: React.FC = () => {
               onClick={() => setFilterGroup('individual')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 filterGroup === 'individual'
-                  ? 'bg-sky-950/80 text-sky-300 border border-sky-800'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-sky-100 dark:bg-sky-950/80 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-800'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <User className="w-3.5 h-3.5" /> Individuales
@@ -173,8 +176,8 @@ export const DeliverablesDashboard: React.FC = () => {
               onClick={() => setFilterGroup('group')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 filterGroup === 'group'
-                  ? 'bg-indigo-950/80 text-indigo-300 border border-indigo-800'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <Users className="w-3.5 h-3.5" /> Grupales
@@ -198,21 +201,21 @@ export const DeliverablesDashboard: React.FC = () => {
                     </Badge>
                   </div>
                   <div>
-                    <h4 className={`text-sm font-bold text-slate-100 ${isDone ? 'line-through text-slate-400' : ''}`}>
+                    <h4 className={`text-sm font-bold text-slate-900 dark:text-slate-100 ${isDone ? 'line-through text-slate-400' : ''}`}>
                       {deliv.title}
                     </h4>
-                    {deliv.description && <p className="text-xs text-slate-400 mt-1">{deliv.description}</p>}
+                    {deliv.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{deliv.description}</p>}
                   </div>
-                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
-                    <span className="text-slate-400 font-mono flex items-center gap-1">
-                      {deliv.is_group ? <Users className="w-3.5 h-3.5 text-indigo-400" /> : <User className="w-3.5 h-3.5 text-sky-400" />}
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                    <span className="text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
+                      {deliv.is_group ? <Users className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> : <User className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />}
                       {deliv.is_group ? 'Grupal' : 'Individual'}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-300 font-mono">Peso: {deliv.weight_percentage}%</span>
+                      <span className="text-slate-700 dark:text-slate-300 font-mono">Peso: {deliv.weight_percentage}%</span>
                       <button
                         onClick={() => handleDeleteDeliverable(deliv.id!)}
-                        className="text-slate-500 hover:text-rose-400 transition-colors p-1"
+                        className="text-slate-400 hover:text-rose-500 transition-colors p-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -233,22 +236,22 @@ export const DeliverablesDashboard: React.FC = () => {
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">Título de la Actividad</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Título de la Actividad</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className={inputClass}
               placeholder="Ej: Parcial 2 de Mecánica Orbital"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">Asignatura</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Asignatura</label>
             <select
               value={subjectId}
               onChange={(e) => setSubjectId(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className={inputClass}
             >
               <option value="">Selecciona una asignatura</option>
               {subjects.map((s) => (
@@ -261,34 +264,34 @@ export const DeliverablesDashboard: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Modalidad</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Modalidad</label>
               <select
                 value={isGroup ? 'group' : 'individual'}
                 onChange={(e) => setIsGroup(e.target.value === 'group')}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               >
                 <option value="individual">👤 Individual</option>
                 <option value="group">👥 Grupal</option>
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Peso % en la Nota</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Peso % en la Nota</label>
               <input
                 type="number"
                 value={weight}
                 onChange={(e) => setWeight(Number(e.target.value))}
-                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+                className={inputClass}
               />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">Fecha Límite</label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Fecha Límite</label>
             <input
               type="datetime-local"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500"
+              className={inputClass}
             />
           </div>
 

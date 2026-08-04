@@ -31,17 +31,17 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/60 dark:bg-black/70 backdrop-blur-sm animate-fade-in">
       <div
-        className="glass-panel rounded-2xl border border-slate-700/80 shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden animate-fade-in"
+        className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden text-slate-900 dark:text-slate-100 transition-colors"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-          <h3 className="text-lg font-bold text-slate-100 font-heading">{title}</h3>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{title}</h3>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/80 transition-colors"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
