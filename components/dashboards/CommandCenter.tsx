@@ -136,6 +136,41 @@ export const CommandCenter: React.FC = () => {
         </Card>
       ) : (
         <>
+          {/* 4-Metric Academic Capacity Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800 space-y-1">
+              <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">Clases en Horario</div>
+              <div className="text-lg font-mono font-bold text-cyan-600 dark:text-cyan-400">
+                {classHours.toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Horas de asistencia agendadas</div>
+            </Card>
+
+            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800 space-y-1">
+              <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">Estudio por Fuera (DME)</div>
+              <div className="text-lg font-mono font-bold text-purple-600 dark:text-purple-400">
+                {totalDMEHours.toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Trabajo autónomo sugerido</div>
+            </Card>
+
+            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800 space-y-1">
+              <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">Dedicación Total</div>
+              <div className="text-lg font-mono font-bold text-slate-900 dark:text-slate-100">
+                {(classHours + totalDMEHours).toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Carga académica global</div>
+            </Card>
+
+            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-emerald-500/30 space-y-1 glow-synergy">
+              <div className="text-[10px] font-mono uppercase text-emerald-600 dark:text-emerald-400 font-medium">Tiempo Libre Neto</div>
+              <div className="text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                {netFreeTime.toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
+              </div>
+              <div className="text-[10px] text-emerald-600/80 dark:text-emerald-500/80 font-mono">Margen libre (descontando 7h sueño)</div>
+            </Card>
+          </div>
+
           {/* Asymmetric Command Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Primary Hero Block (7/12): Entregas y Asignaturas */}
