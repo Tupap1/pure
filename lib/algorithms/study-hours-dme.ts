@@ -22,7 +22,8 @@ export interface DMEResult {
 }
 
 /**
-  Calcula la Dosis Mínima Eficaz (DME) de horas de estudio semanal para una materia (REQ-06)
+ * Calcula la Dosis Mínima Eficaz (DME) de horas de estudio semanal para una materia (REQ-06)
+ * Ajustado para soportar inicio de semestre (current_grade === 0) y carga multi-carrera de 12 materias.
  */
 export function calculateDME(
   subject: SubjectDMEParams,
@@ -39,14 +40,19 @@ export function calculateDME(
 
   // 3. Factor de margen de nota
   let marginFactor = 1.0;
-  const gradeGap = subject.target_grade - subject.current_grade;
 
-  if (subject.current_grade >= subject.target_grade + 0.5) {
+  // Si está iniciando el semestre (current_grade === 0 o no registrado), la brecha NO se penaliza
+  if (!subject.current_grade || subject.current_grade === 0) {
+    marginFactor = 1.0; // Estado neutral inicial de semestre
+  } else if (subject.current_grade >= subject.target_grade + 0.5) {
     marginFactor = 0.6; // Excelente margen -> Reducir horas
   } else if (subject.current_grade >= subject.target_grade) {
     marginFactor = 0.8; // Cumpliendo meta -> Ligera reducción
-  } else if (gradeGap > 0) {
-    marginFactor = 1.0 + gradeGap; // Brecha positiva -> Incrementar horas
+  } else {
+    const gradeGap = subject.target_grade - subject.current_grade;
+    if (gradeGap > 0) {
+      marginFactor = 1.0 + Math.min(1.0, gradeGap); // Incremento controlado por brecha
+    }
   }
 
   // 4. Factor de descuento por sinergia temática (ej: 50% compartido -> 0.85 multiplicador)
@@ -79,7 +85,7 @@ export interface NetFreeTimeParams {
 }
 
 /**
-  Calcula el Tiempo Libre Neto Semanal restante de las 168 horas totales (REQ-06)
+ * Calcula el Tiempo Libre Neto Semanal restante de las 168 horas totales (REQ-06)
  */
 export function calculateNetFreeTime(params: NetFreeTimeParams): number {
   const totalWeeklyHours = 168;
