@@ -24,207 +24,236 @@ export async function clearAllData() {
   );
 }
 
-export async function seedDemoData() {
+export async function seedRealSemesterData() {
   await clearAllData();
 
-  // 1. Universidades
-  const uniAeroId = 'uni-aeroespacial';
-  const uniSoftId = 'uni-software';
+  // 1. Universidad
+  const uniId = 'uni-udea';
+  await pureDB.universities.add({
+    id: uniId,
+    name: 'Universidad de Antioquia - Ingeniería Aeroespacial',
+    modality: 'presencial',
+    scale_min: 0.0,
+    scale_max: 5.0,
+    passing_grade: 3.0,
+    color: '#0ea5e9',
+    created_at: new Date().toISOString(),
+  });
 
-  await pureDB.universities.bulkAdd([
-    {
-      id: uniAeroId,
-      name: 'Universidad Nacional (Ingeniería Aeroespacial)',
-      modality: 'presencial',
-      scale_min: 0.0,
-      scale_max: 5.0,
-      passing_grade: 3.0,
-      color: '#0ea5e9',
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: uniSoftId,
-      name: 'Universidad Distrital (Ingeniería de Software)',
-      modality: 'virtual',
-      scale_min: 0.0,
-      scale_max: 5.0,
-      passing_grade: 3.0,
-      color: '#6366f1',
-      created_at: new Date().toISOString(),
-    },
-  ]);
+  // 2. Profesor Base
+  const profId = 'prof-udea-base';
+  await pureDB.professors.add({
+    id: profId,
+    university_id: uniId,
+    name: 'Coordinación Nivel I - Aeroespacial',
+    email: 'aeroespacial@udea.edu.co',
+    created_at: new Date().toISOString(),
+  });
 
-  // 2. Profesores
-  const prof1Id = 'prof-roberto';
-  const prof2Id = 'prof-sofia';
-
-  await pureDB.professors.bulkAdd([
-    {
-      id: prof1Id,
-      university_id: uniAeroId,
-      name: 'Dr. Roberto Ramírez',
-      email: 'rramirez@aero.edu',
-      office_hours: 'Martes 14:00 - 16:00',
-      notes: 'Énfasis en resolución analítica y rigor matemático en parciales presenciales.',
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: prof2Id,
-      university_id: uniSoftId,
-      name: 'Ing. Sofía Martínez',
-      email: 'smartinez@software.edu',
-      office_hours: 'Jueves Virtual 17:00',
-      notes: 'Evalúa mediante talleres de código C++ y pruebas de rendimiento.',
-      created_at: new Date().toISOString(),
-    },
-  ]);
-
-  // 3. Materias
-  const subAero1Id = 'sub-aero-1';
-  const subSoft1Id = 'sub-soft-1';
+  // 3. Materias Matriculadas Nivel I
+  const sub1 = 'sub-vivamos';
+  const sub2 = 'sub-geom';
+  const sub3 = 'sub-calc';
+  const sub4 = 'sub-quim';
+  const sub5 = 'sub-intro-aero';
+  const sub6 = 'sub-prog';
 
   await pureDB.subjects.bulkAdd([
     {
-      id: subAero1Id,
-      university_id: uniAeroId,
-      professor_id: prof1Id,
-      name: 'Mecánica Orbital & Cálculo Vectorial',
-      code: 'AERO-301',
-      credits: 4,
+      id: sub1,
+      university_id: uniId,
+      professor_id: profId,
+      name: 'Vivamos la Universidad',
+      code: '2585101',
+      credits: 1,
+      difficulty: 1,
+      modality: 'presencial',
+      target_grade: 4.5,
+      current_grade: 0,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: sub2,
+      university_id: uniId,
+      professor_id: profId,
+      name: 'Geometría Vectorial y Analítica',
+      code: '2585131',
+      credits: 3,
       difficulty: 4,
       modality: 'presencial',
       target_grade: 4.5,
-      current_grade: 4.65,
+      current_grade: 0,
       created_at: new Date().toISOString(),
     },
     {
-      id: subSoft1Id,
-      university_id: uniSoftId,
-      professor_id: prof2Id,
-      name: 'Algoritmos Numéricos & Estructuras de Datos',
-      code: 'SOFT-204',
+      id: sub3,
+      university_id: uniId,
+      professor_id: profId,
+      name: 'Cálculo Diferencial',
+      code: '2585132',
+      credits: 3,
+      difficulty: 4,
+      modality: 'presencial',
+      target_grade: 4.5,
+      current_grade: 0,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: sub4,
+      university_id: uniId,
+      professor_id: profId,
+      name: 'Química General',
+      code: '2585240',
+      credits: 4,
+      difficulty: 3,
+      modality: 'presencial',
+      target_grade: 4.5,
+      current_grade: 0,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: sub5,
+      university_id: uniId,
+      professor_id: profId,
+      name: 'Introducción a la Ingeniería Aeroespacial',
+      code: '2591101',
+      credits: 1,
+      difficulty: 2,
+      modality: 'presencial',
+      target_grade: 4.8,
+      current_grade: 0,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: sub6,
+      university_id: uniId,
+      professor_id: profId,
+      name: 'Programación y Ciencia Computacional',
+      code: '2591102',
       credits: 3,
       difficulty: 3,
-      modality: 'virtual',
-      target_grade: 4.0,
-      current_grade: 4.4,
+      modality: 'presencial',
+      target_grade: 4.8,
+      current_grade: 0,
       created_at: new Date().toISOString(),
     },
   ]);
 
-  // 4. Horarios
+  // 4. Horarios Semanales (1 = Lunes, 2 = Martes, 3 = Miércoles, 4 = Jueves, 5 = Viernes)
   await pureDB.schedules.bulkAdd([
+    // Vivamos la Universidad (Miércoles 11-13)
     {
-      id: 'sched-1',
-      subject_id: subAero1Id,
-      day_of_week: 1, // Lunes
-      start_time: '08:00',
-      end_time: '10:00',
-      classroom: 'Aula 302 - Edificio de Ingenierías',
+      id: 'sch-1',
+      subject_id: sub1,
+      day_of_week: 3,
+      start_time: '11:00',
+      end_time: '13:00',
+      classroom: 'Aula por definir / Edificio Central',
       created_at: new Date().toISOString(),
     },
+
+    // Geometría Vectorial (Martes y Jueves 9-11)
     {
-      id: 'sched-2',
-      subject_id: subSoft1Id,
-      day_of_week: 1, // Lunes (Traslape provocado para pruebas)
+      id: 'sch-2',
+      subject_id: sub2,
+      day_of_week: 2,
       start_time: '09:00',
       end_time: '11:00',
-      classroom: 'Campus Virtual / Zoom',
+      classroom: 'Aula 2-305',
       created_at: new Date().toISOString(),
     },
-  ]);
+    {
+      id: 'sch-3',
+      subject_id: sub2,
+      day_of_week: 4,
+      start_time: '09:00',
+      end_time: '11:00',
+      classroom: 'Aula 2-305',
+      created_at: new Date().toISOString(),
+    },
 
-  // 5. Syllabus
-  await pureDB.syllabusTopics.bulkAdd([
+    // Cálculo Diferencial (Miércoles y Viernes 9-11)
     {
-      id: 'top-1',
-      subject_id: subAero1Id,
-      title: 'Unidad 1: Matrices y Vectores de Estado Orbital',
-      mastery_status: 'dominado',
-      order_index: 1,
+      id: 'sch-4',
+      subject_id: sub3,
+      day_of_week: 3,
+      start_time: '09:00',
+      end_time: '11:00',
+      classroom: 'Aula 2-306',
       created_at: new Date().toISOString(),
     },
     {
-      id: 'top-2',
-      subject_id: subAero1Id,
-      parent_id: 'top-1',
-      title: 'Resolución de Matrices y Operaciones con Vectores',
-      mastery_status: 'dominado',
-      order_index: 2,
+      id: 'sch-5',
+      subject_id: sub3,
+      day_of_week: 5,
+      start_time: '09:00',
+      end_time: '11:00',
+      classroom: 'Aula 2-306',
       created_at: new Date().toISOString(),
     },
-    {
-      id: 'top-3',
-      subject_id: subSoft1Id,
-      title: 'Unidad 1: Algoritmos Numéricos',
-      mastery_status: 'en_estudio',
-      order_index: 1,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'top-4',
-      subject_id: subSoft1Id,
-      parent_id: 'top-3',
-      title: 'Algoritmos Numéricos y Operaciones con Matrices',
-      mastery_status: 'en_estudio',
-      order_index: 2,
-      created_at: new Date().toISOString(),
-    },
-  ]);
 
-  // 6. Entregas
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(23, 59, 0, 0);
-
-  const in3days = new Date();
-  in3days.setDate(in3days.getDate() + 3);
-  in3days.setHours(23, 59, 0, 0);
-
-  await pureDB.deliverables.bulkAdd([
+    // Química General (Martes 7-9 / Martes 11-13 / Jueves 7-9)
     {
-      id: 'deliv-1',
-      subject_id: subAero1Id,
-      topic_id: 'top-2',
-      title: 'Proyecto Integrador: Avionica C++',
-      description: 'Simulación de trayectoria de satélite y matrices de orientación.',
-      due_date: tomorrow.toISOString(),
-      weight_percentage: 30,
-      type: 'proyecto',
-      is_group: true,
-      complexity: 'dificil',
-      status: 'pendiente',
+      id: 'sch-6',
+      subject_id: sub4,
+      day_of_week: 2,
+      start_time: '07:00',
+      end_time: '09:00',
+      classroom: 'Aula 2-305 (Teoría)',
       created_at: new Date().toISOString(),
     },
     {
-      id: 'deliv-2',
-      subject_id: subSoft1Id,
-      topic_id: 'top-4',
-      title: 'Taller 2: Algoritmos Numéricos en Matrices',
-      description: 'Implementación en C++ de algoritmos de resolución matricial.',
-      due_date: in3days.toISOString(),
-      weight_percentage: 15,
-      type: 'taller',
-      is_group: false,
-      complexity: 'medio',
-      status: 'pendiente',
+      id: 'sch-7',
+      subject_id: sub4,
+      day_of_week: 2,
+      start_time: '11:00',
+      end_time: '13:00',
+      classroom: 'LAB 3-103 (Práctica)',
       created_at: new Date().toISOString(),
     },
     {
-      id: 'deliv-3',
-      subject_id: subAero1Id,
-      topic_id: 'top-1',
-      title: 'Parcial 1: Estructuras Aeroespaciales',
-      description: 'Examen presencial de álgebra matricial.',
-      due_date: new Date().toISOString(),
-      weight_percentage: 25,
-      grade: 4.8,
-      type: 'parcial',
-      is_group: false,
-      complexity: 'dificil',
-      status: 'calificado',
+      id: 'sch-8',
+      subject_id: sub4,
+      day_of_week: 4,
+      start_time: '07:00',
+      end_time: '09:00',
+      classroom: 'Aula 2-305 (Teoría)',
+      created_at: new Date().toISOString(),
+    },
+
+    // Introducción a la Ing. Aeroespacial (Miércoles 15-17)
+    {
+      id: 'sch-9',
+      subject_id: sub5,
+      day_of_week: 3,
+      start_time: '15:00',
+      end_time: '17:00',
+      classroom: 'Aula 1-403',
+      created_at: new Date().toISOString(),
+    },
+
+    // Programación y Ciencia Computacional (Miércoles y Viernes 13-15)
+    {
+      id: 'sch-10',
+      subject_id: sub6,
+      day_of_week: 3,
+      start_time: '13:00',
+      end_time: '15:00',
+      classroom: 'SISTEMAS 1A',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'sch-11',
+      subject_id: sub6,
+      day_of_week: 5,
+      start_time: '13:00',
+      end_time: '15:00',
+      classroom: 'SISTEMAS 1A',
       created_at: new Date().toISOString(),
     },
   ]);
 }
 
+export async function seedDemoData() {
+  await seedRealSemesterData();
+}

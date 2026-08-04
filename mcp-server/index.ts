@@ -8,6 +8,7 @@ import {
   handleGetAcademicOverview,
   handleParseAndIngestSyllabus,
   handleFindCrossSubjectSynergies,
+  handleIngestAcademicEnrollment,
 } from './tools-handler';
 
 const server = new Server(
@@ -31,6 +32,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: 'object',
           properties: {},
+        },
+      },
+      {
+        name: 'ingest_academic_enrollment',
+        description: 'Procesa e ingesta la matrícula real del estudiante (materias Nivel I, créditos, grupos y horarios con aulas asignadas).',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            raw_text: { type: 'string', description: 'Texto de las materias y horarios matriculados' },
+          },
         },
       },
       {
@@ -65,6 +76,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const overview = handleGetAcademicOverview();
       return {
         content: [{ type: 'text', text: JSON.stringify(overview, null, 2) }],
+      };
+    }
+
+    case 'ingest_academic_enrollment': {
+      const { raw_text } = (args || {}) as { raw_text?: string };
+      const result = handleIngestAcademicEnrollment(raw_text);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
     }
 

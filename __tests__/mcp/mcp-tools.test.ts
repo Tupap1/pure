@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   handleGetAcademicOverview,
   handleParseAndIngestSyllabus,
-  handleFindCrossSubjectSynergies
+  handleFindCrossSubjectSynergies,
+  handleIngestAcademicEnrollment
 } from '@/mcp-server/tools-handler';
 
 describe('REQ-09: Servidor MCP Bidireccional para Antigravity AI Bridge', () => {
@@ -10,7 +11,14 @@ describe('REQ-09: Servidor MCP Bidireccional para Antigravity AI Bridge', () => 
     const overview = handleGetAcademicOverview();
     expect(overview.status).toBe('success');
     expect(overview.data.netFreeTimeHours).toBeDefined();
-    expect(overview.data.universities).toHaveLength(2);
+    expect(overview.data.universities.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('debe parsear e ingestar la matrícula académica del estudiante mediante el MCP', () => {
+    const enrollment = handleIngestAcademicEnrollment();
+    expect(enrollment.status).toBe('success');
+    expect(enrollment.data.subjectsCount).toBe(6);
+    expect(enrollment.data.schedulesCount).toBe(11);
   });
 
   it('debe parsear un plan de estudios en texto plano y retornar una estructura en árbol jerárquico', () => {

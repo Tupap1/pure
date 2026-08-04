@@ -34,6 +34,8 @@ services:
       dockerfile: Dockerfile
     container_name: pure_mcp_server
     command: ["npx", "tsx", "mcp-server/index.ts"]
+    stdin_open: true
+    tty: true
     depends_on:
       - pure-db
     restart: unless-stopped
