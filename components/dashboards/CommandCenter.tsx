@@ -70,6 +70,36 @@ export const CommandCenter: React.FC = () => {
     { label: 'Horario Clases', progress: Math.min(100, Math.round((classHours / 168) * 100)), color: '#38bdf8' },
   ];
 
+  // Dynamic Heatmap Days calculated from active subjects and deliverables in IndexedDB
+  const realHeatmapDays = React.useMemo(() => {
+    const result = [];
+    const now = new Date();
+    const dailyDmeTarget = subjects.length > 0 ? (totalDMEHours / 5) : 0;
+
+    for (let i = 27; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayOfWeek = d.getDay();
+
+      const delivsOnDate = deliverables.filter((del) => del.due_date?.startsWith(dateStr));
+      const completedDelivs = delivsOnDate.filter((del) => del.status === 'entregado');
+
+      let hours = 0;
+      if (completedDelivs.length > 0) {
+        hours += completedDelivs.length * 2.0;
+      } else if (delivsOnDate.length > 0 && dayOfWeek !== 0) {
+        hours += delivsOnDate.length * 1.5;
+      } else if (dailyDmeTarget > 0 && dayOfWeek >= 1 && dayOfWeek <= 5 && i <= 7) {
+        hours = Number(dailyDmeTarget.toFixed(1));
+      }
+
+      const intensity = (hours === 0 ? 0 : hours <= 2 ? 1 : hours <= 4 ? 2 : hours <= 6 ? 3 : 4) as 0 | 1 | 2 | 3 | 4;
+      result.push({ date: dateStr, hours, intensity });
+    }
+    return result;
+  }, [deliverables, subjects, totalDMEHours]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Overview Header Banner */}
@@ -291,7 +321,7 @@ export const CommandCenter: React.FC = () => {
           {/* Heatmap & Historical GPA Analytics Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="p-5 space-y-4">
-              <StudyHeatmap />
+              <StudyHeatmap days={realHeatmapDays} />
             </Card>
 
             <Card className="p-5 space-y-4">
