@@ -10,7 +10,7 @@ export function usePureData() {
         clearAllData().then(() => seedRealSemesterData());
       } else {
         pureDB.universities.count().then((count) => {
-          if (count === 0) {
+          if (count < 2) {
             seedRealSemesterData();
           }
         });
