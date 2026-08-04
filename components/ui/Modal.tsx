@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -14,6 +15,12 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   children,
 }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -28,19 +35,19 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-slate-900 w-full h-[92vh] sm:h-auto sm:max-h-[90vh] sm:max-w-xl rounded-t-2xl sm:rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden text-slate-900 dark:text-slate-100 transition-all transform animate-slide-up sm:animate-none"
+        className="bg-white dark:bg-slate-900 w-full max-w-lg max-h-[85vh] sm:max-h-[90vh] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden text-slate-900 dark:text-slate-100 my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header with touch-friendly X button */}
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-slate-50 dark:bg-slate-900">
           <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 tracking-tight truncate pr-2">
             {title}
           </h3>
@@ -54,10 +61,11 @@ export const Modal: React.FC<ModalProps> = ({
         </div>
 
         {/* Modal Content area with smooth touch scroll */}
-        <div className="px-5 sm:px-6 py-5 overflow-y-auto space-y-4 flex-1 pb-12 sm:pb-6">
+        <div className="p-5 overflow-y-auto space-y-4 flex-1">
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
