@@ -57,6 +57,7 @@ export const ConfigDashboard: React.FC = () => {
   const [subDifficulty, setSubDifficulty] = useState(3);
   const [subModality, setSubModality] = useState<'presencial' | 'virtual'>('presencial');
   const [subTargetGrade, setSubTargetGrade] = useState(4.5);
+  const [subMaxAbsences, setSubMaxAbsences] = useState(4);
 
   // Schedule form
   const [schedSubjectId, setSchedSubjectId] = useState('');
@@ -110,6 +111,7 @@ export const ConfigDashboard: React.FC = () => {
     setSubDifficulty(sub.difficulty || 3);
     setSubModality(sub.modality || 'presencial');
     setSubTargetGrade(sub.target_grade || 4.5);
+    setSubMaxAbsences(sub.max_absences || 4);
     setIsAddSubjectOpen(true);
   };
 
@@ -206,6 +208,7 @@ export const ConfigDashboard: React.FC = () => {
       difficulty: Number(subDifficulty),
       modality: subModality,
       target_grade: Number(subTargetGrade),
+      max_absences: Number(subMaxAbsences),
       current_grade: 0,
     };
 
@@ -916,7 +919,7 @@ export const ConfigDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Créditos</label>
               <input
@@ -945,6 +948,18 @@ export const ConfigDashboard: React.FC = () => {
                 value={subTargetGrade}
                 onChange={(e) => setSubTargetGrade(Number(e.target.value))}
                 className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Fallas Permisibles</label>
+              <input
+                type="number"
+                min={0}
+                max={20}
+                value={subMaxAbsences}
+                onChange={(e) => setSubMaxAbsences(Number(e.target.value))}
+                className={inputClass}
+                placeholder="4"
               />
             </div>
           </div>

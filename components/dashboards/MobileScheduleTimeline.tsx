@@ -210,7 +210,7 @@ export const MobileScheduleTimeline: React.FC = () => {
 
           {activeSubject && (() => {
             const absences = absenceRecords[activeSubject.id!] || [];
-            const allowedAbsences = 4;
+            const allowedAbsences = activeSubject.max_absences !== undefined ? activeSubject.max_absences : 4;
             const remainingAbsences = Math.max(0, allowedAbsences - absences.length);
 
             return (
