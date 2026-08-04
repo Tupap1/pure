@@ -48,15 +48,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
   ];
 
   return (
-    <aside className="hidden md:flex w-60 bg-white dark:bg-[#0d121d] border-r border-slate-200 dark:border-slate-800/80 flex-col justify-between h-screen sticky top-0 z-30 transition-colors">
+    <aside className="hidden md:flex w-60 bg-white dark:bg-[#090d18] border-r border-slate-200 dark:border-slate-800/80 flex-col justify-between h-screen sticky top-0 z-30 transition-colors">
       {/* Brand / Logo */}
-      <div className="p-4 border-b border-slate-200 dark:border-slate-800/80 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 border border-sky-500/40 flex items-center justify-center font-mono font-bold text-sm shadow-sm">
-          P
+      <div className="p-4 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/40 flex items-center justify-center font-mono font-bold text-sm shadow-sm glow-aeroespacial">
+            P
+          </div>
+          <div>
+            <h1 className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight font-heading leading-none">
+              PURE OS
+            </h1>
+            <span className="text-[9px] font-mono text-cyan-600 dark:text-cyan-400 font-semibold tracking-wider uppercase block mt-0.5">
+              v2.0 Cybernetic
+            </span>
+          </div>
         </div>
-        <h1 className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight font-heading">
-          PURE
-        </h1>
       </div>
 
       {/* Navigation Items */}

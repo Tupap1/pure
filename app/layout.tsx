@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'PURE OS',
+  title: 'PURE OS — Academic Control System',
   description:
-    'Sistema de gestión académica multi-institución para ingeniería.',
+    'Sistema propietario de gestión académica multi-institución para ingeniería.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -19,7 +19,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#070a12',
+  themeColor: '#05080e',
 };
 
 export default function RootLayout({
@@ -29,7 +29,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className="dark">
-      <body className="antialiased bg-[#070a12] text-slate-100 min-h-screen selection:bg-sky-500/30 selection:text-sky-200">
+      <body className="antialiased bg-[#05080e] text-slate-100 min-h-screen selection:bg-cyan-500/30 selection:text-cyan-200 cyber-grid-bg">
         {children}
       </body>
     </html>

@@ -4,61 +4,62 @@
 
 ## Mode
 
-Operate (High-efficiency Academic Software Tool)
+Operate (Titanium Cybernetic Academic Software System)
 
 ## Aesthetic Identity & Vision
 
-PURE OS is a precision software application designed with the visual authority of modern developer tools (Linear, Raycast, Vercel). The interface recedes to highlight real academic data: hours, grades, conflict matrices, and deadlines.
+PURE OS es una consola de control e ingeniería académica con la autoridad visual de herramientas propietarias de alta gama (SpaceX Launch Control, Linear, Raycast). Su estética se basa en un acabado metálico **Titanium Cybernetic**, usando fondos obsidiana profunda (`#05080e`), paneles quirúrgicos (`#0d1322`), micro-redes de puntos (*Dot Grid Pattern*), tipografía **Space Grotesk** para titulares y acentos luminosos en **Cyber Cyan** (`#00f0ff`), **Orbital Violet** (`#c084fc`) y **Telemetry Emerald** (`#00ff9d`).
 
-### Anti-Pattern Ban List (Impeccable Craft Floor)
-- ❌ **No Eyebrows / Kickers:** Banned above headers (e.g. no "PURE OS • EFICIENCIA ACADÉMICA", no "SEMESTRE ACTIVO").
-- ❌ **No Marketing Slogans:** Banned filler text (e.g. no "Algoritmo DME", no "Inspiración Inspo UI", no "Curva de Rendimiento", no "Foco Finito").
-- ❌ **No Unearned Containers:** No cards nested inside cards, no redundant list borders.
-- ❌ **No Monospace as Costume:** Monospace (`JetBrains Mono`) is restricted to actual data, codes, hours, and grades.
+---
+
+## Anti-Pattern Ban List (Impeccable Craft Floor)
+- ❌ **No Eyebrows / Kickers:** Prohibidos arriba de los títulos principales.
+- ❌ **No Marketing Fluff / Slogans:** Prohibidos eslóganes o badges decorativos sin métricas numéricas asociadas.
+- ❌ **No Unearned Containers:** Prohibido anidar tarjetas dentro de tarjetas sin jerarquía estructural.
+- ❌ **No Monospace as Costume:** La fuente `JetBrains Mono` se restringe estrictamente a datos, códigos, horas y notas numéricas.
 
 ---
 
 ## Palette & Surface System
 
 ### Light Mode (`html.light`)
-- `--bg-main`: `#f4f6f9` (Soft crisp slate gray background)
-- `--bg-sidebar`: `#ffffff` (Pure white navigation column)
-- `--bg-card`: `#ffffff` (Clean white card container)
-- `--border-color`: `#e2e8f0` (Crisp 1px border)
-- `--text-primary`: `#0f172a` (High contrast charcoal)
-- `--text-secondary`: `#475569` (Mid slate)
-- `--text-muted`: `#64748b` (Muted gray)
+- `--bg-main`: `#f1f4f9` (Gris titanio claro)
+- `--bg-sidebar`: `#ffffff` (Blanco puro)
+- `--bg-card`: `#ffffff` (Contenedor blanco nítido)
+- `--border-color`: `#cbd5e1` (Borde 1px nítido)
+- `--text-primary`: `#090e17` (Carbón de alto contraste)
+- `--text-secondary`: `#334155` (Azul pizarra)
 
-### Dark Mode (`html.dark`)
-- `--bg-main`: `#07090e` (Deep obsidian black background)
-- `--bg-sidebar`: `#0d121d` (Elevated dark sidebar)
-- `--bg-card`: `#111726` (Surface card container)
-- `--border-color`: `#1e293d` (Subtle 1px border)
-- `--text-primary`: `#f8fafc` (High contrast off-white)
-- `--text-secondary`: `#94a3b8` (Muted slate)
-- `--text-muted`: `#64748b` (Dark gray)
+### Dark Mode (`html.dark`) — Titanium Cybernetic OS
+- `--bg-main`: `#05080e` (Obsidiana espacial profunda)
+- `--bg-sidebar`: `#090d18` (Columna lateral elevada)
+- `--bg-card`: `#0d1322` (Contenedor de superficie titanio)
+- `--border-color`: `#1e293b` (Borde quirúrgico 1px)
+- `--border-hover`: `#334155` (Resplandor al interactuar)
+- `--text-primary`: `#f8fafc` (Blanco hielo)
+- `--text-secondary`: `#94a3b8` (Pizarra mate)
 
-### Functional Accents
-- **Aeroespacial Degree:** Cyan / Sky (`#38bdf8` dark / `#0284c7` light)
-- **Software Degree:** Purple / Violet (`#c084fc` dark / `#9333ea` light)
-- **Synergy / DME Positive:** Emerald (`#34d399` dark / `#059669` light)
-- **Warning / Alert:** Amber (`#f59e0b`)
-- **Danger / Conflict:** Rose (`#ef4444`)
+### Functional Cyber Accents
+- **Aeroespacial Degree / Primary:** Cyber Cyan (`#00f0ff` / `#0284c7`)
+- **Software Degree:** Orbital Violet (`#c084fc` / `#9333ea`)
+- **Telemetry / Positive:** Telemetry Emerald (`#00ff9d` / `#059669`)
+- **Warning / Alert:** Beacon Amber (`#ffb700`)
+- **Danger / Conflict:** Alert Rose (`#ff3b3b`)
 
 ---
 
 ## Typography Scale
 
-- **Display Headers (`h1`, `h2`):** `font-heading` (`Outfit`), `font-bold` to `font-extrabold`, `tracking-tight` (-0.02em). No eyebrows above.
-- **Section Headers (`h3`, `h4`):** `font-heading`, `font-bold`, crisp line-height.
-- **Body & Controls (`p`, `button`, `input`):** `font-sans` (`Inter`), `leading-normal` or `leading-relaxed`.
-- **Metrics & Codes (`span.font-mono`, `code`):** `font-mono` (`JetBrains Mono`), exact figures only.
+- **Display Headers (`h1`, `h2`):** `font-heading` (`Space Grotesk`), `font-bold` a `font-extrabold`, `tracking-tight` (-0.03em).
+- **Section Headers (`h3`, `h4`):** `font-heading` (`Space Grotesk`), `font-bold`.
+- **Body & Controls (`p`, `button`, `input`):** `font-sans` (`Inter`), `leading-normal`.
+- **Metrics & Telemetry (`span.font-mono`, `code`):** `font-mono` (`JetBrains Mono`), números y códigos exactos.
 
 ---
 
 ## Component Radius Scale
 
 - **Modals / Hero Overlays:** `16px` (`rounded-2xl`)
-- **Cards & Data Tables:** `12px` (`rounded-xl`)
+- **Cards & Data Panels:** `12px` (`rounded-xl`)
 - **Buttons, Inputs & Selects:** `8px` (`rounded-lg`)
 - **Status Pills / Code Badges:** `4px` (`rounded-md`)
