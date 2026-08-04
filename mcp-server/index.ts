@@ -118,6 +118,31 @@ async function main() {
     app.use(cors({ origin: '*' }));
     app.use(express.json());
 
+    // OAuth discovery metadata for Claude / Custom Connectors requiring OAuth probing
+    app.get('/', (req, res) => {
+      res.json({
+        status: 'active',
+        name: 'pure-mcp-server',
+        version: '1.0.0',
+        sse_endpoint: '/sse',
+        message_endpoint: '/message',
+        auth_required: false,
+      });
+    });
+
+    app.get(['/.well-known/oauth-authorization-server', '/.well-known/openid-configuration'], (req, res) => {
+      const hostUrl = `${req.protocol}://${req.get('host')}`;
+      res.json({
+        issuer: hostUrl,
+        service_documentation: hostUrl,
+        token_endpoint_auth_methods_supported: ['none'],
+        response_types_supported: [],
+        grant_types_supported: [],
+        code_challenge_methods_supported: [],
+        auth_required: false,
+      });
+    });
+
     const sseTransportsMap = new Map<string, SSEServerTransport>();
 
     app.get('/sse', async (req, res) => {
