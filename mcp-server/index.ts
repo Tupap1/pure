@@ -26,49 +26,49 @@ const server = new Server(
   }
 );
 
+const TOOLS_LIST = [
+  {
+    name: 'get_academic_overview',
+    description: 'Retorna el resumen académico global, tiempo libre neto, promedios por carrera y alertas urgentes.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'ingest_academic_enrollment',
+    description: 'Procesa e ingesta la matrícula real del estudiante (materias Nivel I, créditos, grupos y horarios con aulas asignadas).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        raw_text: { type: 'string', description: 'Texto de las materias y horarios matriculados' },
+      },
+    },
+  },
+  {
+    name: 'parse_and_ingest_syllabus',
+    description: 'Recibe un texto/PDF de temario y lo convierte en árbol jerárquico de ejes temáticos para la asignatura.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        subject_id: { type: 'string', description: 'ID de la asignatura' },
+        raw_text: { type: 'string', description: 'Texto plano del temario o plan de estudios' },
+      },
+      required: ['subject_id', 'raw_text'],
+    },
+  },
+  {
+    name: 'find_cross_subject_synergies',
+    description: 'Escanea temarios de Ingeniería Aeroespacial e Ingeniería de Software y devuelve coincidencias temáticas para fusionar estudio.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+];
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: 'get_academic_overview',
-        description: 'Retorna el resumen académico global, tiempo libre neto, promedios por carrera y alertas urgentes.',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      },
-      {
-        name: 'ingest_academic_enrollment',
-        description: 'Procesa e ingesta la matrícula real del estudiante (materias Nivel I, créditos, grupos y horarios con aulas asignadas).',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            raw_text: { type: 'string', description: 'Texto de las materias y horarios matriculados' },
-          },
-        },
-      },
-      {
-        name: 'parse_and_ingest_syllabus',
-        description: 'Recibe un texto/PDF de temario y lo convierte en árbol jerárquico de ejes temáticos para la asignatura.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            subject_id: { type: 'string', description: 'ID de la asignatura' },
-            raw_text: { type: 'string', description: 'Texto plano del temario o plan de estudios' },
-          },
-          required: ['subject_id', 'raw_text'],
-        },
-      },
-      {
-        name: 'find_cross_subject_synergies',
-        description: 'Escanea temarios de Ingeniería Aeroespacial e Ingeniería de Software y devuelve coincidencias temáticas para fusionar estudio.',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      },
-    ],
-  };
+  return { tools: TOOLS_LIST };
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -126,6 +126,7 @@ async function main() {
         version: '1.0.0',
         sse_endpoint: '/sse',
         message_endpoint: '/message',
+        streamable_http_endpoint: '/mcp',
         auth_required: false,
       });
     });
@@ -143,6 +144,82 @@ async function main() {
       });
     });
 
+    // 1. Streamable HTTP Transport (Modern Claude.ai Remote Connector Standard - JSON-RPC 2.0)
+    app.post(['/', '/mcp'], async (req, res) => {
+      const { jsonrpc, id, method, params } = req.body || {};
+
+      if (jsonrpc !== '2.0') {
+        return res.status(400).json({ jsonrpc: '2.0', id: id || null, error: { code: -32600, message: 'Invalid Request' } });
+      }
+
+      if (method === 'initialize') {
+        return res.json({
+          jsonrpc: '2.0',
+          id,
+          result: {
+            protocolVersion: params?.protocolVersion || '2024-11-05',
+            capabilities: { tools: {} },
+            serverInfo: { name: 'pure-mcp-server', version: '1.0.0' },
+          },
+        });
+      }
+
+      if (method === 'notifications/initialized') {
+        return res.status(200).send();
+      }
+
+      if (method === 'tools/list') {
+        return res.json({
+          jsonrpc: '2.0',
+          id,
+          result: { tools: TOOLS_LIST },
+        });
+      }
+
+      if (method === 'tools/call') {
+        const { name, arguments: args } = params || {};
+        try {
+          let resultData: any;
+          if (name === 'get_academic_overview') {
+            resultData = handleGetAcademicOverview();
+          } else if (name === 'ingest_academic_enrollment') {
+            resultData = handleIngestAcademicEnrollment(args?.raw_text);
+          } else if (name === 'parse_and_ingest_syllabus') {
+            resultData = handleParseAndIngestSyllabus(args?.subject_id, args?.raw_text);
+          } else if (name === 'find_cross_subject_synergies') {
+            resultData = handleFindCrossSubjectSynergies();
+          } else {
+            return res.json({
+              jsonrpc: '2.0',
+              id,
+              error: { code: -32601, message: `Tool not found: ${name}` },
+            });
+          }
+
+          return res.json({
+            jsonrpc: '2.0',
+            id,
+            result: {
+              content: [{ type: 'text', text: JSON.stringify(resultData, null, 2) }],
+            },
+          });
+        } catch (err: any) {
+          return res.json({
+            jsonrpc: '2.0',
+            id,
+            error: { code: -32603, message: err.message },
+          });
+        }
+      }
+
+      return res.json({
+        jsonrpc: '2.0',
+        id,
+        error: { code: -32601, message: `Method not found: ${method}` },
+      });
+    });
+
+    // 2. Legacy SSE Transport (Server-Sent Events)
     const sseTransportsMap = new Map<string, SSEServerTransport>();
 
     app.get('/sse', async (req, res) => {
@@ -178,7 +255,7 @@ async function main() {
 
     const PORT = process.env.MCP_PORT || 3001;
     app.listen(Number(PORT), '0.0.0.0', () => {
-      console.log(`Servidor MCP HTTP/SSE escuchando en http://0.0.0.0:${PORT}/sse`);
+      console.log(`Servidor MCP HTTP/SSE escuchando en http://0.0.0.0:${PORT}/sse y http://0.0.0.0:${PORT}/mcp`);
     });
   } else {
     const transport = new StdioServerTransport();
