@@ -11,103 +11,182 @@ import {
   handleParseAndIngestSyllabus,
   handleFindCrossSubjectSynergies,
   handleIngestAcademicEnrollment,
+  handleManageUniversities,
+  handleManageProfessors,
+  handleManageSubjects,
+  handleManageSchedules,
+  handleManageDeliverables,
+  handleManageSyllabusTopics,
 } from './tools-handler';
 
-const server = new Server(
+export const TOOLS_LIST = [
   {
-    name: 'pure-mcp-server',
-    version: '1.0.0',
+    name: 'get_academic_overview',
+    description: 'Retorna el resumen académico global, tiempo libre neto, promedios por carrera y alertas urgentes.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
   },
   {
-    capabilities: {
-      tools: {},
+    name: 'ingest_academic_enrollment',
+    description: 'Procesa e ingesta la matrícula real del estudiante (materias Nivel I, créditos, grupos y horarios con aulas asignadas). Debe proporcionar raw_text con los datos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        raw_text: { type: 'string', description: 'Texto o JSON estructurado de materias y horarios matriculados' },
+      },
+      required: ['raw_text'],
     },
-  }
-);
+  },
+  {
+    name: 'parse_and_ingest_syllabus',
+    description: 'Recibe un texto/PDF de temario y lo convierte en árbol jerárquico de ejes temáticos para la asignatura.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        subject_id: { type: 'string', description: 'ID de la asignatura' },
+        raw_text: { type: 'string', description: 'Texto plano del temario o plan de estudios' },
+      },
+      required: ['subject_id', 'raw_text'],
+    },
+  },
+  {
+    name: 'find_cross_subject_synergies',
+    description: 'Escanea temarios de Ingeniería Aeroespacial e Ingeniería de Software y devuelve coincidencias temáticas para fusionar estudio.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'manage_universities',
+    description: 'Operaciones CRUD sobre Universidades (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos de la universidad (id, name, modality, scale_min, scale_max, passing_grade, color)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_professors',
+    description: 'Operaciones CRUD sobre Profesores (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos del profesor (id, university_id, name, email, office_hours, notes)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_subjects',
+    description: 'Operaciones CRUD sobre Asignaturas / Materias (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos de la materia (id, university_id, professor_id, name, code, credits, difficulty, target_grade)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_schedules',
+    description: 'Operaciones CRUD sobre Horarios y Aulas de clase (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos del horario (id, subject_id, day_of_week, start_time, end_time, classroom)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_deliverables',
+    description: 'Operaciones CRUD sobre Entregables / Parciales / Tareas (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos del entregable (id, subject_id, title, due_date, weight_percentage, grade, type, status)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_syllabus_topics',
+    description: 'Operaciones CRUD sobre Temarios y Ejes Temáticos (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos del tema (id, subject_id, parent_id, title, description, mastery_status, order_index)' },
+      },
+      required: ['action'],
+    },
+  },
+];
 
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: 'get_academic_overview',
-        description: 'Retorna el resumen académico global, tiempo libre neto, promedios por carrera y alertas urgentes.',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      },
-      {
-        name: 'ingest_academic_enrollment',
-        description: 'Procesa e ingesta la matrícula real del estudiante (materias Nivel I, créditos, grupos y horarios con aulas asignadas).',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            raw_text: { type: 'string', description: 'Texto de las materias y horarios matriculados' },
-          },
-        },
-      },
-      {
-        name: 'parse_and_ingest_syllabus',
-        description: 'Recibe un texto/PDF de temario y lo convierte en árbol jerárquico de ejes temáticos para la asignatura.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            subject_id: { type: 'string', description: 'ID de la asignatura' },
-            raw_text: { type: 'string', description: 'Texto plano del temario o plan de estudios' },
-          },
-          required: ['subject_id', 'raw_text'],
-        },
-      },
-      {
-        name: 'find_cross_subject_synergies',
-        description: 'Escanea temarios de Ingeniería Aeroespacial e Ingeniería de Software y devuelve coincidencias temáticas para fusionar estudio.',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      },
-    ],
-  };
-});
-
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
+export function executeToolCall(name: string, args: any) {
   switch (name) {
-    case 'get_academic_overview': {
-      const overview = handleGetAcademicOverview();
-      return {
-        content: [{ type: 'text', text: JSON.stringify(overview, null, 2) }],
-      };
-    }
-
-    case 'ingest_academic_enrollment': {
-      const { raw_text } = (args || {}) as { raw_text?: string };
-      const result = handleIngestAcademicEnrollment(raw_text);
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
-
-    case 'parse_and_ingest_syllabus': {
-      const { subject_id, raw_text } = args as { subject_id: string; raw_text: string };
-      const result = handleParseAndIngestSyllabus(subject_id, raw_text);
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
-
-    case 'find_cross_subject_synergies': {
-      const synergies = handleFindCrossSubjectSynergies();
-      return {
-        content: [{ type: 'text', text: JSON.stringify(synergies, null, 2) }],
-      };
-    }
-
+    case 'get_academic_overview':
+      return handleGetAcademicOverview();
+    case 'ingest_academic_enrollment':
+      return handleIngestAcademicEnrollment(args?.raw_text);
+    case 'parse_and_ingest_syllabus':
+      return handleParseAndIngestSyllabus(args?.subject_id, args?.raw_text);
+    case 'find_cross_subject_synergies':
+      return handleFindCrossSubjectSynergies();
+    case 'manage_universities':
+      return handleManageUniversities(args?.action, args?.data);
+    case 'manage_professors':
+      return handleManageProfessors(args?.action, args?.data);
+    case 'manage_subjects':
+      return handleManageSubjects(args?.action, args?.data);
+    case 'manage_schedules':
+      return handleManageSchedules(args?.action, args?.data);
+    case 'manage_deliverables':
+      return handleManageDeliverables(args?.action, args?.data);
+    case 'manage_syllabus_topics':
+      return handleManageSyllabusTopics(args?.action, args?.data);
     default:
       throw new Error(`Herramienta MCP no reconocida: ${name}`);
   }
-});
+}
+
+export function createMcpServerInstance() {
+  const mcpServer = new Server(
+    {
+      name: 'pure-mcp-server',
+      version: '1.0.0',
+    },
+    {
+      capabilities: {
+        tools: {},
+      },
+    }
+  );
+
+  mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
+    return { tools: TOOLS_LIST };
+  });
+
+  mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    const result = executeToolCall(name, args);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  });
+
+  return mcpServer;
+}
 
 async function main() {
   const port = Number(process.env.MCP_PORT || 3001);
@@ -128,14 +207,18 @@ async function main() {
       return;
     }
 
-    const hostHeader = req.headers.host || `localhost:${port}`;
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const baseUrl = `${protocol}://${hostHeader}`;
+    let baseUrl: string;
+    if (process.env.PUBLIC_MCP_URL) {
+      baseUrl = process.env.PUBLIC_MCP_URL.replace(/\/$/, '');
+    } else {
+      const hostHeader = (req.headers['x-forwarded-host'] as string) || req.headers.host || `localhost:${port}`;
+      const protocol = (req.headers['x-forwarded-proto'] as string) || 'https';
+      baseUrl = `${protocol}://${hostHeader}`;
+    }
+
     const url = new URL(req.url || '/', baseUrl);
 
-    // --- OAUTH 2.0 & RFC 7591 DYNAMIC CLIENT REGISTRATION ENDPOINTS ---
-
-    // OAuth Authorization Server Metadata (RFC 8414 / OpenID Discovery)
+    // OpenID / OAuth Authorization Discovery
     if (
       url.pathname === '/.well-known/oauth-authorization-server' ||
       url.pathname === '/.well-known/openid-configuration'
@@ -156,7 +239,7 @@ async function main() {
       return;
     }
 
-    // Dynamic Client Registration (RFC 7591 for Claude Custom Connectors)
+    // Dynamic Client Registration (RFC 7591)
     if ((url.pathname === '/oauth/register' || url.pathname === '/register') && req.method === 'POST') {
       let body = '';
       req.on('data', (chunk) => (body += chunk));
@@ -179,39 +262,39 @@ async function main() {
           );
         } catch (err: any) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
+          res.end(JSON.stringify({ error: err.message }));
         }
       });
       return;
     }
 
-    // OAuth Authorization Endpoint
-    if (url.pathname === '/oauth/authorize') {
+    // OAuth Authorization Code Redirect
+    if (url.pathname === '/oauth/authorize' || url.pathname === '/authorize') {
       const redirectUri = url.searchParams.get('redirect_uri') || 'https://claude.ai/oauth/callback';
       const state = url.searchParams.get('state') || '';
-      const authCode = `pure_code_${Date.now()}`;
-
-      const redirectTarget = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}code=${authCode}&state=${encodeURIComponent(state)}`;
-      res.writeHead(302, { Location: redirectTarget });
+      const separator = redirectUri.includes('?') ? '&' : '?';
+      const targetUrl = `${redirectUri}${separator}code=pure_auto_code_${Date.now()}&state=${encodeURIComponent(state)}`;
+      res.writeHead(302, { Location: targetUrl });
       res.end();
       return;
     }
 
-    // OAuth Token Exchange Endpoint
-    if (url.pathname === '/oauth/token' && req.method === 'POST') {
+    // OAuth Access Token Exchange
+    if ((url.pathname === '/oauth/token' || url.pathname === '/token') && req.method === 'POST') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
-          access_token: requiredToken || 'pure_access_token_2026',
+          access_token: `pure_token_${Date.now()}`,
           token_type: 'Bearer',
-          expires_in: 315360000,
+          expires_in: 31536000,
+          scope: 'mcp',
         })
       );
       return;
     }
 
-    // Healthcheck endpoint (Unauthenticated)
-    if (url.pathname === '/' || url.pathname === '/health') {
+    // Health Check Endpoint
+    if (url.pathname === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
@@ -224,7 +307,7 @@ async function main() {
       return;
     }
 
-    // Optional Bearer Token Authentication check (bypassed for OAuth endpoints & Health)
+    // Optional Bearer Token Authentication check
     if (requiredToken && requiredToken.trim() !== '') {
       const authHeader = req.headers.authorization;
       const expectedAuth = `Bearer ${requiredToken}`;
@@ -250,7 +333,8 @@ async function main() {
         transports.delete(transport.sessionId);
       };
 
-      await server.connect(transport);
+      const sessionServer = createMcpServerInstance();
+      await sessionServer.connect(transport);
       return;
     }
 
@@ -318,12 +402,15 @@ async function main() {
   // Also support STDIO fallback if executed in CLI context
   if (process.env.MCP_STDIO === 'true') {
     const stdioTransport = new StdioServerTransport();
-    await server.connect(stdioTransport);
+    const instance = createMcpServerInstance();
+    await instance.connect(stdioTransport);
     console.error('Servidor MCP de Pure conectado vía stdio');
   }
 }
 
-main().catch((err) => {
-  console.error('Error fatal en el Servidor MCP de Pure:', err);
-  process.exit(1);
-});
+if (process.env.NODE_ENV !== 'test') {
+  main().catch((err) => {
+    console.error('Error fatal en el Servidor MCP de Pure:', err);
+    process.exit(1);
+  });
+}

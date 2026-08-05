@@ -2,7 +2,7 @@
 set -e
 
 echo "🚀 Ejecutando migraciones de PostgreSQL..."
-npm run db:migrate || echo "⚠️ Advertencia: Ocurrió un retraso en la migración o la base de datos se está iniciando. Continuando con la ejecución del servidor..."
+npm run db:migrate || echo "⚠️ Advertencia: Error en la migración. Continuando..."
 
-echo "✅ Iniciando servidor web Next.js..."
+echo "✅ Iniciando servidor..."
 exec "$@"
