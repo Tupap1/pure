@@ -42,6 +42,7 @@ services:
       - MCP_PORT=3001
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER:-pure_user}:${POSTGRES_PASSWORD:-pure_secure_password_2026}@pure-db:5432/${POSTGRES_DB:-pure_academic}?sslmode=disable
+      - PUBLIC_MCP_URL=${PUBLIC_MCP_URL:-https://mcp.btw-one.com}
     depends_on:
       - pure-db
     restart: unless-stopped

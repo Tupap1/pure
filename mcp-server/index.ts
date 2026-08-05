@@ -43,12 +43,13 @@ export const TOOLS_LIST = [
   },
   {
     name: 'ingest_academic_enrollment',
-    description: 'Procesa e ingesta la matrícula real del estudiante (materias Nivel I, créditos, grupos y horarios con aulas asignadas).',
+    description: 'Procesa e ingesta la matrícula real del estudiante (materias, créditos, grupos y horarios con aulas asignadas). OBLIGATORIO: debes proporcionar el texto completo o JSON de la matrícula en el argumento raw_text.',
     inputSchema: {
       type: 'object',
       properties: {
-        raw_text: { type: 'string', description: 'Texto o JSON estructurado de materias, horarios y aulas' },
+        raw_text: { type: 'string', description: 'Texto plano completo o JSON estructurado de las materias, horarios y aulas de la matrícula' },
       },
+      required: ['raw_text'],
     },
   },
   {
@@ -208,7 +209,10 @@ async function main() {
 
     // Zero-Auth Auto-Approval OAuth endpoints for Claude.ai Custom Connectors (RFC 7591 / RFC 8414)
     const getBaseUrl = (req: express.Request) => {
-      const host = req.get('host') || 'mcp.btw-one.com';
+      if (process.env.PUBLIC_MCP_URL) {
+        return process.env.PUBLIC_MCP_URL.replace(/\/$/, '');
+      }
+      const host = req.get('x-forwarded-host') || req.get('host') || 'mcp.btw-one.com';
       const protocol = req.get('x-forwarded-proto') || 'https';
       return `${protocol}://${host}`;
     };
