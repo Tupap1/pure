@@ -10,7 +10,9 @@
     "mcp:start": "tsx mcp-server/index.ts",
     "mcp:start:http": "tsx mcp-server/index.ts --http",
     "lint": "next lint",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:all": "npm run typecheck && vitest run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.1",
