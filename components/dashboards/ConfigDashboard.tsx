@@ -235,7 +235,7 @@ export const ConfigDashboard: React.FC = () => {
     } else {
       await pureDB.subjects.add({
         ...validation.data,
-        modality: validation.data.modality === 'virtual' ? 'virtual' : 'presencial',
+        modality: validation.data.modality || subModality || 'presencial',
         target_grade: validation.data.target_grade ?? Number(subTargetGrade) ?? 3.0,
         current_grade: validation.data.current_grade ?? 0,
         created_at: new Date().toISOString(),

@@ -31,7 +31,7 @@ export interface SubjectEntity {
   code?: string;
   credits: number;
   difficulty: number;
-  modality: 'presencial' | 'virtual';
+  modality: 'presencial' | 'virtual' | 'hibrida';
   target_grade: number;
   current_grade: number;
   max_absences?: number;
