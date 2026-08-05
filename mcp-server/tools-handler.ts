@@ -154,31 +154,44 @@ export function handleFindCrossSubjectSynergies() {
 
 /**
  * Ingesta dinámica de matrícula académica.
- * Si recibe JSON o texto estructurado con custom classrooms o asignaturas,
- * actualiza el store respetando exactamente las aulas enviadas.
+ * Si recibe JSON o texto plano estructurado, procesa y actualiza
+ * dinámicamente el store con la información entregada.
  */
 export function handleIngestAcademicEnrollment(rawEnrollmentText?: string) {
-  if (rawEnrollmentText) {
+  if (rawEnrollmentText && rawEnrollmentText.trim().length > 0) {
+    let parsedSuccess = false;
+
+    // 1. Intentar parsear como objeto JSON estructurado
     try {
       const parsed = JSON.parse(rawEnrollmentText);
-      if (parsed.universities) store.universities = parsed.universities;
-      if (parsed.professors) store.professors = parsed.professors;
-      if (parsed.subjects) store.subjects = parsed.subjects;
-      if (parsed.schedules) store.schedules = parsed.schedules;
+      if (parsed.universities || parsed.subjects || parsed.schedules) {
+        if (parsed.universities) store.universities = parsed.universities;
+        if (parsed.professors) store.professors = parsed.professors;
+        if (parsed.subjects) store.subjects = parsed.subjects;
+        if (parsed.schedules) store.schedules = parsed.schedules;
+        parsedSuccess = true;
+      }
 
-      // Classroom overrides map: e.g. { "sub-vivamos": "2-212", "sub-geom": "2-209" }
       if (parsed.classroomOverrides) {
         for (const [subId, newClassroom] of Object.entries(parsed.classroomOverrides)) {
           store.schedules
             .filter((sch) => sch.subject_id === subId)
             .forEach((sch) => {
-              sch.classroom = newClassroom;
+              sch.classroom = newClassroom as string;
             });
         }
+        parsedSuccess = true;
       }
     } catch {
-      // Plain text classroom extraction
-      const lines = rawEnrollmentText.split('\n');
+      // Fallthrough a parseo dinámico de texto plano
+    }
+
+    // 2. Parseo dinámico de texto plano
+    if (!parsedSuccess) {
+      const lines = rawEnrollmentText.split('\n').map((l) => l.trim()).filter(Boolean);
+      let updatedExistingClassrooms = false;
+
+      // Primer intento: actualización de aulas en materias existentes (ej: "Geometría Vectorial: 2-209")
       lines.forEach((line) => {
         const parts = line.split(':');
         if (parts.length === 2) {
@@ -191,11 +204,56 @@ export function handleIngestAcademicEnrollment(rawEnrollmentText?: string) {
                 .filter((sch) => sch.subject_id === sub.id)
                 .forEach((sch) => {
                   sch.classroom = val;
+                  updatedExistingClassrooms = true;
                 });
             }
           });
         }
       });
+
+      // Si no coincidió con materias existentes, ingestión dinámica completa
+      if (!updatedExistingClassrooms) {
+        const newSubjects: Omit<SubjectEntity, 'created_at' | 'current_grade'>[] = [];
+        const newSchedules: any[] = [];
+        const defaultUniId = store.universities[0]?.id || 'uni-ingested';
+        const defaultProfId = store.professors[0]?.id || null;
+
+        lines.forEach((line, index) => {
+          const parts = line.split(/[:\-–|]/).map((p) => p.trim()).filter(Boolean);
+          if (parts.length > 0) {
+            const subjectName = parts[0];
+            const classroomOrDetail = parts.length > 1 ? parts.slice(1).join(' - ') : 'Aula por definir';
+            const subId = `sub-ingested-${index + 1}`;
+
+            newSubjects.push({
+              id: subId,
+              university_id: defaultUniId,
+              professor_id: defaultProfId,
+              name: subjectName,
+              code: `ING-${100 + index}`,
+              credits: 3,
+              difficulty: 3,
+              modality: 'presencial',
+              target_grade: 4.5,
+            });
+
+            newSchedules.push({
+              id: `sch-ingested-${index + 1}`,
+              subject_id: subId,
+              day_of_week: (index % 5) + 1,
+              start_time: '08:00',
+              end_time: '10:00',
+              classroom: classroomOrDetail,
+              periodicity: 'semanal',
+            });
+          }
+        });
+
+        if (newSubjects.length > 0) {
+          store.subjects = newSubjects;
+          store.schedules = newSchedules;
+        }
+      }
     }
   }
 
