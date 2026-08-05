@@ -28,11 +28,15 @@ yarn-error.log*
 .env.local
 .env.*.local
 
-# IDE
+# IDE & AI Assistant tool states
 .vscode/
 .idea/
+.gemini/
+.claude/
+.cursor/
 *.swp
 *.swo
+*.tsbuildinfo
 
 # OS
 .DS_Store
