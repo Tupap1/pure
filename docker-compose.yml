@@ -1,4 +1,4 @@
-# PURE OS Stack v1.0.1 - Streamable HTTP & RFC 7591 OAuth Support
+# PURE OS Stack v1.0.2 - Clean Network Spec
 services:
   pure-db:
     image: postgres:16-alpine
@@ -47,8 +47,3 @@ services:
 
 volumes:
   postgres_data:
-
-networks:
-  default:
-    name: bridge
-
