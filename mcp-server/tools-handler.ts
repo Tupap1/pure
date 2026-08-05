@@ -224,10 +224,12 @@ export function handleManageUniversities(action: 'create' | 'read' | 'update' | 
         id: data.id || `uni-${Date.now()}`,
         name: data.name,
         modality: data.modality || 'presencial',
-        scale_min: Number(data.scale_min ?? 0),
-        scale_max: Number(data.scale_max ?? 5),
-        passing_grade: Number(data.passing_grade ?? 3),
+        scale_min: Number(data.scale_min ?? 0.0),
+        scale_max: Number(data.scale_max ?? 5.0),
+        passing_grade: Number(data.passing_grade ?? 3.0),
         color: data.color || '#0ea5e9',
+        has_alternating_saturdays: Boolean(data.has_alternating_saturdays ?? true),
+        first_sabado_a_date: data.first_sabado_a_date || '2026-08-01',
       };
       store.universities.push(newUni);
       return { status: 'success', message: 'Universidad creada exitosamente', data: newUni };
@@ -333,6 +335,7 @@ export function handleManageSchedules(action: 'create' | 'read' | 'update' | 'de
         start_time: data.start_time,
         end_time: data.end_time,
         classroom: data.classroom || null,
+        periodicity: data.periodicity || 'semanal',
       };
       store.schedules.push(newSched);
       return { status: 'success', message: 'Horario creado exitosamente', data: newSched };
