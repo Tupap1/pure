@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
 import { pureDB } from '@/lib/db/dexie-schema';
-import { clearAllData, seedDemoData } from '@/lib/db/seed';
+import { clearAllData } from '@/lib/db/seed';
 import {
   UniversitySchema,
   ProfessorSchema,
@@ -295,10 +295,6 @@ export const ConfigDashboard: React.FC = () => {
           <Button variant="ghost" size="sm" onClick={() => clearAllData()}>
             <RotateCcw className="w-3.5 h-3.5" /> Limpiar Todo
           </Button>
-
-          <Button variant="software" size="sm" onClick={() => seedDemoData()}>
-            <Sparkles className="w-3.5 h-3.5" /> Cargar Matrícula Demo
-          </Button>
         </div>
       </div>
 
@@ -410,15 +406,15 @@ export const ConfigDashboard: React.FC = () => {
                 <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-slate-100 dark:bg-slate-900 text-center text-xs font-mono">
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 text-[10px]">Min</div>
-                    <div className="text-slate-800 dark:text-slate-200 font-bold">{uni.scale_min.toFixed(1)}</div>
+                    <div className="text-slate-800 dark:text-slate-200 font-bold">{Number(uni.scale_min).toFixed(1)}</div>
                   </div>
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 text-[10px]">Max</div>
-                    <div className="text-slate-800 dark:text-slate-200 font-bold">{uni.scale_max.toFixed(1)}</div>
+                    <div className="text-slate-800 dark:text-slate-200 font-bold">{Number(uni.scale_max).toFixed(1)}</div>
                   </div>
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 text-[10px]">Aprobatorio</div>
-                    <div className="text-emerald-600 dark:text-emerald-400 font-bold">{uni.passing_grade.toFixed(1)}</div>
+                    <div className="text-emerald-600 dark:text-emerald-400 font-bold">{Number(uni.passing_grade).toFixed(1)}</div>
                   </div>
                 </div>
               </Card>
@@ -679,18 +675,7 @@ export const ConfigDashboard: React.FC = () => {
             <RotateCcw className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             Mantenimiento & Acciones de Base de Datos
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="p-5 space-y-3 border border-amber-200 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/20">
-              <div className="flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-300">
-                <Sparkles className="w-4 h-4 text-amber-500" /> Cargar Matrícula Demo (UdeA + UdeC)
-              </div>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                Puebla automáticamente la base de datos IndexedDB local con instituciones, asignaturas de doble ingeniería, docentes y horarios de prueba.
-              </p>
-              <Button variant="software" size="sm" onClick={() => seedDemoData()}>
-                Cargar Datos Demo
-              </Button>
-            </Card>
+          <div className="grid grid-cols-1 gap-4">
 
             <Card className="p-5 space-y-3 border border-rose-200 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20">
               <div className="flex items-center gap-2 text-sm font-bold text-rose-800 dark:text-rose-300">

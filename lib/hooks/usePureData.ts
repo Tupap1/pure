@@ -1,6 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { pureDB } from '../db/dexie-schema';
-import { seedRealSemesterData, clearAllData } from '../db/seed';
 import { useEffect } from 'react';
 
 export function usePureData() {
@@ -32,24 +31,11 @@ export function usePureData() {
                 if (syllabusTopics?.length) await pureDB.syllabusTopics.bulkPut(syllabusTopics);
               }
             );
-            return;
           }
         }
-
-        // Fallback to local Dexie seed if PostgreSQL has no records yet
-        pureDB.universities.count().then((count) => {
-          if (count < 2) {
-            seedRealSemesterData();
-          }
-        });
       })
       .catch((err) => {
-        console.warn('PostgreSQL sync fetch fallback to IndexedDB local:', err);
-        pureDB.universities.count().then((count) => {
-          if (count < 2) {
-            seedRealSemesterData();
-          }
-        });
+        console.warn('PostgreSQL sync fetch error:', err);
       });
   }, []);
 

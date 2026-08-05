@@ -17,7 +17,12 @@ export async function GET() {
     return NextResponse.json({
       status: 'success',
       data: {
-        universities: unis.rows,
+        universities: unis.rows.map((u) => ({
+          ...u,
+          scale_min: Number(u.scale_min),
+          scale_max: Number(u.scale_max),
+          passing_grade: Number(u.passing_grade),
+        })),
         professors: profs.rows,
         subjects: subs.rows.map((s) => ({
           ...s,
