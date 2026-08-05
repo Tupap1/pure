@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   filterDeliverables,
   sortDeliverablesByUrgency,
+  calculateSubjectGradeProgress,
+  generateDeliverablesFromPreset,
+  PRESETS,
   DeliverableFilterOptions,
   Deliverable
 } from '@/lib/domain/deliverable';
@@ -60,8 +63,30 @@ describe('REQ-05: Entregas, Evaluaciones y Filtros de Tareas', () => {
 
   it('debe ordenar entregas pendientes por urgencia de fecha límite', () => {
     const sorted = sortDeliverablesByUrgency(mockDeliverables);
-    // d3 está calificado, d2 es el 04 de agosto, d1 es el 10 de agosto
     expect(sorted[0].id).toBe('d2'); // Más urgente (4 de agosto)
     expect(sorted[1].id).toBe('d1'); // Segundo más urgente (10 de agosto)
+  });
+
+  it('debe calcular el progreso de notas y el promedio acumulado ponderado correctamente', () => {
+    const deliverables: Deliverable[] = [
+      { id: 'd-p1', subject_id: 'sub-calc', title: 'Parcial 1', weight_percentage: 20, grade: 4.0, status: 'calificado', type: 'parcial', due_date: '', is_group: false, complexity: 'medio' },
+      { id: 'd-q1', subject_id: 'sub-calc', title: 'Quiz 1', weight_percentage: 5, grade: 5.0, status: 'calificado', type: 'quiz', due_date: '', is_group: false, complexity: 'facil' },
+      { id: 'd-p2', subject_id: 'sub-calc', title: 'Parcial 2', weight_percentage: 20, status: 'pendiente', type: 'parcial', due_date: '', is_group: false, complexity: 'medio' },
+    ];
+
+    const progress = calculateSubjectGradeProgress(deliverables as any, 'sub-calc');
+    expect(progress.totalConfiguredWeight).toBe(45);
+    expect(progress.evaluatedWeight).toBe(25);
+    // (4.0 * 20 + 5.0 * 5) / 25 = (80 + 25) / 25 = 105 / 25 = 4.20
+    expect(progress.currentWeightedGrade).toBe(4.20);
+    expect(progress.isComplete100Percent).toBe(false);
+  });
+
+  it('debe generar entregables a partir de una plantilla de 4 parciales (20%) + 1 actividad (20%) sumando 100%', () => {
+    const preset = PRESETS[0];
+    const generated = generateDeliverablesFromPreset(preset, 'sub-calc');
+    expect(generated).toHaveLength(5);
+    const sum = generated.reduce((acc, item) => acc + item.weight_percentage, 0);
+    expect(sum).toBe(100);
   });
 });

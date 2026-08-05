@@ -1,67 +1,114 @@
-export interface Deliverable {
-  id: string;
-  subject_id: string;
-  topic_id?: string;
-  title: string;
-  description?: string;
-  due_date: string; // ISO String
-  weight_percentage: number;
-  grade?: number;
-  type: 'taller' | 'proyecto' | 'parcial' | 'quiz' | 'laboratorio' | 'examen_final' | string;
-  location_modality?: 'presencial' | 'virtual';
-  is_group: boolean;
-  complexity: 'facil' | 'medio' | 'dificil';
-  status: 'pendiente' | 'entregado' | 'calificado';
-}
+import { DeliverableEntity } from '../db/dexie-schema';
+
+export type Deliverable = DeliverableEntity;
 
 export interface DeliverableFilterOptions {
   is_group?: boolean;
-  status?: 'pendiente' | 'entregado' | 'calificado';
-  complexity?: 'facil' | 'medio' | 'dificil';
-  type?: 'taller' | 'proyecto' | 'parcial' | 'quiz' | 'laboratorio' | 'examen_final' | string;
-  location_modality?: 'presencial' | 'virtual';
-  subject_id?: string;
+  status?: string;
+  type?: string;
 }
 
-/**
-  Filtra la lista de entregas según los criterios especificados (REQ-05)
- */
-export function filterDeliverables(
-  items: Deliverable[],
-  options: DeliverableFilterOptions = {}
-): Deliverable[] {
-  return items.filter((item) => {
-    if (options.is_group !== undefined && item.is_group !== options.is_group) {
-      return false;
-    }
-    if (options.status && item.status !== options.status) {
-      return false;
-    }
-    if (options.complexity && item.complexity !== options.complexity) {
-      return false;
-    }
-    if (options.type && item.type.toLowerCase() !== options.type.toLowerCase()) {
-      return false;
-    }
-    if (options.location_modality && item.location_modality !== options.location_modality) {
-      return false;
-    }
-    if (options.subject_id && item.subject_id !== options.subject_id) {
-      return false;
-    }
+export function filterDeliverables(deliverables: DeliverableEntity[], options: DeliverableFilterOptions): DeliverableEntity[] {
+  return deliverables.filter((item) => {
+    if (options.is_group !== undefined && item.is_group !== options.is_group) return false;
+    if (options.status !== undefined && item.status !== options.status) return false;
+    if (options.type !== undefined && item.type !== options.type) return false;
     return true;
   });
 }
 
-/**
-  Ordena las entregas pendientes por urgencia según fecha límite ascendente (REQ-05)
- */
-export function sortDeliverablesByUrgency(items: Deliverable[]): Deliverable[] {
-  const pendingItems = items.filter((item) => item.status === 'pendiente');
+export function sortDeliverablesByUrgency(deliverables: DeliverableEntity[]): DeliverableEntity[] {
+  return deliverables
+    .filter((d) => d.status === 'pendiente')
+    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+}
 
-  return [...pendingItems].sort((a, b) => {
-    const timeA = new Date(a.due_date).getTime();
-    const timeB = new Date(b.due_date).getTime();
-    return timeA - timeB;
-  });
+export interface SubjectGradeProgress {
+  subject_id: string;
+  totalConfiguredWeight: number;
+  evaluatedWeight: number;
+  pendingWeight: number;
+  currentWeightedGrade: number;
+  isComplete100Percent: boolean;
+}
+
+/**
+ * Calculates subject grade progress, total configured weight, and current weighted grade.
+ */
+export function calculateSubjectGradeProgress(
+  deliverables: DeliverableEntity[],
+  subjectId: string
+): SubjectGradeProgress {
+  const subDeliverables = deliverables.filter((d) => d.subject_id === subjectId);
+
+  const totalConfiguredWeight = subDeliverables.reduce((acc, d) => acc + (Number(d.weight_percentage) || 0), 0);
+
+  const gradedDeliverables = subDeliverables.filter(
+    (d) => d.status === 'calificado' && d.grade !== undefined && d.grade !== null
+  );
+
+  const evaluatedWeight = gradedDeliverables.reduce((acc, d) => acc + (Number(d.weight_percentage) || 0), 0);
+
+  const weightedSum = gradedDeliverables.reduce(
+    (acc, d) => acc + (Number(d.grade) * Number(d.weight_percentage)),
+    0
+  );
+
+  const currentWeightedGrade = evaluatedWeight > 0 ? weightedSum / evaluatedWeight : 0;
+  const pendingWeight = Math.max(0, 100 - evaluatedWeight);
+
+  return {
+    subject_id: subjectId,
+    totalConfiguredWeight,
+    evaluatedWeight,
+    pendingWeight,
+    currentWeightedGrade: Number(currentWeightedGrade.toFixed(2)),
+    isComplete100Percent: totalConfiguredWeight === 100,
+  };
+}
+
+export interface EvaluationPreset {
+  name: string;
+  items: Array<{ title: string; weight: number; type: 'parcial' | 'quiz' | 'taller' | 'proyecto' | 'laboratorio' }>;
+}
+
+export const PRESETS: EvaluationPreset[] = [
+  {
+    name: '4 Parciales (20%) + 1 Actividad (20%)',
+    items: [
+      { title: 'Parcial 1', weight: 20, type: 'parcial' },
+      { title: 'Parcial 2', weight: 20, type: 'parcial' },
+      { title: 'Parcial 3', weight: 20, type: 'parcial' },
+      { title: 'Parcial 4', weight: 20, type: 'parcial' },
+      { title: 'Actividad / Taller Final', weight: 20, type: 'taller' },
+    ],
+  },
+  {
+    name: '3 Quizzes (5%) + 2 Parciales (35%) + 1 Proyecto (15%)',
+    items: [
+      { title: 'Quiz 1', weight: 5, type: 'quiz' },
+      { title: 'Quiz 2', weight: 5, type: 'quiz' },
+      { title: 'Quiz 3', weight: 5, type: 'quiz' },
+      { title: 'Parcial 1', weight: 35, type: 'parcial' },
+      { title: 'Parcial 2', weight: 35, type: 'parcial' },
+      { title: 'Proyecto Integrador', weight: 15, type: 'proyecto' },
+    ],
+  },
+];
+
+/**
+ * Generates deliverable entities from an evaluation preset for a given subject.
+ */
+export function generateDeliverablesFromPreset(preset: EvaluationPreset, subjectId: string): Omit<DeliverableEntity, 'id'>[] {
+  return preset.items.map((item, idx) => ({
+    subject_id: subjectId,
+    title: item.title,
+    weight_percentage: item.weight,
+    type: item.type,
+    due_date: new Date(Date.now() + (idx + 1) * 7 * 24 * 60 * 60 * 1000).toISOString(),
+    is_group: false,
+    complexity: 'medio',
+    status: 'pendiente',
+    created_at: new Date().toISOString(),
+  }));
 }

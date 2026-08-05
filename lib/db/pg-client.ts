@@ -27,6 +27,8 @@ export async function initPostgresSchema() {
         scale_max NUMERIC NOT NULL DEFAULT 5.0,
         passing_grade NUMERIC NOT NULL DEFAULT 3.0,
         color TEXT DEFAULT '#0ea5e9',
+        has_alternating_saturdays BOOLEAN DEFAULT TRUE,
+        first_sabado_a_date TEXT DEFAULT '2026-08-01',
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
@@ -62,6 +64,7 @@ export async function initPostgresSchema() {
         start_time TEXT NOT NULL,
         end_time TEXT NOT NULL,
         classroom TEXT,
+        periodicity TEXT DEFAULT 'semanal',
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 

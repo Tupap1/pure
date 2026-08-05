@@ -8,6 +8,8 @@ export interface UniversityEntity {
   scale_max: number;
   passing_grade: number;
   color: string;
+  has_alternating_saturdays?: boolean;
+  first_sabado_a_date?: string;
   created_at?: string;
 }
 
@@ -43,6 +45,7 @@ export interface ScheduleEntity {
   start_time: string;
   end_time: string;
   classroom?: string;
+  periodicity?: 'semanal' | 'sabado_a' | 'sabado_b';
   created_at?: string;
 }
 
