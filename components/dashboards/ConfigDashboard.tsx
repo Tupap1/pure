@@ -60,7 +60,7 @@ export const ConfigDashboard: React.FC = () => {
   const [subProfId, setSubProfId] = useState('');
   const [subCredits, setSubCredits] = useState(3);
   const [subDifficulty, setSubDifficulty] = useState(3);
-  const [subModality, setSubModality] = useState<'presencial' | 'virtual'>('presencial');
+  const [subModality, setSubModality] = useState<'presencial' | 'virtual' | 'hibrida'>('presencial');
   const [subTargetGrade, setSubTargetGrade] = useState(4.5);
 
   // Schedule form
@@ -831,6 +831,7 @@ export const ConfigDashboard: React.FC = () => {
               >
                 <option value="presencial">Presencial</option>
                 <option value="virtual">Virtual</option>
+                <option value="hibrida">Híbrida</option>
               </select>
             </div>
           </div>
