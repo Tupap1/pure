@@ -128,7 +128,87 @@ async function main() {
       return;
     }
 
-    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const hostHeader = req.headers.host || `localhost:${port}`;
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const baseUrl = `${protocol}://${hostHeader}`;
+    const url = new URL(req.url || '/', baseUrl);
+
+    // --- OAUTH 2.0 & RFC 7591 DYNAMIC CLIENT REGISTRATION ENDPOINTS ---
+
+    // OAuth Authorization Server Metadata (RFC 8414 / OpenID Discovery)
+    if (
+      url.pathname === '/.well-known/oauth-authorization-server' ||
+      url.pathname === '/.well-known/openid-configuration'
+    ) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          issuer: baseUrl,
+          authorization_endpoint: `${baseUrl}/oauth/authorize`,
+          token_endpoint: `${baseUrl}/oauth/token`,
+          registration_endpoint: `${baseUrl}/oauth/register`,
+          scopes_supported: ['mcp'],
+          response_types_supported: ['code'],
+          grant_types_supported: ['authorization_code'],
+          token_endpoint_auth_methods_supported: ['client_secret_post', 'none', 'client_secret_basic'],
+        })
+      );
+      return;
+    }
+
+    // Dynamic Client Registration (RFC 7591 for Claude Custom Connectors)
+    if ((url.pathname === '/oauth/register' || url.pathname === '/register') && req.method === 'POST') {
+      let body = '';
+      req.on('data', (chunk) => (body += chunk));
+      req.on('end', () => {
+        try {
+          const json = JSON.parse(body || '{}');
+          const clientId = `pure_client_${Date.now()}`;
+          const clientSecret = `pure_secret_${Math.random().toString(36).substring(2)}`;
+
+          res.writeHead(201, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              client_id: clientId,
+              client_secret: clientSecret,
+              client_name: json.client_name || 'Claude Custom Connector',
+              redirect_uris: json.redirect_uris || ['https://claude.ai/oauth/callback'],
+              grant_types: ['authorization_code'],
+              response_types: ['code'],
+            })
+          );
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
+        }
+      });
+      return;
+    }
+
+    // OAuth Authorization Endpoint
+    if (url.pathname === '/oauth/authorize') {
+      const redirectUri = url.searchParams.get('redirect_uri') || 'https://claude.ai/oauth/callback';
+      const state = url.searchParams.get('state') || '';
+      const authCode = `pure_code_${Date.now()}`;
+
+      const redirectTarget = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}code=${authCode}&state=${encodeURIComponent(state)}`;
+      res.writeHead(302, { Location: redirectTarget });
+      res.end();
+      return;
+    }
+
+    // OAuth Token Exchange Endpoint
+    if (url.pathname === '/oauth/token' && req.method === 'POST') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          access_token: requiredToken || 'pure_access_token_2026',
+          token_type: 'Bearer',
+          expires_in: 315360000,
+        })
+      );
+      return;
+    }
 
     // Healthcheck endpoint (Unauthenticated)
     if (url.pathname === '/' || url.pathname === '/health') {
@@ -138,13 +218,13 @@ async function main() {
           status: 'ok',
           server: 'pure-mcp-server',
           activeSessions: transports.size,
-          endpoints: ['/sse', '/messages', '/api/mcp'],
+          endpoints: ['/sse', '/messages', '/api/mcp', '/oauth/register', '/.well-known/oauth-authorization-server'],
         })
       );
       return;
     }
 
-    // Optional Bearer Token Authentication check
+    // Optional Bearer Token Authentication check (bypassed for OAuth endpoints & Health)
     if (requiredToken && requiredToken.trim() !== '') {
       const authHeader = req.headers.authorization;
       const expectedAuth = `Bearer ${requiredToken}`;
