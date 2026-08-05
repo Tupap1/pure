@@ -43,13 +43,12 @@ export const TOOLS_LIST = [
   },
   {
     name: 'ingest_academic_enrollment',
-    description: 'Procesa e ingesta la matrícula real del estudiante (materias, créditos, grupos y horarios con aulas asignadas). OBLIGATORIO: debes proporcionar el texto completo o JSON de la matrícula en el argumento raw_text.',
+    description: 'Procesa e ingesta la matrícula real del estudiante (materias Nivel I, créditos, grupos y horarios con aulas asignadas).',
     inputSchema: {
       type: 'object',
       properties: {
-        raw_text: { type: 'string', description: 'Texto plano completo o JSON estructurado de las materias, horarios y aulas de la matrícula' },
+        raw_text: { type: 'string', description: 'Texto o JSON estructurado de materias, horarios y aulas' },
       },
-      required: ['raw_text'],
     },
   },
   {
@@ -207,90 +206,55 @@ async function main() {
       });
     });
 
-    // Zero-Auth Auto-Approval OAuth endpoints for Claude.ai Custom Connectors (RFC 7591 / RFC 8414)
+    // Zero-Auth Auto-Approval OAuth endpoints for Claude.ai Custom Connectors
     const getBaseUrl = (req: express.Request) => {
-      if (process.env.PUBLIC_MCP_URL) {
-        return process.env.PUBLIC_MCP_URL.replace(/\/$/, '');
-      }
-      const host = req.get('x-forwarded-host') || req.get('host') || 'mcp.btw-one.com';
+      const host = req.get('host') || 'mcp.btw-one.com';
       const protocol = req.get('x-forwarded-proto') || 'https';
       return `${protocol}://${host}`;
     };
 
-    // Metadata Discovery (RFC 8414 & OpenID Connect)
-    app.get(
-      [
-        '/.well-known/oauth-authorization-server',
-        '/.well-known/oauth-authorization-server/',
-        '/.well-known/openid-configuration',
-        '/.well-known/openid-configuration/',
-      ],
-      (req, res) => {
-        const baseUrl = getBaseUrl(req);
-        res.json({
-          issuer: baseUrl,
-          authorization_endpoint: `${baseUrl}/authorize`,
-          token_endpoint: `${baseUrl}/token`,
-          registration_endpoint: `${baseUrl}/register`,
-          scopes_supported: ['mcp:full_access', 'read', 'write', 'openid'],
-          response_types_supported: ['code'],
-          grant_types_supported: ['authorization_code', 'refresh_token'],
-          code_challenge_methods_supported: ['S256', 'plain'],
-          token_endpoint_auth_methods_supported: ['none', 'client_secret_post', 'client_secret_basic'],
-        });
-      }
-    );
-
-    // RFC 7591 Dynamic Client Registration
-    app.all('/register', (req, res) => {
-      if (req.method === 'OPTIONS') {
-        return res.status(204).end();
-      }
-
-      const redirectUris = req.body?.redirect_uris || req.query?.redirect_uris || [];
-      const clientName = req.body?.client_name || 'Claude.ai Pure Connector';
-      const clientId = `pure-client-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-      const clientSecret = `pure-secret-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-
-      return res.status(201).json({
-        client_id: clientId,
-        client_secret: clientSecret,
-        client_id_issued_at: Math.floor(Date.now() / 1000),
-        client_secret_expires_at: 0,
-        client_name: clientName,
-        redirect_uris: Array.isArray(redirectUris) ? redirectUris : [redirectUris],
-        grant_types: ['authorization_code', 'refresh_token'],
-        response_types: ['code'],
-        token_endpoint_auth_method: 'client_secret_post',
+    app.get(['/.well-known/oauth-authorization-server', '/.well-known/openid-configuration'], (req, res) => {
+      const baseUrl = getBaseUrl(req);
+      res.json({
+        issuer: baseUrl,
+        authorization_endpoint: `${baseUrl}/authorize`,
+        token_endpoint: `${baseUrl}/token`,
+        registration_endpoint: `${baseUrl}/register`,
+        response_types_supported: ['code'],
+        grant_types_supported: ['authorization_code'],
+        code_challenge_methods_supported: ['S256', 'plain'],
+        token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
       });
     });
 
-    // Auto-Approval Authorization Endpoint
-    app.all('/authorize', (req, res) => {
-      const redirectUri = (req.query.redirect_uri || req.body?.redirect_uri) as string;
-      const state = (req.query.state || req.body?.state || '') as string;
-      const code = `pure_auto_code_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    app.post('/register', (req, res) => {
+      res.status(201).json({
+        client_id: 'pure-auto-client-id',
+        client_secret: 'pure-auto-client-secret',
+        client_id_issued_at: Math.floor(Date.now() / 1000),
+        client_name: 'Claude.ai Pure Connector',
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        redirect_uris: req.body?.redirect_uris || [],
+      });
+    });
 
+    app.get('/authorize', (req, res) => {
+      const redirectUri = req.query.redirect_uri as string;
+      const state = req.query.state as string;
       if (redirectUri) {
         const separator = redirectUri.includes('?') ? '&' : '?';
-        const targetUrl = `${redirectUri}${separator}code=${code}&state=${encodeURIComponent(state)}`;
+        const targetUrl = `${redirectUri}${separator}code=pure_auto_approved_code&state=${encodeURIComponent(state || '')}`;
         return res.redirect(302, targetUrl);
       }
-
       return res.send('OAuth Auto-Approved');
     });
 
-    // Token Exchange Endpoint
-    app.all(['/token', '/oauth/token'], (req, res) => {
-      if (req.method === 'OPTIONS') {
-        return res.status(204).end();
-      }
-
-      return res.json({
-        access_token: `pure_access_token_${Date.now()}`,
+    app.post('/token', (req, res) => {
+      res.json({
+        access_token: 'pure_access_token_granted',
         token_type: 'Bearer',
         expires_in: 31536000,
-        refresh_token: `pure_refresh_token_${Date.now()}`,
         scope: 'mcp:full_access',
       });
     });
