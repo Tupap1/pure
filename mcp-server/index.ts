@@ -12,6 +12,12 @@ import {
   handleParseAndIngestSyllabus,
   handleFindCrossSubjectSynergies,
   handleIngestAcademicEnrollment,
+  handleManageUniversities,
+  handleManageProfessors,
+  handleManageSubjects,
+  handleManageSchedules,
+  handleManageDeliverables,
+  handleManageSyllabusTopics,
 } from './tools-handler';
 
 const server = new Server(
@@ -26,7 +32,7 @@ const server = new Server(
   }
 );
 
-const TOOLS_LIST = [
+export const TOOLS_LIST = [
   {
     name: 'get_academic_overview',
     description: 'Retorna el resumen académico global, tiempo libre neto, promedios por carrera y alertas urgentes.',
@@ -41,7 +47,7 @@ const TOOLS_LIST = [
     inputSchema: {
       type: 'object',
       properties: {
-        raw_text: { type: 'string', description: 'Texto de las materias y horarios matriculados' },
+        raw_text: { type: 'string', description: 'Texto o JSON estructurado de materias, horarios y aulas' },
       },
     },
   },
@@ -65,49 +71,117 @@ const TOOLS_LIST = [
       properties: {},
     },
   },
+  {
+    name: 'manage_universities',
+    description: 'Operaciones CRUD sobre Universidades (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos de la universidad (id, name, modality, scale_min, scale_max, passing_grade, color)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_professors',
+    description: 'Operaciones CRUD sobre Profesores (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos del profesor (id, university_id, name, email, office_hours, notes)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_subjects',
+    description: 'Operaciones CRUD sobre Asignaturas / Materias (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos de la materia (id, university_id, professor_id, name, code, credits, difficulty, target_grade)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_schedules',
+    description: 'Operaciones CRUD sobre Horarios y Aulas de clase (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos del horario (id, subject_id, day_of_week, start_time, end_time, classroom)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_deliverables',
+    description: 'Operaciones CRUD sobre Entregables / Parciales / Tareas (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos del entregable (id, subject_id, title, due_date, weight_percentage, grade, type, status)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_syllabus_topics',
+    description: 'Operaciones CRUD sobre Temarios y Ejes Temáticos (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos del tema (id, subject_id, parent_id, title, description, mastery_status, order_index)' },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools: TOOLS_LIST };
 });
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
+export function executeToolCall(name: string, args: any) {
   switch (name) {
-    case 'get_academic_overview': {
-      const overview = handleGetAcademicOverview();
-      return {
-        content: [{ type: 'text', text: JSON.stringify(overview, null, 2) }],
-      };
-    }
-
-    case 'ingest_academic_enrollment': {
-      const { raw_text } = (args || {}) as { raw_text?: string };
-      const result = handleIngestAcademicEnrollment(raw_text);
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
-
-    case 'parse_and_ingest_syllabus': {
-      const { subject_id, raw_text } = args as { subject_id: string; raw_text: string };
-      const result = handleParseAndIngestSyllabus(subject_id, raw_text);
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
-
-    case 'find_cross_subject_synergies': {
-      const synergies = handleFindCrossSubjectSynergies();
-      return {
-        content: [{ type: 'text', text: JSON.stringify(synergies, null, 2) }],
-      };
-    }
-
+    case 'get_academic_overview':
+      return handleGetAcademicOverview();
+    case 'ingest_academic_enrollment':
+      return handleIngestAcademicEnrollment(args?.raw_text);
+    case 'parse_and_ingest_syllabus':
+      return handleParseAndIngestSyllabus(args?.subject_id, args?.raw_text);
+    case 'find_cross_subject_synergies':
+      return handleFindCrossSubjectSynergies();
+    case 'manage_universities':
+      return handleManageUniversities(args?.action, args?.data);
+    case 'manage_professors':
+      return handleManageProfessors(args?.action, args?.data);
+    case 'manage_subjects':
+      return handleManageSubjects(args?.action, args?.data);
+    case 'manage_schedules':
+      return handleManageSchedules(args?.action, args?.data);
+    case 'manage_deliverables':
+      return handleManageDeliverables(args?.action, args?.data);
+    case 'manage_syllabus_topics':
+      return handleManageSyllabusTopics(args?.action, args?.data);
     default:
       throw new Error(`Herramienta MCP no reconocida: ${name}`);
   }
+}
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+  const result = executeToolCall(name, args);
+  return {
+    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+  };
 });
 
 async function main() {
@@ -148,12 +222,11 @@ async function main() {
         registration_endpoint: `${baseUrl}/register`,
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code'],
-        code_challenge_methods_supported: ['S256', "plain"],
+        code_challenge_methods_supported: ['S256', 'plain'],
         token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
       });
     });
 
-    // Dynamic Client Registration (RFC 7591)
     app.post('/register', (req, res) => {
       res.status(201).json({
         client_id: 'pure-auto-client-id',
@@ -166,7 +239,6 @@ async function main() {
       });
     });
 
-    // Auto-Approve Authorize Route (No login form needed)
     app.get('/authorize', (req, res) => {
       const redirectUri = req.query.redirect_uri as string;
       const state = req.query.state as string;
@@ -178,7 +250,6 @@ async function main() {
       return res.send('OAuth Auto-Approved');
     });
 
-    // Auto-Approve Token Route
     app.post('/token', (req, res) => {
       res.json({
         access_token: 'pure_access_token_granted',
@@ -223,23 +294,7 @@ async function main() {
       if (method === 'tools/call') {
         const { name, arguments: args } = params || {};
         try {
-          let resultData: any;
-          if (name === 'get_academic_overview') {
-            resultData = handleGetAcademicOverview();
-          } else if (name === 'ingest_academic_enrollment') {
-            resultData = handleIngestAcademicEnrollment(args?.raw_text);
-          } else if (name === 'parse_and_ingest_syllabus') {
-            resultData = handleParseAndIngestSyllabus(args?.subject_id, args?.raw_text);
-          } else if (name === 'find_cross_subject_synergies') {
-            resultData = handleFindCrossSubjectSynergies();
-          } else {
-            return res.json({
-              jsonrpc: '2.0',
-              id,
-              error: { code: -32601, message: `Tool not found: ${name}` },
-            });
-          }
-
+          const resultData = executeToolCall(name, args);
           return res.json({
             jsonrpc: '2.0',
             id,
@@ -251,7 +306,7 @@ async function main() {
           return res.json({
             jsonrpc: '2.0',
             id,
-            error: { code: -32603, message: err.message },
+            error: { code: -32601, message: err.message },
           });
         }
       }
@@ -268,18 +323,15 @@ async function main() {
 
     app.get('/sse', async (req, res) => {
       try {
-        console.log('Conexión MCP SSE recibida desde agente externo:', req.ip);
         const transport = new SSEServerTransport('/message', res);
         sseTransportsMap.set(transport.sessionId, transport);
 
         req.on('close', () => {
-          console.log(`Sesión MCP SSE cerrada: ${transport.sessionId}`);
           sseTransportsMap.delete(transport.sessionId);
         });
 
         await server.connect(transport);
       } catch (err) {
-        console.error('Error fatal al iniciar conexion SSE:', err);
         if (!res.headersSent) {
           res.status(500).json({ error: 'Error al iniciar SSE' });
         }
