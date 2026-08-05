@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
-import { pureDB } from '@/lib/db/dexie-schema';
+import { pureDB, DeliverableEntity } from '@/lib/db/dexie-schema';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -12,13 +12,7 @@ import {
   User,
   Calculator,
   Trash2,
-  Pencil,
-  MapPin,
-  Laptop,
-  FileText,
-  FlaskConical,
-  Award,
-  Layers
+  Edit3
 } from 'lucide-react';
 import { calculateRequiredGradeForRemaining } from '@/lib/domain/subject';
 import { DeliverableSchema, validateEntity } from '@/lib/validations/schemas';
@@ -26,47 +20,28 @@ import { DeliverableSchema, validateEntity } from '@/lib/validations/schemas';
 export const DeliverablesDashboard: React.FC = () => {
   const { isLoaded, subjects, deliverables } = usePureData();
   const [filterGroup, setFilterGroup] = useState<'all' | 'individual' | 'group'>('all');
-  const [filterType, setFilterType] = useState<string>('all');
-  const [filterModality, setFilterModality] = useState<'all' | 'presencial' | 'virtual'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingDeliv, setEditingDeliv] = useState<DeliverableEntity | null>(null);
 
   // Form states
   const [title, setTitle] = useState('');
   const [subjectId, setSubjectId] = useState('');
-  const [activityType, setActivityType] = useState<string>('Parcial');
-  const [locationModality, setLocationModality] = useState<'presencial' | 'virtual'>('presencial');
   const [weight, setWeight] = useState(20);
   const [isGroup, setIsGroup] = useState(false);
   const [complexity, setComplexity] = useState<'facil' | 'medio' | 'dificil'>('medio');
   const [dueDate, setDueDate] = useState('');
+  const [status, setStatus] = useState<'pendiente' | 'entregado' | 'calificado'>('pendiente');
+  const [grade, setGrade] = useState<number | undefined>(undefined);
 
-  // Editing ID
-  const [editingDelivId, setEditingDelivId] = useState<string | null>(null);
   const [delivErrors, setDelivErrors] = useState<Record<string, string>>({});
 
   if (!isLoaded) {
     return <div className="p-8 text-center text-slate-400 font-mono">Cargando entregas...</div>;
   }
 
-  // Handle subject change to auto-suggest subject's default modality
-  const handleSubjectChange = (newSubjectId: string) => {
-    setSubjectId(newSubjectId);
-    const selectedSub = subjects.find((s) => s.id === newSubjectId);
-    if (selectedSub) {
-      setLocationModality(selectedSub.modality === 'presencial' ? 'presencial' : 'virtual');
-    }
-  };
-
   const filteredDeliverables = deliverables.filter((item) => {
-    if (filterGroup === 'group' && !item.is_group) return false;
-    if (filterGroup === 'individual' && item.is_group) return false;
-
-    if (filterType !== 'all' && item.type.toLowerCase() !== filterType.toLowerCase()) return false;
-
-    const sub = subjects.find((s) => s.id === item.subject_id);
-    const itemModality = item.location_modality || (sub?.modality === 'presencial' ? 'presencial' : 'virtual');
-    if (filterModality !== 'all' && itemModality !== filterModality) return false;
-
+    if (filterGroup === 'group') return item.is_group;
+    if (filterGroup === 'individual') return !item.is_group;
     return true;
   });
 
@@ -75,32 +50,43 @@ export const DeliverablesDashboard: React.FC = () => {
     ? calculateRequiredGradeForRemaining(deliverables as any, activeSubject.target_grade)
     : null;
 
-  const handleOpenEditDeliverable = (deliv: any) => {
-    setEditingDelivId(deliv.id);
-    setTitle(deliv.title);
-    setSubjectId(deliv.subject_id);
-    setActivityType(deliv.type || 'Parcial');
-    const sub = subjects.find((s) => s.id === deliv.subject_id);
-    setLocationModality(deliv.location_modality || (sub?.modality === 'presencial' ? 'presencial' : 'virtual'));
-    setWeight(deliv.weight_percentage);
-    setIsGroup(deliv.is_group || false);
-    setComplexity(deliv.complexity as any);
-    setDueDate(deliv.due_date ? deliv.due_date.substring(0, 10) : '');
+  const openAddModal = () => {
+    setTitle('');
+    setSubjectId(subjects[0]?.id || '');
+    setWeight(20);
+    setIsGroup(false);
+    setComplexity('medio');
+    setDueDate('');
+    setStatus('pendiente');
+    setGrade(undefined);
     setDelivErrors({});
     setIsAddModalOpen(true);
   };
 
-  const handleAddDeliverable = async () => {
+  const openEditModal = (deliv: DeliverableEntity) => {
+    setEditingDeliv(deliv);
+    setTitle(deliv.title);
+    setSubjectId(deliv.subject_id);
+    setWeight(deliv.weight_percentage);
+    setIsGroup(deliv.is_group);
+    setComplexity(deliv.complexity);
+    setDueDate(deliv.due_date ? new Date(deliv.due_date).toISOString().slice(0, 16) : '');
+    setStatus(deliv.status);
+    setGrade(deliv.grade);
+    setDelivErrors({});
+  };
+
+  const handleSaveDeliverable = async () => {
     const delivData = {
       subject_id: subjectId,
       title,
       due_date: dueDate ? new Date(dueDate).toISOString() : new Date().toISOString(),
       weight_percentage: Number(weight),
-      type: activityType,
-      location_modality: locationModality,
+      type: 'Parcial',
       is_group: isGroup,
       complexity: complexity === 'dificil' ? 'Difícil' : complexity === 'facil' ? 'Fácil' : 'Medio',
-      status: 'pendiente',
+      status: status,
+      grade: grade !== undefined && grade !== null ? Number(grade) : undefined,
     };
 
     const validation = validateEntity(DeliverableSchema, delivData as any);
@@ -110,26 +96,26 @@ export const DeliverablesDashboard: React.FC = () => {
     }
 
     setDelivErrors({});
-    if (editingDelivId) {
-      await pureDB.deliverables.update(editingDelivId, {
+
+    if (editingDeliv && editingDeliv.id) {
+      await pureDB.deliverables.update(editingDeliv.id, {
         ...validation.data as any,
-        type: activityType,
-        location_modality: locationModality,
-        complexity: complexity,
+        complexity,
+        status,
+        grade: grade !== undefined && grade !== null ? Number(grade) : undefined,
       });
+      setEditingDeliv(null);
     } else {
       await pureDB.deliverables.add({
         ...validation.data as any,
-        type: activityType,
-        location_modality: locationModality,
+        type: 'Parcial',
         complexity: complexity,
+        status: status,
+        grade: grade !== undefined && grade !== null ? Number(grade) : undefined,
         created_at: new Date().toISOString(),
       });
+      setIsAddModalOpen(false);
     }
-
-    setTitle('');
-    setEditingDelivId(null);
-    setIsAddModalOpen(false);
   };
 
   const handleDeleteDeliverable = async (id: string) => {
@@ -140,28 +126,23 @@ export const DeliverablesDashboard: React.FC = () => {
     'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-16">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 font-heading tracking-tight">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            Entregas, Evaluaciones & Exámenes
+            Entregas, Evaluaciones & Exámenes (CRUD Completo)
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Registro clasificado por tipo (Parciales, Talleres, Quices) y modalidad (Presencial vs Virtual).
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Registro y edición de actividades con calculadora de nota mínima requerida.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <Button
             variant="synergy"
             size="sm"
-            onClick={() => {
-              setEditingDelivId(null);
-              setTitle('');
-              if (subjects.length > 0) handleSubjectChange(subjects[0].id!);
-              setIsAddModalOpen(true);
-            }}
+            onClick={openAddModal}
             disabled={subjects.length === 0}
           >
             <Plus className="w-4 h-4" /> Registrar Actividad
@@ -217,7 +198,7 @@ export const DeliverablesDashboard: React.FC = () => {
             variant="synergy"
             size="sm"
             className="mt-4"
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={openAddModal}
             disabled={subjects.length === 0}
           >
             <Plus className="w-4 h-4" /> Agregar Entrega
@@ -225,103 +206,38 @@ export const DeliverablesDashboard: React.FC = () => {
         </Card>
       ) : (
         <>
-          {/* Multi-Dimensional Filter Controls */}
-          <div className="space-y-2 bg-slate-100 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800/80">
-            {/* Row 1: Tipo de Actividad Filter */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-              <span className="text-[10px] font-mono uppercase font-bold text-slate-400 mr-1 shrink-0">Tipo:</span>
-              {[
-                { id: 'all', label: 'Todas las Actividades' },
-                { id: 'parcial', label: '📝 Parciales' },
-                { id: 'taller', label: '🛠️ Talleres' },
-                { id: 'proyecto', label: '🚀 Proyectos' },
-                { id: 'quiz', label: '⏱️ Quices' },
-                { id: 'laboratorio', label: '🧪 Laboratorios' },
-                { id: 'examen_final', label: '🎯 Exámenes Finales' },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setFilterType(t.id)}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all shrink-0 ${
-                    filterType === t.id
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Row 2: Modalidad & Formato Filters */}
-            <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-200 dark:border-slate-800/80">
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="text-[10px] font-mono uppercase font-bold text-slate-400 mr-1 shrink-0">Modalidad:</span>
-                <button
-                  onClick={() => setFilterModality('all')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
-                    filterModality === 'all'
-                      ? 'bg-cyan-600 text-white shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  Todas
-                </button>
-                <button
-                  onClick={() => setFilterModality('presencial')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all flex items-center gap-1 ${
-                    filterModality === 'presencial'
-                      ? 'bg-sky-600 text-white shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  <MapPin className="w-3 h-3 text-sky-400" /> Presenciales
-                </button>
-                <button
-                  onClick={() => setFilterModality('virtual')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all flex items-center gap-1 ${
-                    filterModality === 'virtual'
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  <Laptop className="w-3 h-3 text-purple-400" /> Virtuales
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1.5 text-xs">
-                <button
-                  onClick={() => setFilterGroup('all')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
-                    filterGroup === 'all'
-                      ? 'bg-slate-800 text-slate-100 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  Todos
-                </button>
-                <button
-                  onClick={() => setFilterGroup('individual')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all flex items-center gap-1 ${
-                    filterGroup === 'individual'
-                      ? 'bg-slate-700 text-white shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  <User className="w-3 h-3" /> Individual
-                </button>
-                <button
-                  onClick={() => setFilterGroup('group')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all flex items-center gap-1 ${
-                    filterGroup === 'group'
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  <Users className="w-3 h-3" /> Grupal
-                </button>
-              </div>
-            </div>
+          {/* Filter Tabs */}
+          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+            <button
+              onClick={() => setFilterGroup('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                filterGroup === 'all'
+                  ? 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Todas ({deliverables.length})
+            </button>
+            <button
+              onClick={() => setFilterGroup('individual')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                filterGroup === 'individual'
+                  ? 'bg-sky-100 dark:bg-sky-950/80 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-800'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" /> Individuales
+            </button>
+            <button
+              onClick={() => setFilterGroup('group')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                filterGroup === 'group'
+                  ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" /> Grupales
+            </button>
           </div>
 
           {/* Deliverable Cards Grid */}
@@ -329,74 +245,46 @@ export const DeliverablesDashboard: React.FC = () => {
             {filteredDeliverables.map((deliv) => {
               const sub = subjects.find((s) => s.id === deliv.subject_id);
               const isDone = deliv.status === 'calificado' || deliv.status === 'entregado';
-              const actualModality = deliv.location_modality || (sub?.modality === 'presencial' ? 'presencial' : 'virtual');
 
               return (
-                <Card key={deliv.id} className="space-y-3 p-4 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    {/* Top Badges: Subject Name + Modality (Presencial vs Virtual) + Type */}
-                    <div className="flex items-center justify-between gap-1 flex-wrap">
-                      <Badge variant={sub?.modality === 'presencial' ? 'aeroespacial' : 'software'}>
-                        {sub?.name || 'Asignatura'}
-                      </Badge>
-
-                      <div className="flex items-center gap-1">
-                        <span
-                          className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 ${
-                            actualModality === 'presencial'
-                              ? 'bg-sky-950/80 text-sky-400 border border-sky-500/30'
-                              : 'bg-purple-950/80 text-purple-400 border border-purple-500/30'
-                          }`}
-                        >
-                          {actualModality === 'presencial' ? (
-                            <>
-                              <MapPin className="w-3 h-3 text-sky-400" /> Presencial
-                            </>
-                          ) : (
-                            <>
-                              <Laptop className="w-3 h-3 text-purple-400" /> Virtual
-                            </>
-                          )}
-                        </span>
-
-                        <Badge variant={deliv.complexity === 'dificil' ? 'danger' : 'warning'}>
-                          {deliv.complexity}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Title & Type Badge */}
-                    <div className="pt-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 bg-slate-800 text-purple-300 font-bold rounded-md border border-slate-700">
-                          {deliv.type || 'Parcial'}
-                        </span>
-                      </div>
-                      <h4 className={`text-sm font-bold text-slate-900 dark:text-slate-100 ${isDone ? 'line-through text-slate-400' : ''}`}>
-                        {deliv.title}
-                      </h4>
-                      {deliv.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{deliv.description}</p>}
-                    </div>
+                <Card key={deliv.id} className="space-y-3 p-4">
+                  <div className="flex items-center justify-between">
+                    <Badge variant={sub?.modality === 'presencial' ? 'aeroespacial' : 'software'}>
+                      {sub?.name || 'Asignatura'}
+                    </Badge>
+                    <Badge variant={deliv.complexity === 'dificil' ? 'danger' : 'warning'}>
+                      {deliv.complexity}
+                    </Badge>
                   </div>
-
+                  <div>
+                    <h4 className={`text-sm font-bold text-slate-900 dark:text-slate-100 ${isDone ? 'line-through text-slate-400' : ''}`}>
+                      {deliv.title}
+                    </h4>
+                    {deliv.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{deliv.description}</p>}
+                    {deliv.grade !== undefined && deliv.grade !== null && (
+                      <p className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                        Nota Obtenida: {deliv.grade.toFixed(2)}
+                      </p>
+                    )}
+                  </div>
                   <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
                     <span className="text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
                       {deliv.is_group ? <Users className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> : <User className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />}
                       {deliv.is_group ? 'Grupal' : 'Individual'}
                     </span>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-slate-700 dark:text-slate-300 font-mono font-bold">Peso: {deliv.weight_percentage}%</span>
+                      <span className="text-slate-700 dark:text-slate-300 font-mono text-[11px]">Peso: {deliv.weight_percentage}%</span>
                       <button
-                        onClick={() => handleOpenEditDeliverable(deliv)}
-                        title="Editar entrega"
-                        className="text-slate-400 hover:text-emerald-500 transition-colors p-1"
+                        onClick={() => openEditModal(deliv)}
+                        className="text-slate-400 hover:text-sky-500 transition-colors p-1"
+                        title="Editar Actividad"
                       >
-                        <Pencil className="w-3.5 h-3.5" />
+                        <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDeleteDeliverable(deliv.id!)}
-                        title="Eliminar entrega"
                         className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                        title="Eliminar Actividad"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -411,9 +299,12 @@ export const DeliverablesDashboard: React.FC = () => {
 
       {/* Modal Add / Edit Deliverable */}
       <Modal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        title={editingDelivId ? 'Editar Actividad / Evaluación' : 'Registrar Nueva Actividad / Evaluación'}
+        isOpen={isAddModalOpen || editingDeliv !== null}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditingDeliv(null);
+        }}
+        title={editingDeliv ? `Editar Actividad: ${editingDeliv.title}` : 'Registrar Nueva Actividad / Evaluación'}
       >
         <div className="space-y-4">
           <div>
@@ -425,59 +316,27 @@ export const DeliverablesDashboard: React.FC = () => {
               className={inputClass}
               placeholder="Ej: Parcial 2 de Mecánica Orbital"
             />
-            {delivErrors.title && <p className="text-xs text-rose-500 mt-1">{delivErrors.title}</p>}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Asignatura</label>
-              <select
-                value={subjectId}
-                onChange={(e) => handleSubjectChange(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Selecciona una asignatura</option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.code})
-                  </option>
-                ))}
-              </select>
-              {delivErrors.subject_id && <p className="text-xs text-rose-500 mt-1">{delivErrors.subject_id}</p>}
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Tipo de Actividad / Evaluación</label>
-              <select
-                value={activityType}
-                onChange={(e) => setActivityType(e.target.value)}
-                className={inputClass}
-              >
-                <option value="Parcial">📝 Parcial</option>
-                <option value="Taller">🛠️ Taller</option>
-                <option value="Proyecto">🚀 Proyecto Integrador</option>
-                <option value="Quiz">⏱️ Quiz / Prueba Corta</option>
-                <option value="Laboratorio">🧪 Laboratorio / Práctica</option>
-                <option value="Examen Final">🎯 Examen Final</option>
-              </select>
-            </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Asignatura</label>
+            <select
+              value={subjectId}
+              onChange={(e) => setSubjectId(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Selecciona una asignatura</option>
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.code})
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Ubicación / Modalidad</label>
-              <select
-                value={locationModality}
-                onChange={(e) => setLocationModality(e.target.value as any)}
-                className={inputClass}
-              >
-                <option value="presencial">🏫 Presencial (Campus)</option>
-                <option value="virtual">💻 Virtual (En Línea)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Formato</label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Modalidad</label>
               <select
                 value={isGroup ? 'group' : 'individual'}
                 onChange={(e) => setIsGroup(e.target.value === 'group')}
@@ -487,7 +346,6 @@ export const DeliverablesDashboard: React.FC = () => {
                 <option value="group">👥 Grupal</option>
               </select>
             </div>
-
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Peso % en la Nota</label>
               <input
@@ -496,26 +354,65 @@ export const DeliverablesDashboard: React.FC = () => {
                 onChange={(e) => setWeight(Number(e.target.value))}
                 className={inputClass}
               />
-              {delivErrors.weight_percentage && <p className="text-xs text-rose-500 mt-1">{delivErrors.weight_percentage}</p>}
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Fecha y Hora Límite</label>
-            <input
-              type="datetime-local"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className={inputClass}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Complejidad</label>
+              <select
+                value={complexity}
+                onChange={(e) => setComplexity(e.target.value as any)}
+                className={inputClass}
+              >
+                <option value="facil">Fácil</option>
+                <option value="medio">Medio</option>
+                <option value="dificil">Difícil</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Estado</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as any)}
+                className={inputClass}
+              >
+                <option value="pendiente">Pendiente</option>
+                <option value="entregado">Entregado</option>
+                <option value="calificado">Calificado</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Fecha Límite</label>
+              <input
+                type="datetime-local"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Nota Calificada (Opcional)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={grade !== undefined && grade !== null ? grade : ''}
+                onChange={(e) => setGrade(e.target.value !== '' ? Number(e.target.value) : undefined)}
+                className={inputClass}
+                placeholder="Ej: 4.8"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => setIsAddModalOpen(false)}>
+            <Button variant="ghost" onClick={() => { setIsAddModalOpen(false); setEditingDeliv(null); }}>
               Cancelar
             </Button>
-            <Button variant="synergy" onClick={handleAddDeliverable}>
-              {editingDelivId ? 'Guardar Cambios' : 'Guardar Actividad'}
+            <Button variant="synergy" onClick={handleSaveDeliverable}>
+              {editingDeliv ? 'Guardar Cambios' : 'Guardar Actividad'}
             </Button>
           </div>
         </div>

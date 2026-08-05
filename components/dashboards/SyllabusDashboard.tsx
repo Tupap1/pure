@@ -11,7 +11,9 @@ import {
   Sparkles,
   FileText,
   Zap,
-  BookOpen
+  BookOpen,
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import { calculateSyllabusProgress, findSynergiesBetweenTopics } from '@/lib/domain/syllabus';
 
@@ -19,6 +21,10 @@ export const SyllabusDashboard: React.FC = () => {
   const { isLoaded, subjects, syllabusTopics } = usePureData();
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
+  const [editingTopic, setEditingTopic] = useState<SyllabusTopicEntity | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editMastery, setEditMastery] = useState<SyllabusTopicEntity['mastery_status']>('no_iniciado');
+
   const [rawText, setRawText] = useState('');
   const [synergySynced, setSynergySynced] = useState(false);
 
@@ -34,6 +40,25 @@ export const SyllabusDashboard: React.FC = () => {
 
   const handleUpdateMastery = async (id: string, status: SyllabusTopicEntity['mastery_status']) => {
     await pureDB.syllabusTopics.update(id, { mastery_status: status });
+  };
+
+  const openEditTopic = (topic: SyllabusTopicEntity) => {
+    setEditingTopic(topic);
+    setEditTitle(topic.title);
+    setEditMastery(topic.mastery_status);
+  };
+
+  const handleSaveTopicEdit = async () => {
+    if (!editingTopic || !editingTopic.id) return;
+    await pureDB.syllabusTopics.update(editingTopic.id, {
+      title: editTitle,
+      mastery_status: editMastery,
+    });
+    setEditingTopic(null);
+  };
+
+  const handleDeleteTopic = async (id: string) => {
+    await pureDB.syllabusTopics.delete(id);
   };
 
   const handleIngestSyllabus = async () => {
@@ -53,15 +78,21 @@ export const SyllabusDashboard: React.FC = () => {
     setIsIngestModalOpen(false);
   };
 
+  const inputClass =
+    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-16">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 font-heading tracking-tight">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <GitMerge className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-            Ejes Temáticos & Sinergias
+            Ejes Temáticos & Sinergias (Syllabus Engine)
           </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Edición de ejes temáticos y sincronización de equivalencias entre carreras.
+          </p>
         </div>
         {activeSubject && (
           <div className="flex items-center gap-3">
@@ -77,7 +108,7 @@ export const SyllabusDashboard: React.FC = () => {
           <BookOpen className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
           <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No hay materias configuradas</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
-            Registra primero tus asignaturas en la pestaña <strong>Configuración & CRUD</strong> para comenzar a cargar temarios y detectar sinergias.
+            Registra primero tus asignaturas en la pestaña <strong>Ajustes</strong> para comenzar a cargar temarios y detectar sinergias.
           </p>
         </Card>
       ) : (
@@ -165,14 +196,14 @@ export const SyllabusDashboard: React.FC = () => {
                 activeTopics.map((topic) => (
                   <div
                     key={topic.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs gap-3"
                   >
                     <div className="flex items-center gap-3">
                       <BookOpen className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
                       <span className="font-medium text-slate-800 dark:text-slate-200">{topic.title}</span>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 justify-end">
                       <Badge variant={topic.mastery_status}>{topic.mastery_status}</Badge>
 
                       <select
@@ -187,6 +218,22 @@ export const SyllabusDashboard: React.FC = () => {
                         <option value="repasado">Repasado</option>
                         <option value="dominado">Dominado ✅</option>
                       </select>
+
+                      <button
+                        onClick={() => openEditTopic(topic)}
+                        className="text-slate-400 hover:text-sky-500 transition-colors p-1"
+                        title="Editar Tema"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteTopic(topic.id!)}
+                        className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                        title="Eliminar Tema"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))
@@ -195,6 +242,48 @@ export const SyllabusDashboard: React.FC = () => {
           </Card>
         </>
       )}
+
+      {/* Edit Topic Modal */}
+      <Modal
+        isOpen={editingTopic !== null}
+        onClose={() => setEditingTopic(null)}
+        title="Editar Eje Temático"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Título del Tema</label>
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Estado de Dominio</label>
+            <select
+              value={editMastery}
+              onChange={(e) => setEditMastery(e.target.value as any)}
+              className={inputClass}
+            >
+              <option value="no_iniciado">No Iniciado</option>
+              <option value="en_estudio">En Estudio</option>
+              <option value="repasado">Repasado</option>
+              <option value="dominado">Dominado ✅</option>
+            </select>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="ghost" onClick={() => setEditingTopic(null)}>
+              Cancelar
+            </Button>
+            <Button variant="aeroespacial" onClick={handleSaveTopicEdit}>
+              Guardar Cambios
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* AI Syllabus Ingestion Modal */}
       <Modal

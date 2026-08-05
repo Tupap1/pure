@@ -1,4 +1,3 @@
-# PURE OS Stack v1.0.2 - Clean Network Spec
 services:
   pure-db:
     image: postgres:16-alpine
@@ -11,7 +10,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
     restart: unless-stopped
 
   pure-web:
@@ -35,14 +33,15 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: pure_mcp_server
-    command: ["npx", "tsx", "mcp-server/index.ts", "--http"]
+    command: ["npx", "tsx", "mcp-server/index.ts"]
     ports:
       - "3001:3001"
     environment:
-      - MCP_PORT=3001
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-pure_user}:${POSTGRES_PASSWORD:-pure_secure_password_2026}@pure-db:5432/${POSTGRES_DB:-pure_academic}?sslmode=disable
-      - PUBLIC_MCP_URL=${PUBLIC_MCP_URL:-https://mcp.btw-one.com}
+      - MCP_PORT=3001
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
+    stdin_open: true
+    tty: true
     depends_on:
       - pure-db
     restart: unless-stopped

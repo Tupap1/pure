@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
-import { pureDB } from '@/lib/db/dexie-schema';
-import { clearAllData } from '@/lib/db/seed';
+import { pureDB, UniversityEntity, ProfessorEntity, SubjectEntity, ScheduleEntity } from '@/lib/db/dexie-schema';
+import { clearAllData, seedDemoData } from '@/lib/db/seed';
 import {
   UniversitySchema,
   ProfessorSchema,
@@ -19,22 +19,28 @@ import {
   Plus,
   Mail,
   Trash2,
+  Edit3,
   GraduationCap,
   BookOpen,
   Calendar,
   RotateCcw,
-  Sparkles,
-  Pencil
+  Sparkles
 } from 'lucide-react';
 
 export const ConfigDashboard: React.FC = () => {
   const { isLoaded, universities, professors, subjects, schedules } = usePureData();
-  const [activeConfigTab, setActiveConfigTab] = useState<'universities' | 'subjects' | 'professors' | 'maintenance'>('universities');
 
+  // Add Modal States
   const [isAddUniOpen, setIsAddUniOpen] = useState(false);
   const [isAddProfOpen, setIsAddProfOpen] = useState(false);
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
   const [isAddScheduleOpen, setIsAddScheduleOpen] = useState(false);
+
+  // Edit Modal States
+  const [editingUni, setEditingUni] = useState<UniversityEntity | null>(null);
+  const [editingProf, setEditingProf] = useState<ProfessorEntity | null>(null);
+  const [editingSubject, setEditingSubject] = useState<SubjectEntity | null>(null);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduleEntity | null>(null);
 
   // Uni form
   const [uniName, setUniName] = useState('');
@@ -57,20 +63,13 @@ export const ConfigDashboard: React.FC = () => {
   const [subDifficulty, setSubDifficulty] = useState(3);
   const [subModality, setSubModality] = useState<'presencial' | 'virtual'>('presencial');
   const [subTargetGrade, setSubTargetGrade] = useState(4.5);
-  const [subMaxAbsences, setSubMaxAbsences] = useState(4);
 
   // Schedule form
   const [schedSubjectId, setSchedSubjectId] = useState('');
-  const [schedDay, setSchedDay] = useState(1); // 1 = Lunes
+  const [schedDay, setSchedDay] = useState(1);
   const [schedStart, setSchedStart] = useState('08:00');
   const [schedEnd, setSchedEnd] = useState('10:00');
   const [schedClassroom, setSchedClassroom] = useState('');
-
-  // Editing IDs
-  const [editingUniId, setEditingUniId] = useState<string | null>(null);
-  const [editingProfId, setEditingProfId] = useState<string | null>(null);
-  const [editingSubId, setEditingSubId] = useState<string | null>(null);
-  const [editingSchedId, setEditingSchedId] = useState<string | null>(null);
 
   // Form Error States
   const [uniErrors, setUniErrors] = useState<Record<string, string>>({});
@@ -82,51 +81,28 @@ export const ConfigDashboard: React.FC = () => {
     return <div className="p-8 text-center text-slate-400 font-mono">Cargando directorio...</div>;
   }
 
-  // --- EDIT OPEN HANDLERS ---
-  const handleOpenEditUni = (uni: any) => {
-    setEditingUniId(uni.id);
+  // --- UNIVERSITY HANDLERS ---
+  const openAddUni = () => {
+    setUniName('');
+    setUniModality('presencial');
+    setUniMin(0);
+    setUniMax(5);
+    setUniPassing(3);
+    setUniErrors({});
+    setIsAddUniOpen(true);
+  };
+
+  const openEditUni = (uni: UniversityEntity) => {
+    setEditingUni(uni);
     setUniName(uni.name);
     setUniModality(uni.modality);
     setUniMin(uni.scale_min);
     setUniMax(uni.scale_max);
     setUniPassing(uni.passing_grade);
-    setIsAddUniOpen(true);
+    setUniErrors({});
   };
 
-  const handleOpenEditProf = (prof: any) => {
-    setEditingProfId(prof.id);
-    setProfName(prof.name);
-    setProfUniId(prof.university_id);
-    setProfEmail(prof.email || '');
-    setIsAddProfOpen(true);
-  };
-
-  const handleOpenEditSubject = (sub: any) => {
-    setEditingSubId(sub.id);
-    setSubName(sub.name);
-    setSubCode(sub.code || '');
-    setSubUniId(sub.university_id);
-    setSubProfId(sub.professor_id || '');
-    setSubCredits(sub.credits || 3);
-    setSubDifficulty(sub.difficulty || 3);
-    setSubModality(sub.modality || 'presencial');
-    setSubTargetGrade(sub.target_grade || 4.5);
-    setSubMaxAbsences(sub.max_absences || 4);
-    setIsAddSubjectOpen(true);
-  };
-
-  const handleOpenEditSchedule = (sched: any) => {
-    setEditingSchedId(sched.id);
-    setSchedSubjectId(sched.subject_id);
-    setSchedDay(sched.day_of_week);
-    setSchedStart(sched.start_time);
-    setSchedEnd(sched.end_time);
-    setSchedClassroom(sched.classroom || '');
-    setIsAddScheduleOpen(true);
-  };
-
-  // --- SAVE HANDLERS (ADD OR UPDATE) ---
-  const handleAddUni = async () => {
+  const handleSaveUni = async () => {
     const uniData = {
       name: uniName,
       modality: uniModality,
@@ -143,29 +119,41 @@ export const ConfigDashboard: React.FC = () => {
     }
 
     setUniErrors({});
-    if (editingUniId) {
-      await pureDB.universities.update(editingUniId, {
-        ...validation.data,
-        color: validation.data.color || (uniModality === 'presencial' ? '#0ea5e9' : '#6366f1'),
-      });
+    if (editingUni && editingUni.id) {
+      await pureDB.universities.update(editingUni.id, validation.data);
+      setEditingUni(null);
     } else {
       await pureDB.universities.add({
         ...validation.data,
         color: validation.data.color || (uniModality === 'presencial' ? '#0ea5e9' : '#6366f1'),
         created_at: new Date().toISOString(),
       });
+      setIsAddUniOpen(false);
     }
-
-    setUniName('');
-    setEditingUniId(null);
-    setIsAddUniOpen(false);
   };
 
   const handleDeleteUni = async (id: string) => {
     await pureDB.universities.delete(id);
   };
 
-  const handleAddProf = async () => {
+  // --- PROFESSOR HANDLERS ---
+  const openAddProf = () => {
+    setProfName('');
+    setProfUniId(universities[0]?.id || '');
+    setProfEmail('');
+    setProfErrors({});
+    setIsAddProfOpen(true);
+  };
+
+  const openEditProf = (prof: ProfessorEntity) => {
+    setEditingProf(prof);
+    setProfName(prof.name);
+    setProfUniId(prof.university_id);
+    setProfEmail(prof.email || '');
+    setProfErrors({});
+  };
+
+  const handleSaveProf = async () => {
     const profData = {
       university_id: profUniId,
       name: profName,
@@ -179,26 +167,50 @@ export const ConfigDashboard: React.FC = () => {
     }
 
     setProfErrors({});
-    if (editingProfId) {
-      await pureDB.professors.update(editingProfId, validation.data);
+    if (editingProf && editingProf.id) {
+      await pureDB.professors.update(editingProf.id, validation.data);
+      setEditingProf(null);
     } else {
       await pureDB.professors.add({
         ...validation.data,
         created_at: new Date().toISOString(),
       });
+      setIsAddProfOpen(false);
     }
-
-    setProfName('');
-    setProfEmail('');
-    setEditingProfId(null);
-    setIsAddProfOpen(false);
   };
 
   const handleDeleteProf = async (id: string) => {
     await pureDB.professors.delete(id);
   };
 
-  const handleAddSubject = async () => {
+  // --- SUBJECT HANDLERS ---
+  const openAddSubject = () => {
+    setSubName('');
+    setSubCode('');
+    setSubUniId(universities[0]?.id || '');
+    setSubProfId('');
+    setSubCredits(3);
+    setSubDifficulty(3);
+    setSubModality('presencial');
+    setSubTargetGrade(4.5);
+    setSubErrors({});
+    setIsAddSubjectOpen(true);
+  };
+
+  const openEditSubject = (sub: SubjectEntity) => {
+    setEditingSubject(sub);
+    setSubName(sub.name);
+    setSubCode(sub.code || '');
+    setSubUniId(sub.university_id);
+    setSubProfId(sub.professor_id || '');
+    setSubCredits(sub.credits);
+    setSubDifficulty(sub.difficulty);
+    setSubModality(sub.modality);
+    setSubTargetGrade(sub.target_grade);
+    setSubErrors({});
+  };
+
+  const handleSaveSubject = async () => {
     const subData = {
       university_id: subUniId,
       professor_id: subProfId || undefined,
@@ -208,8 +220,7 @@ export const ConfigDashboard: React.FC = () => {
       difficulty: Number(subDifficulty),
       modality: subModality,
       target_grade: Number(subTargetGrade),
-      max_absences: Number(subMaxAbsences),
-      current_grade: 0,
+      current_grade: editingSubject ? editingSubject.current_grade : 0,
     };
 
     const validation = validateEntity(SubjectSchema, subData);
@@ -219,33 +230,47 @@ export const ConfigDashboard: React.FC = () => {
     }
 
     setSubErrors({});
-    const finalData = {
-      ...validation.data,
-      modality: (validation.data.modality === 'virtual' ? 'virtual' : 'presencial') as 'presencial' | 'virtual',
-      target_grade: validation.data.target_grade ?? Number(subTargetGrade) ?? 3.0,
-      current_grade: validation.data.current_grade ?? 0,
-    };
-
-    if (editingSubId) {
-      await pureDB.subjects.update(editingSubId, finalData);
+    if (editingSubject && editingSubject.id) {
+      await pureDB.subjects.update(editingSubject.id, validation.data);
+      setEditingSubject(null);
     } else {
       await pureDB.subjects.add({
-        ...finalData,
+        ...validation.data,
+        modality: validation.data.modality === 'virtual' ? 'virtual' : 'presencial',
+        target_grade: validation.data.target_grade ?? Number(subTargetGrade) ?? 3.0,
+        current_grade: validation.data.current_grade ?? 0,
         created_at: new Date().toISOString(),
       });
+      setIsAddSubjectOpen(false);
     }
-
-    setSubName('');
-    setSubCode('');
-    setEditingSubId(null);
-    setIsAddSubjectOpen(false);
   };
 
   const handleDeleteSubject = async (id: string) => {
     await pureDB.subjects.delete(id);
   };
 
-  const handleAddSchedule = async () => {
+  // --- SCHEDULE HANDLERS ---
+  const openAddSchedule = () => {
+    setSchedSubjectId(subjects[0]?.id || '');
+    setSchedDay(1);
+    setSchedStart('08:00');
+    setSchedEnd('10:00');
+    setSchedClassroom('');
+    setSchedErrors({});
+    setIsAddScheduleOpen(true);
+  };
+
+  const openEditSchedule = (sched: ScheduleEntity) => {
+    setEditingSchedule(sched);
+    setSchedSubjectId(sched.subject_id);
+    setSchedDay(sched.day_of_week);
+    setSchedStart(sched.start_time);
+    setSchedEnd(sched.end_time);
+    setSchedClassroom(sched.classroom || '');
+    setSchedErrors({});
+  };
+
+  const handleSaveSchedule = async () => {
     const schedData = {
       subject_id: schedSubjectId,
       day_of_week: Number(schedDay),
@@ -261,17 +286,16 @@ export const ConfigDashboard: React.FC = () => {
     }
 
     setSchedErrors({});
-    if (editingSchedId) {
-      await pureDB.schedules.update(editingSchedId, validation.data);
+    if (editingSchedule && editingSchedule.id) {
+      await pureDB.schedules.update(editingSchedule.id, validation.data);
+      setEditingSchedule(null);
     } else {
       await pureDB.schedules.add({
         ...validation.data,
         created_at: new Date().toISOString(),
       });
+      setIsAddScheduleOpen(false);
     }
-
-    setEditingSchedId(null);
-    setIsAddScheduleOpen(false);
   };
 
   const handleDeleteSchedule = async (id: string) => {
@@ -282,78 +306,40 @@ export const ConfigDashboard: React.FC = () => {
     'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
 
   return (
-    <div className="space-y-8 animate-fade-in pb-12">
+    <div className="space-y-8 animate-fade-in pb-16">
       {/* Header & Global Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2 font-heading tracking-tight">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
             <Building2 className="w-5 h-5 text-sky-600 dark:text-sky-400" />
-            Configuración & Directorio Base
+            Configuración & Directorio Base (CRUD Completo)
           </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Administra y edita universidades, profesores, asignaturas y clases guardados en tu base de datos local.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => clearAllData()}>
             <RotateCcw className="w-3.5 h-3.5" /> Limpiar Todo
+          </Button>
+
+          <Button variant="aeroespacial" size="sm" onClick={() => seedDemoData()}>
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Ingestar Matrícula vía MCP (UdeA + UdeC)
           </Button>
         </div>
       </div>
 
-      {/* Segmented Sub-Tab Navigation (SaaS Settings Benchmark) */}
-      <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-x-auto scrollbar-none">
-        <button
-          onClick={() => setActiveConfigTab('universities')}
-          className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shrink-0 ${
-            activeConfigTab === 'universities'
-              ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm'
-              : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
-          }`}
-        >
-          <GraduationCap className="w-4 h-4" /> Instituciones ({universities.length})
-        </button>
-        <button
-          onClick={() => setActiveConfigTab('subjects')}
-          className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shrink-0 ${
-            activeConfigTab === 'subjects'
-              ? 'bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 shadow-sm'
-              : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
-          }`}
-        >
-          <BookOpen className="w-4 h-4" /> Asignaturas ({subjects.length})
-        </button>
-        <button
-          onClick={() => setActiveConfigTab('professors')}
-          className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shrink-0 ${
-            activeConfigTab === 'professors'
-              ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm'
-              : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
-          }`}
-        >
-          <UserCheck className="w-4 h-4" /> Docentes ({professors.length})
-        </button>
-        <button
-          onClick={() => setActiveConfigTab('maintenance')}
-          className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shrink-0 ${
-            activeConfigTab === 'maintenance'
-              ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm'
-              : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
-          }`}
-        >
-          <RotateCcw className="w-4 h-4" /> Mantenimiento
-        </button>
-      </div>
-
       {/* 1. Universidades Section */}
-      {activeConfigTab === 'universities' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <GraduationCap className="w-5 h-5 text-sky-600 dark:text-sky-400" />
-              Instituciones Universitarias ({universities.length})
-            </h3>
-            <Button variant="aeroespacial" size="sm" onClick={() => setIsAddUniOpen(true)}>
-              <Plus className="w-3.5 h-3.5" /> Agregar Universidad
-            </Button>
-          </div>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <GraduationCap className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+            Universidades ({universities.length})
+          </h3>
+          <Button variant="aeroespacial" size="sm" onClick={openAddUni}>
+            <Plus className="w-3.5 h-3.5" /> Agregar Universidad
+          </Button>
+        </div>
 
         {universities.length === 0 ? (
           <Card className="p-8 text-center border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
@@ -362,7 +348,7 @@ export const ConfigDashboard: React.FC = () => {
             <p className="text-xs text-slate-500 dark:text-slate-500 mt-1 max-w-md mx-auto">
               Crea tu primera universidad para comenzar a organizar tus carreras y asignaturas.
             </p>
-            <Button variant="aeroespacial" size="sm" className="mt-4" onClick={() => setIsAddUniOpen(true)}>
+            <Button variant="aeroespacial" size="sm" className="mt-4" onClick={openAddUni}>
               <Plus className="w-3.5 h-3.5" /> Crear Universidad
             </Button>
           </Card>
@@ -387,16 +373,16 @@ export const ConfigDashboard: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => handleOpenEditUni(uni)}
-                      title="Editar universidad"
-                      className="text-slate-400 hover:text-sky-500 transition-colors p-1"
+                      onClick={() => openEditUni(uni)}
+                      className="text-slate-400 hover:text-sky-500 transition-colors p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                      title="Editar Universidad"
                     >
-                      <Pencil className="w-4 h-4" />
+                      <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteUni(uni.id!)}
-                      title="Eliminar universidad"
-                      className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                      className="text-slate-400 hover:text-rose-500 transition-colors p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                      title="Eliminar Universidad"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -406,15 +392,15 @@ export const ConfigDashboard: React.FC = () => {
                 <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-slate-100 dark:bg-slate-900 text-center text-xs font-mono">
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 text-[10px]">Min</div>
-                    <div className="text-slate-800 dark:text-slate-200 font-bold">{Number(uni.scale_min).toFixed(1)}</div>
+                    <div className="text-slate-800 dark:text-slate-200 font-bold">{uni.scale_min.toFixed(1)}</div>
                   </div>
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 text-[10px]">Max</div>
-                    <div className="text-slate-800 dark:text-slate-200 font-bold">{Number(uni.scale_max).toFixed(1)}</div>
+                    <div className="text-slate-800 dark:text-slate-200 font-bold">{uni.scale_max.toFixed(1)}</div>
                   </div>
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 text-[10px]">Aprobatorio</div>
-                    <div className="text-emerald-600 dark:text-emerald-400 font-bold">{Number(uni.passing_grade).toFixed(1)}</div>
+                    <div className="text-emerald-600 dark:text-emerald-400 font-bold">{uni.passing_grade.toFixed(1)}</div>
                   </div>
                 </div>
               </Card>
@@ -422,25 +408,18 @@ export const ConfigDashboard: React.FC = () => {
           </div>
         )}
       </div>
-      )}
 
       {/* 2. Profesores Directory Section */}
-      {activeConfigTab === 'professors' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              Directorio de Docentes ({professors.length})
-            </h3>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            Directorio de Profesores ({professors.length})
+          </h3>
           <Button
-            variant="software"
+            variant="primary"
             size="sm"
-            onClick={() => {
-              setEditingProfId(null);
-              setProfName('');
-              setProfEmail('');
-              setIsAddProfOpen(true);
-            }}
+            onClick={openAddProf}
             disabled={universities.length === 0}
           >
             <Plus className="w-3.5 h-3.5" /> Registrar Profesor
@@ -479,16 +458,16 @@ export const ConfigDashboard: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => handleOpenEditProf(prof)}
-                      title="Editar profesor"
-                      className="text-slate-400 hover:text-indigo-500 transition-colors p-1"
+                      onClick={() => openEditProf(prof)}
+                      className="text-slate-400 hover:text-sky-500 transition-colors p-1.5"
+                      title="Editar Profesor"
                     >
-                      <Pencil className="w-4 h-4" />
+                      <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteProf(prof.id!)}
-                      title="Eliminar profesor"
-                      className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                      className="text-slate-400 hover:text-rose-500 transition-colors p-1.5"
+                      title="Eliminar Profesor"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -499,13 +478,10 @@ export const ConfigDashboard: React.FC = () => {
           </div>
         )}
       </div>
-      )}
 
-      {/* 3. Asignaturas & Horarios Section */}
-      {activeConfigTab === 'subjects' && (
-        <>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+      {/* 3. Materias / Asignaturas Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             Asignaturas / Materias ({subjects.length})
@@ -513,12 +489,7 @@ export const ConfigDashboard: React.FC = () => {
           <Button
             variant="aeroespacial"
             size="sm"
-            onClick={() => {
-              setEditingSubId(null);
-              setSubName('');
-              setSubCode('');
-              setIsAddSubjectOpen(true);
-            }}
+            onClick={openAddSubject}
             disabled={universities.length === 0}
           >
             <Plus className="w-3.5 h-3.5" /> Registrar Materia
@@ -536,12 +507,7 @@ export const ConfigDashboard: React.FC = () => {
               variant="aeroespacial"
               size="sm"
               className="mt-4"
-              onClick={() => {
-                setEditingSubId(null);
-                setSubName('');
-                setSubCode('');
-                setIsAddSubjectOpen(true);
-              }}
+              onClick={openAddSubject}
               disabled={universities.length === 0}
             >
               <Plus className="w-3.5 h-3.5" /> Registrar Primera Materia
@@ -571,16 +537,16 @@ export const ConfigDashboard: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => handleOpenEditSubject(sub)}
-                        title="Editar asignatura"
-                        className="text-slate-400 hover:text-sky-500 transition-colors p-1"
+                        onClick={() => openEditSubject(sub)}
+                        className="text-slate-400 hover:text-sky-500 transition-colors p-1.5"
+                        title="Editar Materia"
                       >
-                        <Pencil className="w-4 h-4" />
+                        <Edit3 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteSubject(sub.id!)}
-                        title="Eliminar asignatura"
-                        className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                        className="text-slate-400 hover:text-rose-500 transition-colors p-1.5"
+                        title="Eliminar Materia"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -608,12 +574,9 @@ export const ConfigDashboard: React.FC = () => {
             Horarios Semanales Registrados ({schedules.length})
           </h3>
           <Button
-            variant="software"
+            variant="primary"
             size="sm"
-            onClick={() => {
-              setEditingSchedId(null);
-              setIsAddScheduleOpen(true);
-            }}
+            onClick={openAddSchedule}
             disabled={subjects.length === 0}
           >
             <Plus className="w-3.5 h-3.5" /> Asignar Horario
@@ -645,16 +608,16 @@ export const ConfigDashboard: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => handleOpenEditSchedule(sched)}
-                      title="Editar horario"
-                      className="text-slate-400 hover:text-amber-500 transition-colors p-1"
+                      onClick={() => openEditSchedule(sched)}
+                      className="text-slate-400 hover:text-sky-500 transition-colors p-1"
+                      title="Editar Horario"
                     >
-                      <Pencil className="w-3.5 h-3.5" />
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDeleteSchedule(sched.id!)}
-                      title="Eliminar horario"
                       className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                      title="Eliminar Horario"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -665,38 +628,15 @@ export const ConfigDashboard: React.FC = () => {
           </div>
         )}
       </div>
-        </>
-      )}
-
-      {/* 4. Mantenimiento & Sistema Section */}
-      {activeConfigTab === 'maintenance' && (
-        <div className="space-y-4">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <RotateCcw className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-            Mantenimiento & Acciones de Base de Datos
-          </h3>
-          <div className="grid grid-cols-1 gap-4">
-
-            <Card className="p-5 space-y-3 border border-rose-200 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20">
-              <div className="flex items-center gap-2 text-sm font-bold text-rose-800 dark:text-rose-300">
-                <Trash2 className="w-4 h-4 text-rose-500" /> Resetear Base de Datos Local
-              </div>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                Elimina permanentemente todos los registros locales guardados (universidades, asignaturas, entregables y horarios).
-              </p>
-              <Button variant="danger" size="sm" onClick={() => clearAllData()}>
-                Vaciar Base de Datos
-              </Button>
-            </Card>
-          </div>
-        </div>
-      )}
 
       {/* Modal Add / Edit University */}
       <Modal
-        isOpen={isAddUniOpen}
-        onClose={() => setIsAddUniOpen(false)}
-        title={editingUniId ? 'Editar Universidad' : 'Configurar Nueva Universidad'}
+        isOpen={isAddUniOpen || editingUni !== null}
+        onClose={() => {
+          setIsAddUniOpen(false);
+          setEditingUni(null);
+        }}
+        title={editingUni ? `Editar Universidad: ${editingUni.name}` : 'Configurar Nueva Universidad'}
       >
         <div className="space-y-4">
           <div>
@@ -708,7 +648,6 @@ export const ConfigDashboard: React.FC = () => {
               className={inputClass}
               placeholder="Ej: Universidad EAFIT"
             />
-            {uniErrors.name && <p className="text-xs text-rose-500 font-medium mt-1">{uniErrors.name}</p>}
           </div>
 
           <div>
@@ -753,15 +692,12 @@ export const ConfigDashboard: React.FC = () => {
               />
             </div>
           </div>
-          {uniErrors.scale_max && <p className="text-xs text-rose-500 font-medium mt-1">{uniErrors.scale_max}</p>}
-          {uniErrors.passing_grade && <p className="text-xs text-rose-500 font-medium mt-1">{uniErrors.passing_grade}</p>}
-
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => setIsAddUniOpen(false)}>
+            <Button variant="ghost" onClick={() => { setIsAddUniOpen(false); setEditingUni(null); }}>
               Cancelar
             </Button>
-            <Button variant="aeroespacial" onClick={handleAddUni}>
-              {editingUniId ? 'Guardar Cambios' : 'Guardar Universidad'}
+            <Button variant="aeroespacial" onClick={handleSaveUni}>
+              {editingUni ? 'Guardar Cambios' : 'Guardar Universidad'}
             </Button>
           </div>
         </div>
@@ -769,9 +705,12 @@ export const ConfigDashboard: React.FC = () => {
 
       {/* Modal Add / Edit Professor */}
       <Modal
-        isOpen={isAddProfOpen}
-        onClose={() => setIsAddProfOpen(false)}
-        title={editingProfId ? 'Editar Profesor' : 'Registrar Nuevo Profesor'}
+        isOpen={isAddProfOpen || editingProf !== null}
+        onClose={() => {
+          setIsAddProfOpen(false);
+          setEditingProf(null);
+        }}
+        title={editingProf ? `Editar Profesor: ${editingProf.name}` : 'Registrar Nuevo Profesor'}
       >
         <div className="space-y-4">
           <div>
@@ -783,7 +722,6 @@ export const ConfigDashboard: React.FC = () => {
               className={inputClass}
               placeholder="Ej: Dr. Carlos Pérez"
             />
-            {profErrors.name && <p className="text-xs text-rose-500 font-medium mt-1">{profErrors.name}</p>}
           </div>
 
           <div>
@@ -800,7 +738,6 @@ export const ConfigDashboard: React.FC = () => {
                 </option>
               ))}
             </select>
-            {profErrors.university_id && <p className="text-xs text-rose-500 font-medium mt-1">{profErrors.university_id}</p>}
           </div>
 
           <div>
@@ -812,15 +749,14 @@ export const ConfigDashboard: React.FC = () => {
               className={inputClass}
               placeholder="cperez@universidad.edu"
             />
-            {profErrors.email && <p className="text-xs text-rose-500 font-medium mt-1">{profErrors.email}</p>}
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => setIsAddProfOpen(false)}>
+            <Button variant="ghost" onClick={() => { setIsAddProfOpen(false); setEditingProf(null); }}>
               Cancelar
             </Button>
-            <Button variant="synergy" onClick={handleAddProf}>
-              {editingProfId ? 'Guardar Cambios' : 'Guardar Profesor'}
+            <Button variant="synergy" onClick={handleSaveProf}>
+              {editingProf ? 'Guardar Cambios' : 'Guardar Profesor'}
             </Button>
           </div>
         </div>
@@ -828,9 +764,12 @@ export const ConfigDashboard: React.FC = () => {
 
       {/* Modal Add / Edit Subject */}
       <Modal
-        isOpen={isAddSubjectOpen}
-        onClose={() => setIsAddSubjectOpen(false)}
-        title={editingSubId ? 'Editar Asignatura' : 'Registrar Nueva Asignatura'}
+        isOpen={isAddSubjectOpen || editingSubject !== null}
+        onClose={() => {
+          setIsAddSubjectOpen(false);
+          setEditingSubject(null);
+        }}
+        title={editingSubject ? `Editar Asignatura: ${editingSubject.name}` : 'Registrar Nueva Asignatura'}
       >
         <div className="space-y-4">
           <div>
@@ -842,7 +781,6 @@ export const ConfigDashboard: React.FC = () => {
               className={inputClass}
               placeholder="Ej: Cálculo Vectorial y Geometría"
             />
-            {subErrors.name && <p className="text-xs text-rose-500 font-medium mt-1">{subErrors.name}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -855,7 +793,6 @@ export const ConfigDashboard: React.FC = () => {
                 className={inputClass}
                 placeholder="MAT-201"
               />
-              {subErrors.code && <p className="text-xs text-rose-500 font-medium mt-1">{subErrors.code}</p>}
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Universidad</label>
@@ -871,7 +808,6 @@ export const ConfigDashboard: React.FC = () => {
                   </option>
                 ))}
               </select>
-              {subErrors.university_id && <p className="text-xs text-rose-500 font-medium mt-1">{subErrors.university_id}</p>}
             </div>
           </div>
 
@@ -904,7 +840,7 @@ export const ConfigDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Créditos</label>
               <input
@@ -935,26 +871,14 @@ export const ConfigDashboard: React.FC = () => {
                 className={inputClass}
               />
             </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Fallas Permisibles</label>
-              <input
-                type="number"
-                min={0}
-                max={20}
-                value={subMaxAbsences}
-                onChange={(e) => setSubMaxAbsences(Number(e.target.value))}
-                className={inputClass}
-                placeholder="4"
-              />
-            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => setIsAddSubjectOpen(false)}>
+            <Button variant="ghost" onClick={() => { setIsAddSubjectOpen(false); setEditingSubject(null); }}>
               Cancelar
             </Button>
-            <Button variant="aeroespacial" onClick={handleAddSubject}>
-              {editingSubId ? 'Guardar Cambios' : 'Guardar Materia'}
+            <Button variant="aeroespacial" onClick={handleSaveSubject}>
+              {editingSubject ? 'Guardar Cambios' : 'Guardar Materia'}
             </Button>
           </div>
         </div>
@@ -962,9 +886,12 @@ export const ConfigDashboard: React.FC = () => {
 
       {/* Modal Add / Edit Schedule */}
       <Modal
-        isOpen={isAddScheduleOpen}
-        onClose={() => setIsAddScheduleOpen(false)}
-        title={editingSchedId ? 'Editar Horario de Clase' : 'Asignar Horario a Materia'}
+        isOpen={isAddScheduleOpen || editingSchedule !== null}
+        onClose={() => {
+          setIsAddScheduleOpen(false);
+          setEditingSchedule(null);
+        }}
+        title={editingSchedule ? 'Editar Horario' : 'Asignar Horario a Materia'}
       >
         <div className="space-y-4">
           <div>
@@ -981,7 +908,6 @@ export const ConfigDashboard: React.FC = () => {
                 </option>
               ))}
             </select>
-            {schedErrors.subject_id && <p className="text-xs text-rose-500 font-medium mt-1">{schedErrors.subject_id}</p>}
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -1010,7 +936,6 @@ export const ConfigDashboard: React.FC = () => {
                 className={inputClass}
                 placeholder="08:00"
               />
-              {schedErrors.start_time && <p className="text-xs text-rose-500 font-medium mt-1">{schedErrors.start_time}</p>}
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Hora Fin</label>
@@ -1021,7 +946,6 @@ export const ConfigDashboard: React.FC = () => {
                 className={inputClass}
                 placeholder="10:00"
               />
-              {schedErrors.end_time && <p className="text-xs text-rose-500 font-medium mt-1">{schedErrors.end_time}</p>}
             </div>
           </div>
 
@@ -1032,16 +956,16 @@ export const ConfigDashboard: React.FC = () => {
               value={schedClassroom}
               onChange={(e) => setSchedClassroom(e.target.value)}
               className={inputClass}
-              placeholder="Ej: Salón 301 - Edificio Tecnológico"
+              placeholder="Ej: Aula 2-305"
             />
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => setIsAddScheduleOpen(false)}>
+            <Button variant="ghost" onClick={() => { setIsAddScheduleOpen(false); setEditingSchedule(null); }}>
               Cancelar
             </Button>
-            <Button variant="aeroespacial" onClick={handleAddSchedule}>
-              {editingSchedId ? 'Guardar Cambios' : 'Guardar Horario'}
+            <Button variant="primary" onClick={handleSaveSchedule}>
+              {editingSchedule ? 'Guardar Cambios' : 'Guardar Horario'}
             </Button>
           </div>
         </div>
