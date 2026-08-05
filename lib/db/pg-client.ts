@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { runPostgresMigrations } from '../../scripts/migrate';
 
 const connectionString =
   process.env.DATABASE_URL ||
@@ -18,6 +19,10 @@ export async function initPostgresSchema() {
 
   const client = await pgPool.connect();
   try {
+    // 1. Run migrations first
+    await runPostgresMigrations(pgPool);
+
+    // 2. Safeguard DDL check
     await client.query(`
       CREATE TABLE IF NOT EXISTS universities (
         id TEXT PRIMARY KEY,
@@ -31,6 +36,9 @@ export async function initPostgresSchema() {
         first_sabado_a_date TEXT DEFAULT '2026-08-01',
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+
+      ALTER TABLE universities ADD COLUMN IF NOT EXISTS has_alternating_saturdays BOOLEAN DEFAULT TRUE;
+      ALTER TABLE universities ADD COLUMN IF NOT EXISTS first_sabado_a_date TEXT DEFAULT '2026-08-01';
 
       CREATE TABLE IF NOT EXISTS professors (
         id TEXT PRIMARY KEY,
@@ -67,6 +75,8 @@ export async function initPostgresSchema() {
         periodicity TEXT DEFAULT 'semanal',
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+
+      ALTER TABLE schedules ADD COLUMN IF NOT EXISTS periodicity TEXT DEFAULT 'semanal';
 
       CREATE TABLE IF NOT EXISTS deliverables (
         id TEXT PRIMARY KEY,
