@@ -1,12 +1,19 @@
 import { Pool } from 'pg';
 import { runPostgresMigrations } from '../../scripts/migrate';
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  'postgresql://pure_user:pure_secure_password_2026@localhost:5432/pure_academic';
+function getConnectionString(): string {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('CRITICAL: DATABASE_URL environment variable is required in production.');
+    }
+    return 'postgresql://pure_user:pure_secure_password_2026@localhost:5432/pure_academic';
+  }
+  return dbUrl;
+}
 
 export const pgPool = new Pool({
-  connectionString,
+  connectionString: getConnectionString(),
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,

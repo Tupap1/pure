@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server';
-import { pgPool, initPostgresSchema } from '@/lib/db/pg-client';
+import { pgPool } from '@/lib/db/pg-client';
+
+export const ALLOWED_TABLES = new Set([
+  'universities',
+  'professors',
+  'subjects',
+  'schedules',
+  'deliverables',
+  'syllabus_topics',
+]);
 
 export async function GET() {
   try {
-    await initPostgresSchema();
-
     const [unis, profs, subs, scheds, delivs, topics] = await Promise.all([
       pgPool.query('SELECT * FROM universities ORDER BY name ASC'),
       pgPool.query('SELECT * FROM professors ORDER BY name ASC'),
@@ -52,12 +59,15 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await initPostgresSchema();
     const body = await request.json();
     const { action, table, data } = body;
 
     if (!table || !data) {
       return NextResponse.json({ status: 'error', message: 'Missing table or data' }, { status: 400 });
+    }
+
+    if (!ALLOWED_TABLES.has(table)) {
+      return NextResponse.json({ status: 'error', message: 'Invalid or unauthorized table name' }, { status: 400 });
     }
 
     if (action === 'delete') {
