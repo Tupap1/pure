@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
 import { pureDB, UniversityEntity, ProfessorEntity, SubjectEntity, ScheduleEntity } from '@/lib/db/dexie-schema';
-import { clearAllData, seedDemoData } from '@/lib/db/seed';
+import { clearAllData } from '@/lib/db/seed';
 import {
   UniversitySchema,
   ProfessorSchema,
@@ -23,8 +23,7 @@ import {
   GraduationCap,
   BookOpen,
   Calendar,
-  RotateCcw,
-  Sparkles
+  RotateCcw
 } from 'lucide-react';
 
 export const ConfigDashboard: React.FC = () => {
@@ -321,10 +320,6 @@ export const ConfigDashboard: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => clearAllData()}>
             <RotateCcw className="w-3.5 h-3.5" /> Limpiar Todo
-          </Button>
-
-          <Button variant="aeroespacial" size="sm" onClick={() => seedDemoData()}>
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Ingestar Matrícula vía MCP (UdeA + UdeC)
           </Button>
         </div>
       </div>
