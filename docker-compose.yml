@@ -1,3 +1,4 @@
+# PURE OS Stack v1.0.1 - Streamable HTTP & RFC 7591 OAuth Support
 services:
   pure-db:
     image: postgres:16-alpine
