@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { pgPool } from '@/lib/db/pg-client';
 
-export const ALLOWED_TABLES = new Set([
+const ALLOWED_TABLES = new Set([
   'universities',
   'professors',
   'subjects',

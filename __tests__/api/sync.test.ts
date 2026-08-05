@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { POST, ALLOWED_TABLES } from '@/app/api/sync/route';
+import { POST } from '@/app/api/sync/route';
 
 // Mock DB pool to prevent real queries during unit test execution
 vi.mock('@/lib/db/pg-client', () => ({
@@ -30,31 +30,44 @@ describe('POST /api/sync Security & Validation', () => {
   });
 
   it('should allow valid whitelisted tables', async () => {
-    const validPayload = {
+    const validTables = ['universities', 'professors', 'subjects', 'schedules', 'deliverables', 'syllabus_topics'];
+
+    for (const table of validTables) {
+      const validPayload = {
+        action: 'delete',
+        table,
+        data: { id: 'test-1' },
+      };
+
+      const request = new Request('http://localhost/api/sync', {
+        method: 'POST',
+        body: JSON.stringify(validPayload),
+      });
+
+      const response = await POST(request);
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.status).toBe('success');
+    }
+  });
+
+  it('should reject non-whitelisted tables like users or random strings', async () => {
+    const invalidPayload = {
       action: 'delete',
-      table: 'universities',
-      data: { id: 'uni-1' },
+      table: 'users',
+      data: { id: 'user-1' },
     };
 
     const request = new Request('http://localhost/api/sync', {
       method: 'POST',
-      body: JSON.stringify(validPayload),
+      body: JSON.stringify(invalidPayload),
     });
 
     const response = await POST(request);
     const json = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(json.status).toBe('success');
-  });
-
-  it('should include all required tables in ALLOWED_TABLES whitelist', () => {
-    expect(ALLOWED_TABLES.has('universities')).toBe(true);
-    expect(ALLOWED_TABLES.has('professors')).toBe(true);
-    expect(ALLOWED_TABLES.has('subjects')).toBe(true);
-    expect(ALLOWED_TABLES.has('schedules')).toBe(true);
-    expect(ALLOWED_TABLES.has('deliverables')).toBe(true);
-    expect(ALLOWED_TABLES.has('syllabus_topics')).toBe(true);
-    expect(ALLOWED_TABLES.has('users')).toBe(false);
+    expect(response.status).toBe(400);
+    expect(json.status).toBe('error');
   });
 });
