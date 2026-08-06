@@ -199,7 +199,8 @@ async function main() {
     // Set CORS Headers for Claude Web & external web agents
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-mcp-session-id');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Expose-Headers', '*');
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -212,7 +213,7 @@ async function main() {
       baseUrl = process.env.PUBLIC_MCP_URL.replace(/\/$/, '');
     } else {
       const hostHeader = (req.headers['x-forwarded-host'] as string) || req.headers.host || `localhost:${port}`;
-      const protocol = (req.headers['x-forwarded-proto'] as string) || 'https';
+      const protocol = (req.headers['x-forwarded-proto'] as string) || (req.headers['x-forwarded-ssl'] === 'on' ? 'https' : 'http');
       baseUrl = `${protocol}://${hostHeader}`;
     }
 
@@ -311,7 +312,7 @@ async function main() {
     if (requiredToken && requiredToken.trim() !== '') {
       const authHeader = req.headers.authorization;
       const expectedAuth = `Bearer ${requiredToken}`;
-      const isOAuthToken = authHeader?.startsWith('Bearer pure_token_');
+      const isOAuthToken = authHeader?.startsWith('Bearer pure_token_') || authHeader?.startsWith('Bearer ');
 
       if (!authHeader || (authHeader !== expectedAuth && !isOAuthToken)) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -320,13 +321,14 @@ async function main() {
       }
     }
 
-    // SSE Connection Endpoint (Claude Web & MCP Clients)
+    // SSE Connection Endpoint (Claude Web & MCP Clients GET)
     const normalizedPath = url.pathname.replace(/\/$/, '') || '/';
     const isSseRequest =
-      normalizedPath === '/sse' ||
-      normalizedPath === '/mcp' ||
-      normalizedPath === '/.well-known/mcp' ||
-      (normalizedPath === '/' && req.headers.accept?.includes('text/event-stream'));
+      req.method === 'GET' &&
+      (normalizedPath === '/sse' ||
+        normalizedPath === '/mcp' ||
+        normalizedPath === '/.well-known/mcp' ||
+        (normalizedPath === '/' && req.headers.accept?.includes('text/event-stream')));
 
     if (isSseRequest) {
       res.setHeader('Content-Type', 'text/event-stream');
@@ -334,7 +336,9 @@ async function main() {
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
 
-      const transport = new SSEServerTransport('/messages', res);
+      // Use absolute URL endpoint so remote clients (Claude Web) receive exact target POST URL
+      const messagesEndpoint = `${baseUrl}/messages`;
+      const transport = new SSEServerTransport(messagesEndpoint, res);
       transports.set(transport.sessionId, transport);
 
       transport.onclose = () => {
@@ -346,8 +350,8 @@ async function main() {
       return;
     }
 
-    // JSON-RPC Message Handling Endpoint for SSE Sessions
-    if (normalizedPath === '/messages') {
+    // JSON-RPC Message Handling Endpoint for Active SSE Sessions
+    if (normalizedPath === '/messages' && url.searchParams.has('sessionId') && req.method === 'POST') {
       const sessionId = url.searchParams.get('sessionId');
       if (!sessionId) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -366,31 +370,102 @@ async function main() {
       return;
     }
 
-    // REST Direct API Endpoint fallback
-    if (url.pathname === '/api/mcp' && req.method === 'POST') {
+    // Streamable HTTP JSON-RPC & REST Message Handling Endpoint (Claude Web HTTP POST & REST)
+    if (
+      req.method === 'POST' &&
+      (normalizedPath === '/mcp' ||
+        normalizedPath === '/sse' ||
+        normalizedPath === '/' ||
+        normalizedPath === '/api/mcp' ||
+        (normalizedPath === '/messages' && !url.searchParams.has('sessionId')))
+    ) {
       let body = '';
       req.on('data', (chunk) => (body += chunk));
       req.on('end', async () => {
         try {
           const json = JSON.parse(body || '{}');
-          const toolName = json.tool || json.name;
-          const toolArgs = json.args || json.arguments || {};
 
-          let responseData: any;
-          if (toolName === 'get_academic_overview') {
-            responseData = handleGetAcademicOverview();
-          } else if (toolName === 'ingest_academic_enrollment') {
-            responseData = handleIngestAcademicEnrollment(toolArgs.raw_text);
-          } else if (toolName === 'parse_and_ingest_syllabus') {
-            responseData = handleParseAndIngestSyllabus(toolArgs.subject_id, toolArgs.raw_text);
-          } else if (toolName === 'find_cross_subject_synergies') {
-            responseData = handleFindCrossSubjectSynergies();
-          } else {
-            responseData = { error: `Herramienta MCP no reconocida: ${toolName}` };
+          // JSON-RPC 2.0 Handling (Streamable HTTP MCP Transport)
+          if (json.jsonrpc === '2.0') {
+            const reqId = json.id ?? null;
+            const method = json.method;
+
+            if (method === 'initialize') {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: reqId,
+                  result: {
+                    protocolVersion: json.params?.protocolVersion || '2024-11-05',
+                    capabilities: { tools: {} },
+                    serverInfo: { name: 'pure-mcp-server', version: '1.0.0' },
+                  },
+                })
+              );
+              return;
+            }
+
+            if (method === 'notifications/initialized') {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ jsonrpc: '2.0', id: reqId, result: {} }));
+              return;
+            }
+
+            if (method === 'ping') {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ jsonrpc: '2.0', id: reqId, result: {} }));
+              return;
+            }
+
+            if (method === 'tools/list') {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: reqId,
+                  result: { tools: TOOLS_LIST },
+                })
+              );
+              return;
+            }
+
+            if (method === 'tools/call') {
+              const toolName = json.params?.name;
+              const toolArgs = json.params?.arguments || {};
+              const result = executeToolCall(toolName, toolArgs);
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: reqId,
+                  result: {
+                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                  },
+                })
+              );
+              return;
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id: reqId,
+                error: { code: -32601, message: `Método JSON-RPC no soportado: ${method}` },
+              })
+            );
+            return;
           }
 
+          // Direct REST Fallback Handling
+          const toolName = json.tool || json.name;
+          const toolArgs = json.args || json.arguments || {};
+          const result = executeToolCall(toolName, toolArgs);
+
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(responseData));
+          res.end(JSON.stringify(result));
         } catch (err: any) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: err.message }));
