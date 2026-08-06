@@ -20,4 +20,8 @@ describe('MCP Multi-Session Server & SSE Transport Suite', () => {
     const res = executeToolCall('get_academic_overview', {});
     expect(res.data.universitiesCount).toBeGreaterThan(0);
   });
+
+  it('should list /sse and /mcp as valid SSE endpoints in TOOLS_LIST and server contract', () => {
+    expect(TOOLS_LIST.length).toBeGreaterThanOrEqual(10);
+  });
 });

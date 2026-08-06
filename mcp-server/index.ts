@@ -301,7 +301,7 @@ async function main() {
           status: 'ok',
           server: 'pure-mcp-server',
           activeSessions: transports.size,
-          endpoints: ['/sse', '/messages', '/api/mcp', '/oauth/register', '/.well-known/oauth-authorization-server'],
+          endpoints: ['/sse', '/mcp', '/messages', '/api/mcp', '/oauth/register', '/.well-known/oauth-authorization-server'],
         })
       );
       return;
@@ -320,7 +320,7 @@ async function main() {
     }
 
     // SSE Connection Endpoint (Claude Web & MCP Clients)
-    if (url.pathname === '/sse') {
+    if (url.pathname === '/sse' || url.pathname === '/mcp') {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
