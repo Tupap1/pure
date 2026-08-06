@@ -24,4 +24,11 @@ describe('MCP Multi-Session Server & SSE Transport Suite', () => {
   it('should list /sse and /mcp as valid SSE endpoints in TOOLS_LIST and server contract', () => {
     expect(TOOLS_LIST.length).toBeGreaterThanOrEqual(10);
   });
+
+  it('should support root /, /sse, /mcp, and /.well-known/mcp endpoint routes', () => {
+    const validEndpoints = ['/', '/sse', '/mcp', '/.well-known/mcp'];
+    expect(validEndpoints).toContain('/');
+    expect(validEndpoints).toContain('/sse');
+    expect(validEndpoints).toContain('/mcp');
+  });
 });

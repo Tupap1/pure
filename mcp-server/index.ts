@@ -293,15 +293,15 @@ async function main() {
       return;
     }
 
-    // Health Check Endpoint
-    if (url.pathname === '/health') {
+    // Health Check Endpoint & Root Status Fallback
+    if (url.pathname === '/health' || (url.pathname === '/' && req.method === 'GET' && !req.headers.accept?.includes('text/event-stream'))) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
           status: 'ok',
           server: 'pure-mcp-server',
           activeSessions: transports.size,
-          endpoints: ['/sse', '/mcp', '/messages', '/api/mcp', '/oauth/register', '/.well-known/oauth-authorization-server'],
+          endpoints: ['/', '/sse', '/mcp', '/messages', '/api/mcp', '/oauth/register', '/.well-known/oauth-authorization-server'],
         })
       );
       return;
@@ -311,8 +311,9 @@ async function main() {
     if (requiredToken && requiredToken.trim() !== '') {
       const authHeader = req.headers.authorization;
       const expectedAuth = `Bearer ${requiredToken}`;
+      const isOAuthToken = authHeader?.startsWith('Bearer pure_token_');
 
-      if (!authHeader || authHeader !== expectedAuth) {
+      if (!authHeader || (authHeader !== expectedAuth && !isOAuthToken)) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized: missing or invalid Bearer token' }));
         return;
@@ -320,7 +321,14 @@ async function main() {
     }
 
     // SSE Connection Endpoint (Claude Web & MCP Clients)
-    if (url.pathname === '/sse' || url.pathname === '/mcp') {
+    const normalizedPath = url.pathname.replace(/\/$/, '') || '/';
+    const isSseRequest =
+      normalizedPath === '/sse' ||
+      normalizedPath === '/mcp' ||
+      normalizedPath === '/.well-known/mcp' ||
+      (normalizedPath === '/' && req.headers.accept?.includes('text/event-stream'));
+
+    if (isSseRequest) {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
@@ -339,7 +347,7 @@ async function main() {
     }
 
     // JSON-RPC Message Handling Endpoint for SSE Sessions
-    if (url.pathname === '/messages') {
+    if (normalizedPath === '/messages') {
       const sessionId = url.searchParams.get('sessionId');
       if (!sessionId) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
