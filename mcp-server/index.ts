@@ -1,11 +1,10 @@
 import http from 'http';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+import { validateMcpAuth } from './auth-middleware';
+import { handleHealthCheck } from './health-handler';
 import {
   handleGetAcademicOverview,
   handleParseAndIngestSyllabus,
@@ -18,6 +17,12 @@ import {
   handleManageDeliverables,
   handleManageSyllabusTopics,
 } from './tools-handler';
+import {
+  saveUniversityToDb,
+  saveSubjectToDb,
+  saveScheduleToDb,
+  saveDeliverableToDb,
+} from './db-repository';
 
 export const TOOLS_LIST = [
   {
@@ -134,34 +139,58 @@ export const TOOLS_LIST = [
 ];
 
 export function executeToolCall(name: string, args: any) {
+  let result: any;
   switch (name) {
     case 'get_academic_overview':
-      return handleGetAcademicOverview();
+      result = handleGetAcademicOverview();
+      break;
     case 'ingest_academic_enrollment':
-      return handleIngestAcademicEnrollment(args?.raw_text);
+      result = handleIngestAcademicEnrollment(args?.raw_text);
+      break;
     case 'parse_and_ingest_syllabus':
-      return handleParseAndIngestSyllabus(args?.subject_id, args?.raw_text);
+      result = handleParseAndIngestSyllabus(args?.subject_id, args?.raw_text);
+      break;
     case 'find_cross_subject_synergies':
-      return handleFindCrossSubjectSynergies();
+      result = handleFindCrossSubjectSynergies();
+      break;
     case 'manage_universities':
-      return handleManageUniversities(args?.action, args?.data);
+      result = handleManageUniversities(args?.action, args?.data);
+      if (args?.action === 'create' || args?.action === 'update') {
+        saveUniversityToDb(args.data);
+      }
+      break;
     case 'manage_professors':
-      return handleManageProfessors(args?.action, args?.data);
+      result = handleManageProfessors(args?.action, args?.data);
+      break;
     case 'manage_subjects':
-      return handleManageSubjects(args?.action, args?.data);
+      result = handleManageSubjects(args?.action, args?.data);
+      if (args?.action === 'create' || args?.action === 'update') {
+        saveSubjectToDb(args.data);
+      }
+      break;
     case 'manage_schedules':
-      return handleManageSchedules(args?.action, args?.data);
+      result = handleManageSchedules(args?.action, args?.data);
+      if (args?.action === 'create' || args?.action === 'update') {
+        saveScheduleToDb(args.data);
+      }
+      break;
     case 'manage_deliverables':
-      return handleManageDeliverables(args?.action, args?.data);
+      result = handleManageDeliverables(args?.action, args?.data);
+      if (args?.action === 'create' || args?.action === 'update') {
+        saveDeliverableToDb(args.data);
+      }
+      break;
     case 'manage_syllabus_topics':
-      return handleManageSyllabusTopics(args?.action, args?.data);
+      result = handleManageSyllabusTopics(args?.action, args?.data);
+      break;
     default:
       throw new Error(`Herramienta MCP no reconocida: ${name}`);
   }
+  return result;
 }
 
 export function createMcpServerInstance() {
-  const mcpServer = new Server(
+  const mcpServer = new McpServer(
     {
       name: 'pure-mcp-server',
       version: '1.0.0',
@@ -173,16 +202,59 @@ export function createMcpServerInstance() {
     }
   );
 
-  mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
-    return { tools: TOOLS_LIST };
+  // Register all 10 tools using modern McpServer tool() API
+  mcpServer.tool('get_academic_overview', 'Retorna el resumen académico global, tiempo libre neto y promedios por carrera.', {}, async () => {
+    const res = handleGetAcademicOverview();
+    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
-  mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
-    const result = executeToolCall(name, args);
-    return {
-      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-    };
+  mcpServer.tool('ingest_academic_enrollment', 'Procesa e ingesta la matrícula real del estudiante.', { raw_text: z.string() }, async ({ raw_text }) => {
+    const res = handleIngestAcademicEnrollment(raw_text);
+    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+  });
+
+  mcpServer.tool('parse_and_ingest_syllabus', 'Recibe un texto de temario y lo convierte en árbol de ejes temáticos.', { subject_id: z.string(), raw_text: z.string() }, async ({ subject_id, raw_text }) => {
+    const res = handleParseAndIngestSyllabus(subject_id, raw_text);
+    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+  });
+
+  mcpServer.tool('find_cross_subject_synergies', 'Escanea temarios de Ingeniería Aeroespacial e Ingeniería de Software.', {}, async () => {
+    const res = handleFindCrossSubjectSynergies();
+    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+  });
+
+  mcpServer.tool('manage_universities', 'Operaciones CRUD sobre Universidades.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
+    const res = handleManageUniversities(action, data);
+    if (data && (action === 'create' || action === 'update')) saveUniversityToDb(data);
+    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+  });
+
+  mcpServer.tool('manage_professors', 'Operaciones CRUD sobre Profesores.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
+    const res = handleManageProfessors(action, data);
+    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+  });
+
+  mcpServer.tool('manage_subjects', 'Operaciones CRUD sobre Asignaturas.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
+    const res = handleManageSubjects(action, data);
+    if (data && (action === 'create' || action === 'update')) saveSubjectToDb(data);
+    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+  });
+
+  mcpServer.tool('manage_schedules', 'Operaciones CRUD sobre Horarios y Aulas de clase.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
+    const res = handleManageSchedules(action, data);
+    if (data && (action === 'create' || action === 'update')) saveScheduleToDb(data);
+    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+  });
+
+  mcpServer.tool('manage_deliverables', 'Operaciones CRUD sobre Entregables / Parciales.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
+    const res = handleManageDeliverables(action, data);
+    if (data && (action === 'create' || action === 'update')) saveDeliverableToDb(data);
+    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+  });
+
+  mcpServer.tool('manage_syllabus_topics', 'Operaciones CRUD sobre Ejes Temáticos.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
+    const res = handleManageSyllabusTopics(action, data);
+    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
   return mcpServer;
@@ -190,13 +262,18 @@ export function createMcpServerInstance() {
 
 async function main() {
   const port = Number(process.env.MCP_PORT || 3001);
-  const requiredToken = process.env.MCP_AUTH_TOKEN;
+  const secretKey = process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN || 'Stability8-Showcase4-Lavish9-Petition3';
 
-  // Session storage map for concurrent SSE client connections
-  const transports = new Map<string, SSEServerTransport>();
+  // Instantiate unified StreamableHTTPServerTransport
+  const streamableTransport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => `pure_session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+  });
+
+  const mcpServer = createMcpServerInstance();
+  await mcpServer.connect(streamableTransport);
 
   const httpServer = http.createServer(async (req, res) => {
-    // Set CORS Headers for Claude Web & external web agents
+    // 1. Set CORS Headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
@@ -208,21 +285,22 @@ async function main() {
       return;
     }
 
-    let baseUrl: string;
-    if (process.env.PUBLIC_MCP_URL) {
-      baseUrl = process.env.PUBLIC_MCP_URL.replace(/\/$/, '');
-    } else {
-      const hostHeader = (req.headers['x-forwarded-host'] as string) || req.headers.host || `localhost:${port}`;
-      const protocol = (req.headers['x-forwarded-proto'] as string) || (req.headers['x-forwarded-ssl'] === 'on' ? 'https' : 'http');
-      baseUrl = `${protocol}://${hostHeader}`;
-    }
+    const hostHeader = (req.headers['x-forwarded-host'] as string) || req.headers.host || `localhost:${port}`;
+    const protocol = (req.headers['x-forwarded-proto'] as string) || (req.headers['x-forwarded-ssl'] === 'on' ? 'https' : 'http');
+    const baseUrl = process.env.PUBLIC_MCP_URL ? process.env.PUBLIC_MCP_URL.replace(/\/$/, '') : `${protocol}://${hostHeader}`;
 
     const url = new URL(req.url || '/', baseUrl);
+    const normalizedPath = url.pathname.replace(/\/$/, '') || '/';
 
-    // OpenID / OAuth Authorization Discovery
+    // 2. Health check GET /health
+    if (normalizedPath === '/health') {
+      return handleHealthCheck(req, res);
+    }
+
+    // 3. OAuth 2.0 Discovery
     if (
-      url.pathname === '/.well-known/oauth-authorization-server' ||
-      url.pathname === '/.well-known/openid-configuration'
+      normalizedPath === '/.well-known/oauth-authorization-server' ||
+      normalizedPath === '/.well-known/openid-configuration'
     ) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
@@ -240,237 +318,41 @@ async function main() {
       return;
     }
 
-    // Dynamic Client Registration (RFC 7591)
-    if ((url.pathname === '/oauth/register' || url.pathname === '/register') && req.method === 'POST') {
-      let body = '';
-      req.on('data', (chunk) => (body += chunk));
-      req.on('end', () => {
-        try {
-          const json = JSON.parse(body || '{}');
-          const clientId = `pure_client_${Date.now()}`;
-          const clientSecret = `pure_secret_${Math.random().toString(36).substring(2)}`;
-
-          res.writeHead(201, { 'Content-Type': 'application/json' });
-          res.end(
-            JSON.stringify({
-              client_id: clientId,
-              client_secret: clientSecret,
-              client_name: json.client_name || 'Claude Custom Connector',
-              redirect_uris: json.redirect_uris || ['https://claude.ai/oauth/callback'],
-              grant_types: ['authorization_code'],
-              response_types: ['code'],
-            })
-          );
-        } catch (err: any) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: err.message }));
-        }
-      });
-      return;
-    }
-
-    // OAuth Authorization Code Redirect
-    if (url.pathname === '/oauth/authorize' || url.pathname === '/authorize') {
-      const redirectUri = url.searchParams.get('redirect_uri') || 'https://claude.ai/oauth/callback';
-      const state = url.searchParams.get('state') || '';
-      const separator = redirectUri.includes('?') ? '&' : '?';
-      const targetUrl = `${redirectUri}${separator}code=pure_auto_code_${Date.now()}&state=${encodeURIComponent(state)}`;
-      res.writeHead(302, { Location: targetUrl });
-      res.end();
-      return;
-    }
-
-    // OAuth Access Token Exchange
-    if ((url.pathname === '/oauth/token' || url.pathname === '/token') && req.method === 'POST') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          access_token: `pure_token_${Date.now()}`,
-          token_type: 'Bearer',
-          expires_in: 31536000,
-          scope: 'mcp',
-        })
-      );
-      return;
-    }
-
-    // Health Check Endpoint & Root Status Fallback
-    if (url.pathname === '/health' || (url.pathname === '/' && req.method === 'GET' && !req.headers.accept?.includes('text/event-stream'))) {
+    // 4. Root information GET /
+    if (normalizedPath === '/' && req.method === 'GET' && !req.headers.accept?.includes('text/event-stream')) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
           status: 'ok',
           server: 'pure-mcp-server',
-          activeSessions: transports.size,
-          endpoints: ['/', '/sse', '/mcp', '/messages', '/api/mcp', '/oauth/register', '/.well-known/oauth-authorization-server'],
+          version: '1.0.0',
+          message: 'Servidor MCP de Pure Academic activo.',
+          endpoints: {
+            health: `${baseUrl}/health`,
+            sse: `${baseUrl}/sse`,
+            mcp: `${baseUrl}/mcp`,
+          },
         })
       );
       return;
     }
 
-    // Optional Bearer Token Authentication check
-    if (requiredToken && requiredToken.trim() !== '') {
-      const authHeader = req.headers.authorization;
-      const expectedAuth = `Bearer ${requiredToken}`;
-      const isOAuthToken = authHeader?.startsWith('Bearer pure_token_') || authHeader?.startsWith('Bearer ');
-
-      if (!authHeader || (authHeader !== expectedAuth && !isOAuthToken)) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Unauthorized: missing or invalid Bearer token' }));
-        return;
-      }
-    }
-
-    // SSE Connection Endpoint (Claude Web & MCP Clients GET)
-    const normalizedPath = url.pathname.replace(/\/$/, '') || '/';
-    const isSseRequest =
-      req.method === 'GET' &&
-      (normalizedPath === '/sse' ||
-        normalizedPath === '/mcp' ||
-        normalizedPath === '/.well-known/mcp' ||
-        (normalizedPath === '/' && req.headers.accept?.includes('text/event-stream')));
-
-    if (isSseRequest) {
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache, no-transform');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no');
-
-      // Use absolute URL endpoint so remote clients (Claude Web) receive exact target POST URL
-      const messagesEndpoint = `${baseUrl}/messages`;
-      const transport = new SSEServerTransport(messagesEndpoint, res);
-      transports.set(transport.sessionId, transport);
-
-      transport.onclose = () => {
-        transports.delete(transport.sessionId);
-      };
-
-      const sessionServer = createMcpServerInstance();
-      await sessionServer.connect(transport);
+    // 5. Authentication check for protected routes (/sse, /mcp, /messages)
+    if (!validateMcpAuth(req, secretKey)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized: Missing or invalid Bearer token / API Key' }));
       return;
     }
 
-    // JSON-RPC Message Handling Endpoint for Active SSE Sessions
-    if (normalizedPath === '/messages' && url.searchParams.has('sessionId') && req.method === 'POST') {
-      const sessionId = url.searchParams.get('sessionId');
-      if (!sessionId) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Bad Request: missing sessionId query parameter' }));
-        return;
-      }
-
-      const transport = transports.get(sessionId);
-      if (!transport) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: `Session not found: ${sessionId}` }));
-        return;
-      }
-
-      await transport.handlePostMessage(req, res);
-      return;
-    }
-
-    // Streamable HTTP JSON-RPC & REST Message Handling Endpoint (Claude Web HTTP POST & REST)
+    // 6. Handle Streamable HTTP and SSE requests via StreamableHTTPServerTransport
     if (
-      req.method === 'POST' &&
-      (normalizedPath === '/mcp' ||
-        normalizedPath === '/sse' ||
-        normalizedPath === '/' ||
-        normalizedPath === '/api/mcp' ||
-        (normalizedPath === '/messages' && !url.searchParams.has('sessionId')))
+      normalizedPath === '/sse' ||
+      normalizedPath === '/mcp' ||
+      normalizedPath === '/messages' ||
+      normalizedPath === '/.well-known/mcp' ||
+      normalizedPath === '/'
     ) {
-      let body = '';
-      req.on('data', (chunk) => (body += chunk));
-      req.on('end', async () => {
-        try {
-          const json = JSON.parse(body || '{}');
-
-          // JSON-RPC 2.0 Handling (Streamable HTTP MCP Transport)
-          if (json.jsonrpc === '2.0') {
-            const reqId = json.id ?? null;
-            const method = json.method;
-
-            if (method === 'initialize') {
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(
-                JSON.stringify({
-                  jsonrpc: '2.0',
-                  id: reqId,
-                  result: {
-                    protocolVersion: json.params?.protocolVersion || '2024-11-05',
-                    capabilities: { tools: {} },
-                    serverInfo: { name: 'pure-mcp-server', version: '1.0.0' },
-                  },
-                })
-              );
-              return;
-            }
-
-            if (method === 'notifications/initialized') {
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ jsonrpc: '2.0', id: reqId, result: {} }));
-              return;
-            }
-
-            if (method === 'ping') {
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ jsonrpc: '2.0', id: reqId, result: {} }));
-              return;
-            }
-
-            if (method === 'tools/list') {
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(
-                JSON.stringify({
-                  jsonrpc: '2.0',
-                  id: reqId,
-                  result: { tools: TOOLS_LIST },
-                })
-              );
-              return;
-            }
-
-            if (method === 'tools/call') {
-              const toolName = json.params?.name;
-              const toolArgs = json.params?.arguments || {};
-              const result = executeToolCall(toolName, toolArgs);
-
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(
-                JSON.stringify({
-                  jsonrpc: '2.0',
-                  id: reqId,
-                  result: {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                  },
-                })
-              );
-              return;
-            }
-
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(
-              JSON.stringify({
-                jsonrpc: '2.0',
-                id: reqId,
-                error: { code: -32601, message: `Método JSON-RPC no soportado: ${method}` },
-              })
-            );
-            return;
-          }
-
-          // Direct REST Fallback Handling
-          const toolName = json.tool || json.name;
-          const toolArgs = json.args || json.arguments || {};
-          const result = executeToolCall(toolName, toolArgs);
-
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(result));
-        } catch (err: any) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: err.message }));
-        }
-      });
+      await streamableTransport.handleRequest(req, res);
       return;
     }
 
@@ -479,10 +361,13 @@ async function main() {
   });
 
   httpServer.listen(port, () => {
-    console.error(`Servidor MCP HTTP/SSE listo para Claude Web y Agentes en http://0.0.0.0:${port}/sse`);
+    console.error(`====================================================`);
+    console.error(`🚀 Servidor MCP de Pure listo en http://0.0.0.0:${port}`);
+    console.error(`🔑 Autenticación API Key activada: ${secretKey.substring(0, 10)}...`);
+    console.error(`🏥 Endpoint de Salud: http://0.0.0.0:${port}/health`);
+    console.error(`====================================================`);
   });
 
-  // Also support STDIO fallback if executed in CLI context
   if (process.env.MCP_STDIO === 'true') {
     const stdioTransport = new StdioServerTransport();
     const instance = createMcpServerInstance();
