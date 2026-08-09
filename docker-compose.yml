@@ -31,7 +31,7 @@ services:
   pure-mcp:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.mcp
     container_name: pure_mcp_server
     command: ["npx", "tsx", "mcp-server/index.ts"]
     ports:
@@ -39,7 +39,8 @@ services:
     environment:
       - NODE_ENV=production
       - MCP_PORT=3001
-      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
+      - MCP_API_KEY=${MCP_API_KEY:-Stability8-Showcase4-Lavish9-Petition3}
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-Stability8-Showcase4-Lavish9-Petition3}
       - PUBLIC_MCP_URL=${PUBLIC_MCP_URL:-https://mcp.btw-one.com}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-pure_user}:${POSTGRES_PASSWORD:-pure_secure_password_2026}@pure-db:5432/${POSTGRES_DB:-pure_academic}?sslmode=disable
     stdin_open: true
