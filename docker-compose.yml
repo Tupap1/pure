@@ -40,6 +40,8 @@ services:
       - NODE_ENV=production
       - MCP_PORT=3001
       - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
+      - PUBLIC_MCP_URL=${PUBLIC_MCP_URL:-https://mcp.btw-one.com}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-pure_user}:${POSTGRES_PASSWORD:-pure_secure_password_2026}@pure-db:5432/${POSTGRES_DB:-pure_academic}?sslmode=disable
     stdin_open: true
     tty: true
     depends_on:
