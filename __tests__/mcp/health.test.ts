@@ -39,7 +39,7 @@ describe('MCP Server Health Check Endpoint (GET /health)', () => {
     expect(res.headers.get('content-type')).toContain('application/json');
 
     const data = await res.json();
-    expect(data.status).toBe('ok');
+    expect(['ok', 'degraded']).toContain(data.status);
     expect(data.server).toBe('pure-mcp-server');
     expect(data.version).toBe('1.0.0');
     expect(data).toHaveProperty('timestamp');

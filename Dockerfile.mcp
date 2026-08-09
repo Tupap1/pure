@@ -11,6 +11,7 @@ COPY . .
 
 ENV NODE_ENV=production
 ENV MCP_PORT=3001
+ENV DATABASE_URL="postgresql://pure_user:pure_secure_password_2026@pure-db:5432/pure_academic?sslmode=disable"
 
 EXPOSE 3001
 
