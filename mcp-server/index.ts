@@ -249,10 +249,33 @@ async function main() {
         issuer: baseUrl,
         authorization_endpoint: `${baseUrl}/oauth/authorize`,
         token_endpoint: `${baseUrl}/oauth/token`,
+        registration_endpoint: `${baseUrl}/oauth/register`,
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code'],
-        code_challenge_methods_supported: ['S256', 'plain']
+        code_challenge_methods_supported: ['S256', 'plain'],
+        token_endpoint_auth_methods_supported: ['client_secret_post', 'none', 'client_secret_basic']
       }));
+      return;
+    }
+
+    if (normalizedPath.endsWith('/oauth/register')) {
+      let body = '';
+      req.on('data', chunk => { body += chunk.toString(); });
+      req.on('end', () => {
+        let payload: any = {};
+        try {
+          if (body) payload = JSON.parse(body);
+        } catch (e) {}
+
+        const clientId = `pure_client_${Date.now()}`;
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          client_id: clientId,
+          client_name: payload.client_name || 'Claude Custom Connector',
+          redirect_uris: payload.redirect_uris || ['https://claude.ai/oauth/callback'],
+          token_endpoint_auth_method: 'none'
+        }));
+      });
       return;
     }
 
