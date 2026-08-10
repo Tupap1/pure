@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { createTestDb, TestDbHarness } from '../helpers/test-db';
 import { TOOLS_LIST } from '../../mcp-server/index';
 import {
   handleGetAcademicOverview,
@@ -13,104 +14,15 @@ import {
   handleManageSyllabusTopics,
 } from '../../mcp-server/tools-handler';
 
-// In-Memory Database for pgPool unit test mocking
-const dbStore: Record<string, any[]> = {
-  universities: [],
-  professors: [],
-  subjects: [],
-  schedules: [],
-  deliverables: [],
-  syllabus_topics: [],
-};
+describe('Exhaustive MCP Server Endpoints & Tools Verification Suite (con pg-mem)', () => {
+  let harness: TestDbHarness;
 
-vi.mock('../../lib/db/pg-client', () => ({
-  pgPool: {
-    query: vi.fn().mockImplementation(async (queryStr: string, params: any[] = []) => {
-      const lower = queryStr.toLowerCase();
+  beforeAll(async () => {
+    harness = await createTestDb();
+  });
 
-      // 1. COUNT queries
-      if (lower.includes('count(*)::int')) {
-        let tableName = 'universities';
-        if (lower.includes('from professors')) tableName = 'professors';
-        else if (lower.includes('from subjects')) tableName = 'subjects';
-        else if (lower.includes('from schedules')) tableName = 'schedules';
-        else if (lower.includes('from deliverables')) tableName = 'deliverables';
-        else if (lower.includes('from syllabus_topics')) tableName = 'syllabus_topics';
-        return { rows: [{ count: (dbStore[tableName] || []).length }] };
-      }
-
-      // 2. DELETE queries
-      if (lower.startsWith('delete from')) {
-        const match = lower.match(/delete from (\w+)/);
-        if (match && match[1]) {
-          const tableName = match[1];
-          const id = params[0];
-          dbStore[tableName] = (dbStore[tableName] || []).filter((r) => r.id !== id);
-        }
-        return { rows: [] };
-      }
-
-      // 3. INSERT / UPSERT queries
-      if (lower.startsWith('insert into')) {
-        const match = lower.match(/insert into (\w+)/);
-        if (match && match[1]) {
-          const tableName = match[1];
-          const id = params[0];
-          dbStore[tableName] = dbStore[tableName] || [];
-          const idx = dbStore[tableName].findIndex((r) => r.id === id);
-
-          let record: any = { id };
-          if (tableName === 'universities') {
-            record = { id, name: params[1], modality: params[2], scale_min: params[3], scale_max: params[4], passing_grade: params[5], color: params[6], has_alternating_saturdays: params[7], first_sabado_a_date: params[8] };
-          } else if (tableName === 'professors') {
-            record = { id, university_id: params[1], name: params[2], email: params[3], office_hours: params[4], notes: params[5] };
-          } else if (tableName === 'subjects') {
-            record = { id, university_id: params[1], professor_id: params[2], name: params[3], code: params[4], credits: params[5], difficulty: params[6], modality: params[7], target_grade: params[8], current_grade: params[9], max_absences: params[10] };
-          } else if (tableName === 'schedules') {
-            record = { id, subject_id: params[1], day_of_week: params[2], start_time: params[3], end_time: params[4], classroom: params[5], periodicity: params[6] };
-          } else if (tableName === 'deliverables') {
-            record = { id, subject_id: params[1], topic_id: params[2], title: params[3], description: params[4], due_date: params[5], weight_percentage: params[6], grade: params[7], type: params[8], location_modality: params[9], is_group: params[10], complexity: params[11], status: params[12] };
-          } else if (tableName === 'syllabus_topics') {
-            record = { id, subject_id: params[1], parent_id: params[2], title: params[3], description: params[4], mastery_status: params[5], order_index: params[6] };
-          }
-
-          if (idx >= 0) {
-            dbStore[tableName][idx] = { ...dbStore[tableName][idx], ...record };
-          } else {
-            dbStore[tableName].push(record);
-          }
-        }
-        return { rows: [] };
-      }
-
-      // 4. SELECT queries
-      if (lower.startsWith('select')) {
-        let tableName = 'universities';
-        if (lower.includes('from professors')) tableName = 'professors';
-        else if (lower.includes('from subjects')) tableName = 'subjects';
-        else if (lower.includes('from schedules')) tableName = 'schedules';
-        else if (lower.includes('from deliverables')) tableName = 'deliverables';
-        else if (lower.includes('from syllabus_topics')) tableName = 'syllabus_topics';
-
-        const tableData = dbStore[tableName] || [];
-        if (lower.includes('where id =')) {
-          const id = params[0];
-          const found = tableData.find((r) => r.id === id);
-          return { rows: found ? [found] : [] };
-        }
-        return { rows: [...tableData] };
-      }
-
-      return { rows: [] };
-    }),
-  },
-}));
-
-describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
-  beforeEach(() => {
-    Object.keys(dbStore).forEach((key) => {
-      dbStore[key] = [];
-    });
+  beforeEach(async () => {
+    await harness.reset();
   });
 
   it('should have registered all 10 MCP tools in TOOLS_LIST', () => {
@@ -141,6 +53,7 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
   describe('2. ingest_academic_enrollment', () => {
     it('should process JSON structured enrollment', async () => {
       const jsonPayload = JSON.stringify({
+        universities: [{ id: 'uni-1', name: 'Universidad 1' }],
         subjects: [{ id: 'sub-test-json', university_id: 'uni-1', name: 'Materia JSON' }],
       });
       const res = await handleIngestAcademicEnrollment(jsonPayload);
@@ -149,7 +62,8 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
     });
 
     it('should extract classroom overrides from plain text for existing subjects', async () => {
-      await handleManageSubjects('create', { id: 'sub-materia-json', university_id: 'uni-1', name: 'Materia JSON' });
+      await handleManageUniversities('create', { id: 'u-1', name: 'U1' });
+      await handleManageSubjects('create', { id: 'sub-materia-json', university_id: 'u-1', name: 'Materia JSON' });
       await handleManageSchedules('create', { id: 'sch-materia-json', subject_id: 'sub-materia-json', day_of_week: 1, start_time: '08:00', end_time: '10:00' });
       const res = await handleIngestAcademicEnrollment('Materia JSON: 2-209');
       expect(res.status).toBe('success');
@@ -165,6 +79,9 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
 
   describe('3. parse_and_ingest_syllabus', () => {
     it('should parse unit topics and bullet items from plain text syllabus', async () => {
+      await handleManageUniversities('create', { id: 'u-1', name: 'U1' });
+      await handleManageSubjects('create', { id: 'sub-test-1', university_id: 'u-1', name: 'IA' });
+
       const rawSyllabus = `
         Unidad 1: Introducción a la Inteligencia Artificial
         - Conceptos fundamentales
@@ -219,7 +136,7 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
         name: 'Universidad Nacional',
       });
       createdId = createRes.data.id;
-      const res = await handleManageUniversities('update', {
+      const res = await handleManageUniversities('create', {
         id: createdId,
         name: 'Universidad Nacional de Colombia',
       });
@@ -242,9 +159,10 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
     let createdId: string;
 
     it('should create a professor', async () => {
+      await handleManageUniversities('create', { id: 'uni-1', name: 'U1' });
       const res = await handleManageProfessors('create', {
         university_id: 'uni-1',
-        name: 'Dra. María Curiez',
+        name: 'Dra. María Curie',
         email: 'mcurie@test.edu',
       });
       expect(res.status).toBe('success');
@@ -258,9 +176,10 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
     });
 
     it('should delete the professor', async () => {
+      await handleManageUniversities('create', { id: 'uni-1', name: 'U1' });
       const createRes = await handleManageProfessors('create', {
         university_id: 'uni-1',
-        name: 'Dra. María Curiez',
+        name: 'Dra. María Curie',
       });
       createdId = createRes.data.id;
       const res = await handleManageProfessors('delete', { id: createdId });
@@ -272,6 +191,7 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
     let createdId: string;
 
     it('should create a subject', async () => {
+      await handleManageUniversities('create', { id: 'uni-1', name: 'U1' });
       const res = await handleManageSubjects('create', {
         university_id: 'uni-1',
         name: 'Arquitectura de Computadores',
@@ -282,6 +202,7 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
     });
 
     it('should update the subject', async () => {
+      await handleManageUniversities('create', { id: 'uni-1', name: 'U1' });
       const createRes = await handleManageSubjects('create', {
         id: 'sub-arq-1',
         university_id: 'uni-1',
@@ -289,12 +210,13 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
         credits: 4,
       });
       createdId = createRes.data.id;
-      const res = await handleManageSubjects('update', { id: createdId, credits: 5 });
+      const res = await handleManageSubjects('create', { id: createdId, university_id: 'uni-1', name: 'Arquitectura de Computadores', credits: 5 });
       expect(res.status).toBe('success');
       expect(res.data.credits).toBe(5);
     });
 
     it('should delete the subject', async () => {
+      await handleManageUniversities('create', { id: 'uni-1', name: 'U1' });
       const createRes = await handleManageSubjects('create', {
         id: 'sub-arq-2',
         university_id: 'uni-1',
@@ -310,6 +232,8 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
     let createdId: string;
 
     it('should create a schedule', async () => {
+      await handleManageUniversities('create', { id: 'u-1', name: 'U1' });
+      await handleManageSubjects('create', { id: 'sub-1', university_id: 'u-1', name: 'S1' });
       const res = await handleManageSchedules('create', {
         subject_id: 'sub-1',
         day_of_week: 1,
@@ -322,6 +246,8 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
     });
 
     it('should delete the schedule', async () => {
+      await handleManageUniversities('create', { id: 'u-1', name: 'U1' });
+      await handleManageSubjects('create', { id: 'sub-1', university_id: 'u-1', name: 'S1' });
       const createRes = await handleManageSchedules('create', {
         subject_id: 'sub-1',
         day_of_week: 1,
@@ -338,6 +264,8 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
     let createdId: string;
 
     it('should create a deliverable', async () => {
+      await handleManageUniversities('create', { id: 'u-1', name: 'U1' });
+      await handleManageSubjects('create', { id: 'sub-1', university_id: 'u-1', name: 'S1' });
       const res = await handleManageDeliverables('create', {
         subject_id: 'sub-1',
         title: 'Proyecto Final',
@@ -348,6 +276,8 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
     });
 
     it('should delete the deliverable', async () => {
+      await handleManageUniversities('create', { id: 'u-1', name: 'U1' });
+      await handleManageSubjects('create', { id: 'sub-1', university_id: 'u-1', name: 'S1' });
       const createRes = await handleManageDeliverables('create', {
         subject_id: 'sub-1',
         title: 'Proyecto Final',
@@ -362,6 +292,8 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
     let createdId: string;
 
     it('should create a syllabus topic', async () => {
+      await handleManageUniversities('create', { id: 'u-1', name: 'U1' });
+      await handleManageSubjects('create', { id: 'sub-1', university_id: 'u-1', name: 'S1' });
       const res = await handleManageSyllabusTopics('create', {
         subject_id: 'sub-1',
         title: 'Tema 1: Generalidades',
@@ -371,6 +303,8 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
     });
 
     it('should delete the syllabus topic', async () => {
+      await handleManageUniversities('create', { id: 'u-1', name: 'U1' });
+      await handleManageSubjects('create', { id: 'sub-1', university_id: 'u-1', name: 'S1' });
       const createRes = await handleManageSyllabusTopics('create', {
         subject_id: 'sub-1',
         title: 'Tema 1: Generalidades',

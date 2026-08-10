@@ -1,19 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'http';
 import { AddressInfo } from 'net';
 import crypto from 'crypto';
 import { createRequestHandler } from '../../mcp-server/index';
-
-vi.mock('../../lib/db/pg-client', () => ({
-  pgPool: {
-    query: vi.fn().mockImplementation(async (queryStr: string) => {
-      const lower = queryStr.toLowerCase();
-      if (lower.includes('count(*)::int')) return { rows: [{ count: 2 }] };
-      if (lower.includes('select name, modality')) return { rows: [{ name: 'Test Uni', modality: 'presencial' }] };
-      return { rows: [] };
-    }),
-  },
-}));
+import { createTestDb, TestDbHarness } from '../helpers/test-db';
 
 async function parseStreamableResponse(res: Response): Promise<any> {
   const text = await res.text();
@@ -28,12 +18,14 @@ async function parseStreamableResponse(res: Response): Promise<any> {
   return JSON.parse(text);
 }
 
-describe('Claude Web Remote MCP Endpoint & Real HTTP Server Integration Tests', () => {
+describe('Claude Web Remote MCP Endpoint & Real HTTP Server Integration Tests (con pg-mem)', () => {
   let server: http.Server;
   let baseUrl: string;
+  let harness: TestDbHarness;
   const SECRET_KEY = 'test_secret_key_pure_mcp_123';
 
   beforeAll(async () => {
+    harness = await createTestDb();
     const handler = createRequestHandler({ secretKey: SECRET_KEY });
     server = http.createServer(handler);
 
@@ -351,5 +343,28 @@ describe('Claude Web Remote MCP Endpoint & Real HTTP Server Integration Tests', 
     const wwwAuthHeader = res.headers.get('www-authenticate');
     expect(wwwAuthHeader).toBeDefined();
     expect(wwwAuthHeader).toContain('Bearer resource_metadata=');
+  });
+
+  it('11. GET / público debe retornar status 200 OK con info del servidor', async () => {
+    const res = await fetch(`${baseUrl}/`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.status).toBe('ok');
+    expect(data.server).toBe('pure-mcp-server');
+  });
+
+  it('12. POST /oauth/register con host no permitido debe retornar 400 invalid_request', async () => {
+    const res = await fetch(`${baseUrl}/oauth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_name: 'Evil App',
+        redirect_uris: ['https://evil.com/callback'],
+      }),
+    });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe('invalid_request');
+    expect(data.error_description).toContain('Allowed hosts');
   });
 });

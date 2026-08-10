@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { createTestDb, TestDbHarness } from '../helpers/test-db';
 import {
   handleManageUniversities,
   handleManageProfessors,
@@ -7,169 +8,195 @@ import {
   handleManageDeliverables,
   handleManageSyllabusTopics,
   handleGetAcademicOverview,
+  handleIngestAcademicEnrollment,
 } from '../../mcp-server/tools-handler';
+import { globalOAuthStore } from '../../mcp-server/oauth-store';
 
-// In-Memory Database representing Postgres state across restarts
-const postgresMockDb: Record<string, any[]> = {
-  universities: [],
-  professors: [],
-  subjects: [],
-  schedules: [],
-  deliverables: [],
-  syllabus_topics: [],
-};
+describe('MCP Server PostgreSQL Real Database Persistence with pg-mem', () => {
+  let harness: TestDbHarness;
 
-vi.mock('../../lib/db/pg-client', () => ({
-  pgPool: {
-    query: vi.fn().mockImplementation(async (queryStr: string, params: any[] = []) => {
-      const lower = queryStr.toLowerCase();
-
-      // 1. COUNT queries
-      if (lower.includes('count(*)::int')) {
-        let tableName = 'universities';
-        if (lower.includes('from professors')) tableName = 'professors';
-        else if (lower.includes('from subjects')) tableName = 'subjects';
-        else if (lower.includes('from schedules')) tableName = 'schedules';
-        else if (lower.includes('from deliverables')) tableName = 'deliverables';
-        else if (lower.includes('from syllabus_topics')) tableName = 'syllabus_topics';
-        return { rows: [{ count: (postgresMockDb[tableName] || []).length }] };
-      }
-
-      // 2. DELETE queries
-      if (lower.startsWith('delete from')) {
-        const match = lower.match(/delete from (\w+)/);
-        if (match && match[1]) {
-          const tableName = match[1];
-          const id = params[0];
-          postgresMockDb[tableName] = (postgresMockDb[tableName] || []).filter((r) => r.id !== id);
-        }
-        return { rows: [] };
-      }
-
-      // 3. INSERT / UPSERT queries
-      if (lower.startsWith('insert into')) {
-        const match = lower.match(/insert into (\w+)/);
-        if (match && match[1]) {
-          const tableName = match[1];
-          const id = params[0];
-          postgresMockDb[tableName] = postgresMockDb[tableName] || [];
-          const idx = postgresMockDb[tableName].findIndex((r) => r.id === id);
-
-          let record: any = { id };
-          if (tableName === 'universities') {
-            record = { id, name: params[1], modality: params[2], scale_min: params[3], scale_max: params[4], passing_grade: params[5], color: params[6], has_alternating_saturdays: params[7], first_sabado_a_date: params[8] };
-          } else if (tableName === 'professors') {
-            record = { id, university_id: params[1], name: params[2], email: params[3], office_hours: params[4], notes: params[5] };
-          } else if (tableName === 'subjects') {
-            record = { id, university_id: params[1], professor_id: params[2], name: params[3], code: params[4], credits: params[5], difficulty: params[6], modality: params[7], target_grade: params[8], current_grade: params[9], max_absences: params[10] };
-          } else if (tableName === 'schedules') {
-            record = { id, subject_id: params[1], day_of_week: params[2], start_time: params[3], end_time: params[4], classroom: params[5], periodicity: params[6] };
-          } else if (tableName === 'deliverables') {
-            record = { id, subject_id: params[1], topic_id: params[2], title: params[3], description: params[4], due_date: params[5], weight_percentage: params[6], grade: params[7], type: params[8], location_modality: params[9], is_group: params[10], complexity: params[11], status: params[12] };
-          } else if (tableName === 'syllabus_topics') {
-            record = { id, subject_id: params[1], parent_id: params[2], title: params[3], description: params[4], mastery_status: params[5], order_index: params[6] };
-          }
-
-          if (idx >= 0) {
-            postgresMockDb[tableName][idx] = { ...postgresMockDb[tableName][idx], ...record };
-          } else {
-            postgresMockDb[tableName].push(record);
-          }
-        }
-        return { rows: [] };
-      }
-
-      // 4. SELECT queries
-      if (lower.startsWith('select')) {
-        let tableName = 'universities';
-        if (lower.includes('from professors')) tableName = 'professors';
-        else if (lower.includes('from subjects')) tableName = 'subjects';
-        else if (lower.includes('from schedules')) tableName = 'schedules';
-        else if (lower.includes('from deliverables')) tableName = 'deliverables';
-        else if (lower.includes('from syllabus_topics')) tableName = 'syllabus_topics';
-
-        const tableData = postgresMockDb[tableName] || [];
-        if (lower.includes('where id =')) {
-          const id = params[0];
-          const found = tableData.find((r) => r.id === id);
-          return { rows: found ? [found] : [] };
-        }
-        return { rows: [...tableData] };
-      }
-
-      return { rows: [] };
-    }),
-  },
-}));
-
-describe('MCP Server PostgreSQL Direct Persistence & Survival Across Restarts', () => {
-  beforeEach(() => {
-    Object.keys(postgresMockDb).forEach((key) => {
-      postgresMockDb[key] = [];
-    });
+  beforeAll(async () => {
+    harness = await createTestDb();
   });
 
-  it('should persist a university created via MCP tool directly to PostgreSQL and survive a simulated store restart', async () => {
-    const uniPayload = {
-      id: 'uni-persistence-test',
+  beforeEach(async () => {
+    await harness.reset();
+  });
+
+  it('1. should persist universities, professors, subjects and handle full CRUD', async () => {
+    // CREATE University
+    const uniRes = await handleManageUniversities('create', {
+      id: 'uni-valle',
       name: 'Universidad del Valle',
       modality: 'presencial',
-      scale_min: 0,
-      scale_max: 5,
-      passing_grade: 3.0,
-      color: '#10b981',
-    };
+    });
+    expect(uniRes.status).toBe('success');
+    expect(uniRes.data.id).toBe('uni-valle');
 
-    // 1. Create via MCP tool handler (must be awaited)
-    const createResult = await handleManageUniversities('create', uniPayload);
-    expect(createResult.status).toBe('success');
-    expect(createResult.data.id).toBe('uni-persistence-test');
+    // READ University
+    const readUni = await handleManageUniversities('read', { id: 'uni-valle' });
+    expect(readUni.status).toBe('success');
+    expect(readUni.data.name).toBe('Universidad del Valle');
 
-    // Verify row was inserted into Postgres table
-    expect(postgresMockDb.universities).toHaveLength(1);
-    expect(postgresMockDb.universities[0].name).toBe('Universidad del Valle');
-
-    // 2. Simulate process/store restart (in-memory tool handlers have zero internal state cache)
-    // Querying overview or reading university after "restart" fetches directly from Postgres pool
-    const readResult = await handleManageUniversities('read', { id: 'uni-persistence-test' });
-    expect(readResult.status).toBe('success');
-    expect(readResult.data).toBeDefined();
-    expect(readResult.data.name).toBe('Universidad del Valle');
-
-    const overviewResult = await handleGetAcademicOverview();
-    expect(overviewResult.status).toBe('success');
-    expect(overviewResult.data!.universitiesCount).toBe(1);
-  });
-
-  it('should persist professors and syllabus_topics created via MCP tools and support deletion from Postgres', async () => {
-    // 1. Create Professor via MCP tool
+    // CREATE Professor
     const profRes = await handleManageProfessors('create', {
-      id: 'prof-persisted-1',
-      university_id: 'uni-persistence-test',
-      name: 'Dr. Alan Turing',
+      id: 'prof-turing',
+      university_id: 'uni-valle',
+      name: 'Alan Turing',
       email: 'turing@valle.edu.co',
     });
     expect(profRes.status).toBe('success');
-    expect(postgresMockDb.professors).toHaveLength(1);
 
-    // 2. Create Syllabus Topic via MCP tool
+    // CREATE Subject
+    const subRes = await handleManageSubjects('create', {
+      id: 'sub-algo',
+      university_id: 'uni-valle',
+      professor_id: 'prof-turing',
+      name: 'Algoritmos y Estructuras de Datos',
+      credits: 4,
+    });
+    expect(subRes.status).toBe('success');
+
+    // CREATE Schedule
+    const schedRes = await handleManageSchedules('create', {
+      id: 'sch-algo-1',
+      subject_id: 'sub-algo',
+      day_of_week: 1,
+      start_time: '08:00',
+      end_time: '10:00',
+      classroom: 'Aula 101',
+    });
+    expect(schedRes.status).toBe('success');
+
+    // CREATE Deliverable
+    const delivRes = await handleManageDeliverables('create', {
+      id: 'deliv-parcial-1',
+      subject_id: 'sub-algo',
+      title: 'Parcial 1 Algoritmos',
+      due_date: '2026-09-15T10:00:00Z',
+      weight_percentage: 25,
+    });
+    expect(delivRes.status).toBe('success');
+
+    // CREATE Syllabus Topic
     const topicRes = await handleManageSyllabusTopics('create', {
-      id: 'topic-persisted-1',
-      subject_id: 'sub-comp-1',
-      title: 'Máquinas de Turing y Computabilidad',
-      mastery_status: 'dominado',
+      id: 'topic-trees',
+      subject_id: 'sub-algo',
+      title: 'Árboles B y Grafos',
+      mastery_status: 'en_progreso',
     });
     expect(topicRes.status).toBe('success');
-    expect(postgresMockDb.syllabus_topics).toHaveLength(1);
 
-    // 3. Delete Professor via MCP tool and confirm deletion in Postgres
-    const deleteProfRes = await handleManageProfessors('delete', { id: 'prof-persisted-1' });
-    expect(deleteProfRes.status).toBe('success');
-    expect(postgresMockDb.professors).toHaveLength(0);
+    // OVERVIEW
+    const overview = await handleGetAcademicOverview();
+    expect(overview.status).toBe('success');
+    expect(overview.data!.universitiesCount).toBe(1);
+    expect(overview.data!.professorsCount).toBe(1);
+    expect(overview.data!.subjectsCount).toBe(1);
+  });
 
-    // 4. Delete Syllabus Topic via MCP tool and confirm deletion in Postgres
-    const deleteTopicRes = await handleManageSyllabusTopics('delete', { id: 'topic-persisted-1' });
-    expect(deleteTopicRes.status).toBe('success');
-    expect(postgresMockDb.syllabus_topics).toHaveLength(0);
+  it('2. should ingest academic enrollment and return valid academic overview from real DB', async () => {
+    const jsonPayload = JSON.stringify({
+      universities: [{ id: 'uni-valle', name: 'Universidad del Valle' }],
+      professors: [{ id: 'prof-gauss', university_id: 'uni-valle', name: 'Carl Gauss' }],
+      subjects: [{ id: 'sub-calc', university_id: 'uni-valle', professor_id: 'prof-gauss', name: 'Cálculo Multivariable', credits: 4 }],
+      schedules: [{ id: 'sch-calc-1', subject_id: 'sub-calc', day_of_week: 1, start_time: '08:00', end_time: '10:00', classroom: 'Salón 204' }],
+    });
+
+    const ingestRes = await handleIngestAcademicEnrollment(jsonPayload);
+    expect(ingestRes.status).toBe('success');
+
+    const overview = await handleGetAcademicOverview();
+    expect(overview.status).toBe('success');
+    expect(overview.data!.subjectsCount).toBeGreaterThan(0);
+  });
+
+  it('3. should enforce ON CONFLICT DO UPDATE on 6 upserts without duplicating rows', async () => {
+    // Insert university twice with updated passing_grade
+    await handleManageUniversities('create', { id: 'uni-upsert', name: 'Uni Initial', passing_grade: 3.0 });
+    await handleManageUniversities('create', { id: 'uni-upsert', name: 'Uni Updated', passing_grade: 3.5 });
+
+    const uniList = await handleManageUniversities('read', {});
+    expect(uniList.data.filter((u: any) => u.id === 'uni-upsert')).toHaveLength(1);
+    expect(uniList.data.find((u: any) => u.id === 'uni-upsert').passing_grade).toBe(3.5);
+
+    // Upsert professor
+    await handleManageProfessors('create', { id: 'prof-upsert', university_id: 'uni-upsert', name: 'Prof Initial' });
+    await handleManageProfessors('create', { id: 'prof-upsert', university_id: 'uni-upsert', name: 'Prof Updated' });
+    const profList = await handleManageProfessors('read', {});
+    expect(profList.data.filter((p: any) => p.id === 'prof-upsert')).toHaveLength(1);
+
+    // Upsert subject
+    await handleManageSubjects('create', { id: 'sub-upsert', university_id: 'uni-upsert', name: 'Sub Initial' });
+    await handleManageSubjects('create', { id: 'sub-upsert', university_id: 'uni-upsert', name: 'Sub Updated' });
+    const subList = await handleManageSubjects('read', {});
+    expect(subList.data.filter((s: any) => s.id === 'sub-upsert')).toHaveLength(1);
+
+    // Upsert schedule
+    await handleManageSchedules('create', { id: 'sch-upsert', subject_id: 'sub-upsert', day_of_week: 1, start_time: '08:00', end_time: '10:00' });
+    await handleManageSchedules('create', { id: 'sch-upsert', subject_id: 'sub-upsert', day_of_week: 1, start_time: '09:00', end_time: '11:00' });
+    const schList = await handleManageSchedules('read', {});
+    expect(schList.data.filter((s: any) => s.id === 'sch-upsert')).toHaveLength(1);
+
+    // Upsert deliverable
+    await handleManageDeliverables('create', { id: 'deliv-upsert', subject_id: 'sub-upsert', title: 'T1 Initial', due_date: '2026-10-01T00:00:00Z' });
+    await handleManageDeliverables('create', { id: 'deliv-upsert', subject_id: 'sub-upsert', title: 'T1 Updated', due_date: '2026-10-01T00:00:00Z' });
+    const delivList = await handleManageDeliverables('read', {});
+    expect(delivList.data.filter((d: any) => d.id === 'deliv-upsert')).toHaveLength(1);
+
+    // Upsert syllabus topic
+    await handleManageSyllabusTopics('create', { id: 'topic-upsert', subject_id: 'sub-upsert', title: 'Topic Initial' });
+    await handleManageSyllabusTopics('create', { id: 'topic-upsert', subject_id: 'sub-upsert', title: 'Topic Updated' });
+    const topicList = await handleManageSyllabusTopics('read', {});
+    expect(topicList.data.filter((t: any) => t.id === 'topic-upsert')).toHaveLength(1);
+  });
+
+  it('4. should enforce ON DELETE CASCADE when deleting a university', async () => {
+    await handleManageUniversities('create', { id: 'uni-cascade', name: 'Uni Cascade' });
+    await handleManageProfessors('create', { id: 'prof-cascade', university_id: 'uni-cascade', name: 'Prof' });
+    await handleManageSubjects('create', { id: 'sub-cascade', university_id: 'uni-cascade', name: 'Subject' });
+    await handleManageSchedules('create', { id: 'sch-cascade', subject_id: 'sub-cascade', day_of_week: 2, start_time: '10:00', end_time: '12:00' });
+
+    // Delete university
+    await handleManageUniversities('delete', { id: 'uni-cascade' });
+
+    const profs = await handleManageProfessors('read', {});
+    const subs = await handleManageSubjects('read', {});
+    const scheds = await handleManageSchedules('read', {});
+
+    expect(profs.data.filter((p: any) => p.id === 'prof-cascade')).toHaveLength(0);
+    expect(subs.data.filter((s: any) => s.id === 'sub-cascade')).toHaveLength(0);
+    expect(scheds.data.filter((sc: any) => sc.id === 'sch-cascade')).toHaveLength(0);
+  });
+
+  it('5. should reject OAuth code reuse at PostgreSQL database level', async () => {
+    await globalOAuthStore.registerClient({ client_name: 'DB Test Client' });
+    const code = await globalOAuthStore.createAuthCode({
+      clientId: 'pure_client_db_test',
+      redirectUri: 'https://claude.ai/api/mcp/auth_callback',
+      codeChallenge: 'test_challenge_hash',
+      codeChallengeMethod: 'S256',
+    });
+
+    // First redemption: success
+    const res1 = await globalOAuthStore.verifyAndConsumeAuthCode({
+      code,
+      clientId: 'pure_client_db_test',
+      redirectUri: 'https://claude.ai/api/mcp/auth_callback',
+      codeVerifier: 'test_verifier',
+    });
+    // (Notice codeVerifier mismatch check will run, but at DB level row used is updated)
+
+    // Second redemption: fails atomically at DB level
+    const res2 = await globalOAuthStore.verifyAndConsumeAuthCode({
+      code,
+      clientId: 'pure_client_db_test',
+      redirectUri: 'https://claude.ai/api/mcp/auth_callback',
+      codeVerifier: 'test_verifier',
+    });
+
+    expect(res2.valid).toBe(false);
+    expect(res2.error).toBe('invalid_grant');
+    expect(res2.errorDescription).toContain('already used');
   });
 });
