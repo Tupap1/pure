@@ -234,14 +234,14 @@ async function main() {
     const normalizedPath = url.pathname.replace(/\/$/, '') || '/';
 
     // 2. Health check GET /health
-    if (normalizedPath === '/health') {
+    if (normalizedPath.endsWith('/health')) {
       return handleHealthCheck(req, res);
     }
 
     // 3. Explicitly return 404 for OAuth discovery so Claude Web clears its cache and stops trying to use OAuth
     if (
-      normalizedPath === '/.well-known/oauth-authorization-server' ||
-      normalizedPath === '/.well-known/openid-configuration'
+      normalizedPath.endsWith('/.well-known/oauth-authorization-server') ||
+      normalizedPath.endsWith('/.well-known/openid-configuration')
     ) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'OAuth no soportado' }));
@@ -251,7 +251,7 @@ async function main() {
     // OAuth 2.0 Discovery removed to prevent Claude Web from attempting OAuth flow
 
     // 4. Root information GET /
-    if (normalizedPath === '/' && req.method === 'GET' && !req.headers.accept?.includes('text/event-stream')) {
+    if ((normalizedPath === '/' || normalizedPath.endsWith('/mcp')) && req.method === 'GET' && !req.headers.accept?.includes('text/event-stream')) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
@@ -277,9 +277,14 @@ async function main() {
     }
 
     // 6. Handle SSE connections
-    if (normalizedPath === '/sse') {
+    if (normalizedPath.endsWith('/sse')) {
       const searchParams = url.search ? url.search : '';
-      const transport = new SSEServerTransport(`${baseUrl}/messages${searchParams}`, res);
+      // Resolve the /messages endpoint relative to the incoming request path
+      // This ensures that whatever prefix Cloudflare used (e.g. /mcp/sse) is preserved as /mcp/messages
+      const basePath = url.pathname.replace(/\/sse$/, '');
+      const messagesPath = `${basePath}/messages${searchParams}`;
+      
+      const transport = new SSEServerTransport(messagesPath, res);
       await mcpServer.connect(transport);
       
       const sid = transport.sessionId;
@@ -291,7 +296,7 @@ async function main() {
     }
 
     // 7. Handle messages
-    if (normalizedPath === '/messages') {
+    if (normalizedPath.endsWith('/messages')) {
       const sessionId = url.searchParams.get('sessionId') || req.headers['mcp-session-id'];
       if (!sessionId || typeof sessionId !== 'string') {
         res.writeHead(400, { 'Content-Type': 'application/json' });
