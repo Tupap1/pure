@@ -226,7 +226,8 @@ async function main() {
 
     const hostHeader = (req.headers['x-forwarded-host'] as string) || req.headers.host || `localhost:${port}`;
     const protocol = (req.headers['x-forwarded-proto'] as string) || (req.headers['x-forwarded-ssl'] === 'on' ? 'https' : 'http');
-    const baseUrl = process.env.PUBLIC_MCP_URL ? process.env.PUBLIC_MCP_URL.replace(/\/$/, '') : `${protocol}://${hostHeader}`;
+    // Claude Web OAuth Discovery strictly validates the issuer. We must use the exact host requested.
+    const baseUrl = `${protocol}://${hostHeader}`;
 
     const url = new URL(req.url || '/', baseUrl);
     const normalizedPath = url.pathname.replace(/\/$/, '') || '/';
