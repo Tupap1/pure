@@ -238,6 +238,16 @@ async function main() {
       return handleHealthCheck(req, res);
     }
 
+    // 3. Explicitly return 404 for OAuth discovery so Claude Web clears its cache and stops trying to use OAuth
+    if (
+      normalizedPath === '/.well-known/oauth-authorization-server' ||
+      normalizedPath === '/.well-known/openid-configuration'
+    ) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'OAuth no soportado' }));
+      return;
+    }
+
     // OAuth 2.0 Discovery removed to prevent Claude Web from attempting OAuth flow
 
     // 4. Root information GET /
