@@ -1,6 +1,17 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import http from 'http';
 import { AddressInfo } from 'net';
+
+vi.mock('../../lib/db/pg-client', () => ({
+  pgPool: {
+    query: vi.fn().mockImplementation(async (queryStr: string) => {
+      const lower = queryStr.toLowerCase();
+      if (lower.includes('count(*)::int')) return { rows: [{ count: 2 }] };
+      if (lower.includes('select name, modality')) return { rows: [{ name: 'Test Uni', modality: 'presencial' }] };
+      return { rows: [] };
+    }),
+  },
+}));
 
 describe('Claude Web Remote MCP Endpoint & Transport Integration Tests', () => {
   let server: http.Server;
@@ -8,8 +19,47 @@ describe('Claude Web Remote MCP Endpoint & Transport Integration Tests', () => {
 
   beforeAll(async () => {
     // Import server module and spin up an ephemeral HTTP test server
-    const { createMcpServerInstance, executeToolCall, TOOLS_LIST } = await import('../../mcp-server/index');
+    const { createMcpServerInstance, TOOLS_LIST } = await import('../../mcp-server/index');
+    const {
+      handleGetAcademicOverview,
+      handleManageUniversities,
+      handleManageProfessors,
+      handleManageSubjects,
+      handleManageSchedules,
+      handleManageDeliverables,
+      handleManageSyllabusTopics,
+      handleIngestAcademicEnrollment,
+      handleParseAndIngestSyllabus,
+      handleFindCrossSubjectSynergies,
+    } = await import('../../mcp-server/tools-handler');
     const { SSEServerTransport } = await import('@modelcontextprotocol/sdk/server/sse.js');
+
+    async function dispatchToolCall(name: string, args: any) {
+      switch (name) {
+        case 'get_academic_overview':
+          return await handleGetAcademicOverview();
+        case 'ingest_academic_enrollment':
+          return await handleIngestAcademicEnrollment(args?.raw_text);
+        case 'parse_and_ingest_syllabus':
+          return await handleParseAndIngestSyllabus(args?.subject_id, args?.raw_text);
+        case 'find_cross_subject_synergies':
+          return await handleFindCrossSubjectSynergies();
+        case 'manage_universities':
+          return await handleManageUniversities(args?.action, args?.data);
+        case 'manage_professors':
+          return await handleManageProfessors(args?.action, args?.data);
+        case 'manage_subjects':
+          return await handleManageSubjects(args?.action, args?.data);
+        case 'manage_schedules':
+          return await handleManageSchedules(args?.action, args?.data);
+        case 'manage_deliverables':
+          return await handleManageDeliverables(args?.action, args?.data);
+        case 'manage_syllabus_topics':
+          return await handleManageSyllabusTopics(args?.action, args?.data);
+        default:
+          throw new Error(`Herramienta no reconocida: ${name}`);
+      }
+    }
 
     const transports = new Map<string, any>();
 
@@ -110,7 +160,7 @@ describe('Claude Web Remote MCP Endpoint & Transport Integration Tests', () => {
       ) {
         let body = '';
         req.on('data', (chunk) => (body += chunk));
-        req.on('end', () => {
+        req.on('end', async () => {
           try {
             const json = JSON.parse(body || '{}');
 
@@ -149,7 +199,7 @@ describe('Claude Web Remote MCP Endpoint & Transport Integration Tests', () => {
               if (method === 'tools/call') {
                 const toolName = json.params?.name;
                 const toolArgs = json.params?.arguments || {};
-                const result = executeToolCall(toolName, toolArgs);
+                const result = await dispatchToolCall(toolName, toolArgs);
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(
@@ -166,7 +216,7 @@ describe('Claude Web Remote MCP Endpoint & Transport Integration Tests', () => {
             }
 
             const toolName = json.tool || json.name;
-            const result = executeToolCall(toolName, json.args || json.arguments || {});
+            const result = await dispatchToolCall(toolName, json.args || json.arguments || {});
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(result));
           } catch (err: any) {
@@ -245,7 +295,6 @@ describe('Claude Web Remote MCP Endpoint & Transport Integration Tests', () => {
     if (reader) {
       const { value } = await reader.read();
       receivedText = decoder.decode(value);
-      // Cancel stream to close connection cleanly
       await reader.cancel();
     }
 

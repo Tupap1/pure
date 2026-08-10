@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { validateMcpAuth } from '../../mcp-server/auth-middleware';
 
 describe('MCP Authentication Middleware (validateMcpAuth)', () => {
-  const SECRET_KEY = 'Stability8-Showcase4-Lavish9-Petition3';
+  const SECRET_KEY = 'SecretKeyForTesting123';
 
   it('should allow public access to GET /health', () => {
     const mockReq: any = {
@@ -31,7 +31,7 @@ describe('MCP Authentication Middleware (validateMcpAuth)', () => {
     expect(validateMcpAuth(mockReq, SECRET_KEY)).toBe(false);
   });
 
-  it('should accept valid Authorization: Bearer token', () => {
+  it('should accept valid Authorization: Bearer token matching secret key', () => {
     const mockReq: any = {
       method: 'POST',
       url: '/mcp',
@@ -42,7 +42,7 @@ describe('MCP Authentication Middleware (validateMcpAuth)', () => {
     expect(validateMcpAuth(mockReq, SECRET_KEY)).toBe(true);
   });
 
-  it('should accept valid x-api-key header', () => {
+  it('should accept valid x-api-key header matching secret key', () => {
     const mockReq: any = {
       method: 'POST',
       url: '/mcp',
@@ -53,13 +53,24 @@ describe('MCP Authentication Middleware (validateMcpAuth)', () => {
     expect(validateMcpAuth(mockReq, SECRET_KEY)).toBe(true);
   });
 
-  it('should accept valid ?apiKey= query parameter for SSE browser connections', () => {
+  it('should accept valid ?apiKey= query parameter matching secret key', () => {
     const mockReq: any = {
       method: 'GET',
       url: `/sse?apiKey=${SECRET_KEY}`,
       headers: {},
     };
     expect(validateMcpAuth(mockReq, SECRET_KEY)).toBe(true);
+  });
+
+  it('should REJECT tokens starting with pure_token_ if they do not match target key', () => {
+    const mockReq: any = {
+      method: 'POST',
+      url: '/mcp',
+      headers: {
+        authorization: 'Bearer pure_token_unauthorized_token_123',
+      },
+    };
+    expect(validateMcpAuth(mockReq, SECRET_KEY)).toBe(false);
   });
 
   it('should reject invalid or mismatched tokens', () => {
@@ -71,5 +82,24 @@ describe('MCP Authentication Middleware (validateMcpAuth)', () => {
       },
     };
     expect(validateMcpAuth(mockReq, SECRET_KEY)).toBe(false);
+  });
+
+  it('should reject access if no secret key is passed and env vars are not set', () => {
+    const originalApiKey = process.env.MCP_API_KEY;
+    const originalAuthToken = process.env.MCP_AUTH_TOKEN;
+    delete process.env.MCP_API_KEY;
+    delete process.env.MCP_AUTH_TOKEN;
+
+    const mockReq: any = {
+      method: 'POST',
+      url: '/mcp',
+      headers: {
+        authorization: 'Bearer some_token',
+      },
+    };
+    expect(validateMcpAuth(mockReq)).toBe(false);
+
+    if (originalApiKey) process.env.MCP_API_KEY = originalApiKey;
+    if (originalAuthToken) process.env.MCP_AUTH_TOKEN = originalAuthToken;
   });
 });

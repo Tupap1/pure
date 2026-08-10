@@ -17,12 +17,6 @@ import {
   handleManageDeliverables,
   handleManageSyllabusTopics,
 } from './tools-handler';
-import {
-  saveUniversityToDb,
-  saveSubjectToDb,
-  saveScheduleToDb,
-  saveDeliverableToDb,
-} from './db-repository';
 
 export const TOOLS_LIST = [
   {
@@ -138,57 +132,6 @@ export const TOOLS_LIST = [
   },
 ];
 
-export function executeToolCall(name: string, args: any) {
-  let result: any;
-  switch (name) {
-    case 'get_academic_overview':
-      result = handleGetAcademicOverview();
-      break;
-    case 'ingest_academic_enrollment':
-      result = handleIngestAcademicEnrollment(args?.raw_text);
-      break;
-    case 'parse_and_ingest_syllabus':
-      result = handleParseAndIngestSyllabus(args?.subject_id, args?.raw_text);
-      break;
-    case 'find_cross_subject_synergies':
-      result = handleFindCrossSubjectSynergies();
-      break;
-    case 'manage_universities':
-      result = handleManageUniversities(args?.action, args?.data);
-      if (args?.action === 'create' || args?.action === 'update') {
-        saveUniversityToDb(args.data);
-      }
-      break;
-    case 'manage_professors':
-      result = handleManageProfessors(args?.action, args?.data);
-      break;
-    case 'manage_subjects':
-      result = handleManageSubjects(args?.action, args?.data);
-      if (args?.action === 'create' || args?.action === 'update') {
-        saveSubjectToDb(args.data);
-      }
-      break;
-    case 'manage_schedules':
-      result = handleManageSchedules(args?.action, args?.data);
-      if (args?.action === 'create' || args?.action === 'update') {
-        saveScheduleToDb(args.data);
-      }
-      break;
-    case 'manage_deliverables':
-      result = handleManageDeliverables(args?.action, args?.data);
-      if (args?.action === 'create' || args?.action === 'update') {
-        saveDeliverableToDb(args.data);
-      }
-      break;
-    case 'manage_syllabus_topics':
-      result = handleManageSyllabusTopics(args?.action, args?.data);
-      break;
-    default:
-      throw new Error(`Herramienta MCP no reconocida: ${name}`);
-  }
-  return result;
-}
-
 export function createMcpServerInstance() {
   const mcpServer = new McpServer(
     {
@@ -204,56 +147,52 @@ export function createMcpServerInstance() {
 
   // Register all 10 tools using modern McpServer tool() API
   mcpServer.tool('get_academic_overview', 'Retorna el resumen académico global, tiempo libre neto y promedios por carrera.', {}, async () => {
-    const res = handleGetAcademicOverview();
+    const res = await handleGetAcademicOverview();
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
   mcpServer.tool('ingest_academic_enrollment', 'Procesa e ingesta la matrícula real del estudiante.', { raw_text: z.string() }, async ({ raw_text }) => {
-    const res = handleIngestAcademicEnrollment(raw_text);
+    const res = await handleIngestAcademicEnrollment(raw_text);
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
   mcpServer.tool('parse_and_ingest_syllabus', 'Recibe un texto de temario y lo convierte en árbol de ejes temáticos.', { subject_id: z.string(), raw_text: z.string() }, async ({ subject_id, raw_text }) => {
-    const res = handleParseAndIngestSyllabus(subject_id, raw_text);
+    const res = await handleParseAndIngestSyllabus(subject_id, raw_text);
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
   mcpServer.tool('find_cross_subject_synergies', 'Escanea temarios de Ingeniería Aeroespacial e Ingeniería de Software.', {}, async () => {
-    const res = handleFindCrossSubjectSynergies();
+    const res = await handleFindCrossSubjectSynergies();
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
   mcpServer.tool('manage_universities', 'Operaciones CRUD sobre Universidades.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
-    const res = handleManageUniversities(action, data);
-    if (data && (action === 'create' || action === 'update')) saveUniversityToDb(data);
+    const res = await handleManageUniversities(action, data);
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
   mcpServer.tool('manage_professors', 'Operaciones CRUD sobre Profesores.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
-    const res = handleManageProfessors(action, data);
+    const res = await handleManageProfessors(action, data);
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
   mcpServer.tool('manage_subjects', 'Operaciones CRUD sobre Asignaturas.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
-    const res = handleManageSubjects(action, data);
-    if (data && (action === 'create' || action === 'update')) saveSubjectToDb(data);
+    const res = await handleManageSubjects(action, data);
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
   mcpServer.tool('manage_schedules', 'Operaciones CRUD sobre Horarios y Aulas de clase.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
-    const res = handleManageSchedules(action, data);
-    if (data && (action === 'create' || action === 'update')) saveScheduleToDb(data);
+    const res = await handleManageSchedules(action, data);
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
   mcpServer.tool('manage_deliverables', 'Operaciones CRUD sobre Entregables / Parciales.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
-    const res = handleManageDeliverables(action, data);
-    if (data && (action === 'create' || action === 'update')) saveDeliverableToDb(data);
+    const res = await handleManageDeliverables(action, data);
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
   mcpServer.tool('manage_syllabus_topics', 'Operaciones CRUD sobre Ejes Temáticos.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
-    const res = handleManageSyllabusTopics(action, data);
+    const res = await handleManageSyllabusTopics(action, data);
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
@@ -262,7 +201,11 @@ export function createMcpServerInstance() {
 
 async function main() {
   const port = Number(process.env.MCP_PORT || 3001);
-  const secretKey = process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN || 'Stability8-Showcase4-Lavish9-Petition3';
+  const secretKey = process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN;
+
+  if (!secretKey) {
+    console.warn('⚠️ ADVERTENCIA: MCP_API_KEY / MCP_AUTH_TOKEN no está configurado en el entorno.');
+  }
 
   // Instantiate unified StreamableHTTPServerTransport
   const streamableTransport = new StreamableHTTPServerTransport({
@@ -363,7 +306,7 @@ async function main() {
   httpServer.listen(port, () => {
     console.error(`====================================================`);
     console.error(`🚀 Servidor MCP de Pure listo en http://0.0.0.0:${port}`);
-    console.error(`🔑 Autenticación API Key activada: ${secretKey.substring(0, 10)}...`);
+    console.error(`🔑 Autenticación API Key activada: ${secretKey ? secretKey.substring(0, 10) + '...' : 'SIN CLAVE CONFIGURADA'}`);
     console.error(`🏥 Endpoint de Salud: http://0.0.0.0:${port}/health`);
     console.error(`====================================================`);
   });

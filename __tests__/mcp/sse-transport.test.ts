@@ -1,5 +1,17 @@
-import { describe, it, expect } from 'vitest';
-import { createMcpServerInstance, executeToolCall, TOOLS_LIST } from '../../mcp-server/index';
+import { describe, it, expect, vi } from 'vitest';
+import { createMcpServerInstance, TOOLS_LIST } from '../../mcp-server/index';
+import { handleGetAcademicOverview } from '../../mcp-server/tools-handler';
+
+vi.mock('../../lib/db/pg-client', () => ({
+  pgPool: {
+    query: vi.fn().mockImplementation(async (queryStr: string) => {
+      const lower = queryStr.toLowerCase();
+      if (lower.includes('count(*)::int')) return { rows: [{ count: 2 }] };
+      if (lower.includes('select name, modality')) return { rows: [{ name: 'Test Uni', modality: 'presencial' }] };
+      return { rows: [] };
+    }),
+  },
+}));
 
 describe('MCP Multi-Session Server & SSE Transport Suite', () => {
   it('should create independent SDK Server instances without single-instance collision', () => {
@@ -16,8 +28,9 @@ describe('MCP Multi-Session Server & SSE Transport Suite', () => {
     expect(tool?.inputSchema.required).toContain('raw_text');
   });
 
-  it('should execute tool calls cleanly through executeToolCall', () => {
-    const res = executeToolCall('get_academic_overview', {});
+  it('should execute tool calls cleanly through handleGetAcademicOverview', async () => {
+    const res = await handleGetAcademicOverview();
+    expect(res.status).toBe('success');
     expect(res.data.universitiesCount).toBeGreaterThan(0);
   });
 
