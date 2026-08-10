@@ -4,9 +4,9 @@ export function validateMcpAuth(req: IncomingMessage, secretKey?: string): boole
   const rawKey = secretKey || process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN;
   const targetKey = rawKey ? rawKey.trim() : undefined;
 
-  // 1. Allow public health check GET /health
+  // 1. Allow public health check GET /health and public SSE connection initiation GET /sse
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-  if (req.method === 'GET' && url.pathname === '/health') {
+  if (req.method === 'GET' && (url.pathname === '/health' || url.pathname.endsWith('/sse'))) {
     return true;
   }
 

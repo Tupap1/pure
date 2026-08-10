@@ -318,76 +318,94 @@ async function main() {
       return;
     }
 
-    // 4. Root information GET /
-    if ((normalizedPath === '/' || normalizedPath.endsWith('/mcp')) && req.method === 'GET' && !req.headers.accept?.includes('text/event-stream')) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          status: 'ok',
-          server: 'pure-mcp-server',
-          version: '1.0.0',
-          message: 'Servidor MCP de Pure Academic activo.',
-          endpoints: {
-            health: `${baseUrl}/health`,
-            sse: `${baseUrl}/sse`,
-            mcp: `${baseUrl}/mcp`,
-          },
-        })
-      );
-      return;
-    }
-
-    // 5. Authentication check for protected routes (/sse, /mcp, /messages)
-    if (!validateMcpAuth(req, secretKey)) {
-      res.writeHead(401, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Unauthorized: Missing or invalid Bearer token / API Key' }));
-      return;
-    }
-
-    // 6. Handle SSE connections
-    if (normalizedPath.endsWith('/sse')) {
-      const searchParams = url.search ? url.search : '';
-      // Resolve the /messages endpoint relative to the incoming request path
-      // This ensures that whatever prefix Cloudflare used (e.g. /mcp/sse) is preserved as /mcp/messages
-      const basePath = url.pathname.replace(/\/sse$/, '');
-      const messagesPath = `${basePath}/messages${searchParams}`;
-      
-      const transport = new SSEServerTransport(messagesPath, res);
-      
-      // CREATE A NEW MCP SERVER INSTANCE PER CONNECTION
-      const mcpServer = createMcpServerInstance();
-      await mcpServer.connect(transport);
-      
-      const sid = transport.sessionId;
-      activeTransports.set(sid, transport);
-      transport.onclose = () => activeTransports.delete(sid);
-      transport.onerror = () => activeTransports.delete(sid);
-      
-      return;
-    }
-
-    // 7. Handle messages
-    if (normalizedPath.endsWith('/messages')) {
-      const sessionId = url.searchParams.get('sessionId') || req.headers['mcp-session-id'];
-      if (!sessionId || typeof sessionId !== 'string') {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Missing sessionId parameter' }));
+    try {
+      // 4. Root information GET /
+      if ((normalizedPath === '/' || normalizedPath.endsWith('/mcp')) && req.method === 'GET' && !req.headers.accept?.includes('text/event-stream')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            status: 'ok',
+            server: 'pure-mcp-server',
+            version: '1.0.0',
+            message: 'Servidor MCP de Pure Academic activo.',
+            endpoints: {
+              health: `${baseUrl}/health`,
+              sse: `${baseUrl}/sse`,
+              mcp: `${baseUrl}/mcp`,
+            },
+          })
+        );
         return;
       }
-      
-      const transport = activeTransports.get(sessionId);
-      if (!transport) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Session not found' }));
+
+      // 5. Authentication check for protected routes (/sse, /mcp, /messages)
+      if (!validateMcpAuth(req, secretKey)) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized: Missing or invalid Bearer token / API Key' }));
         return;
       }
-      
-      await transport.handlePostMessage(req, res);
-      return;
-    }
 
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Ruta no encontrada' }));
+      // 6. Handle SSE connections
+      if (normalizedPath.endsWith('/sse')) {
+        const searchParams = url.search ? url.search : '';
+        // Resolve the /messages endpoint relative to the incoming request path
+        // This ensures that whatever prefix Cloudflare used (e.g. /mcp/sse) is preserved as /mcp/messages
+        const basePath = url.pathname.replace(/\/sse$/, '');
+        const messagesPath = `${basePath}/messages${searchParams}`;
+        
+        const transport = new SSEServerTransport(messagesPath, res);
+        
+        // CREATE A NEW MCP SERVER INSTANCE PER CONNECTION
+        const mcpServer = createMcpServerInstance();
+        await mcpServer.connect(transport);
+        
+        const sid = transport.sessionId;
+        activeTransports.set(sid, transport);
+        
+        const originalOnClose = transport.onclose;
+        transport.onclose = () => {
+          originalOnClose?.();
+          activeTransports.delete(sid);
+        };
+        
+        const originalOnError = transport.onerror;
+        transport.onerror = (err) => {
+          originalOnError?.(err);
+          // We do not delete the session on error, it might be a non-fatal message error
+        };
+        
+        return;
+      }
+
+      // 7. Handle messages
+      if (normalizedPath.endsWith('/messages')) {
+        const sessionId = url.searchParams.get('sessionId') || req.headers['mcp-session-id'];
+        if (!sessionId || typeof sessionId !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Missing sessionId parameter' }));
+          return;
+        }
+        
+        const transport = activeTransports.get(sessionId);
+        if (!transport) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Session not found' }));
+          return;
+        }
+        
+        await transport.handlePostMessage(req, res);
+        return;
+      }
+
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Ruta no encontrada' }));
+    } catch (err) {
+      console.error('Unhandled error in HTTP handler:', err);
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal Server Error' }));
+      }
+    }
   });
 
   httpServer.listen(port, () => {
