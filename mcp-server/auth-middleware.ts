@@ -1,11 +1,11 @@
 import { IncomingMessage } from 'http';
 import { globalOAuthStore, OAuthStore } from './oauth-store';
 
-export function validateMcpAuth(
+export async function validateMcpAuth(
   req: IncomingMessage,
   secretKey?: string,
   oauthStore: OAuthStore = globalOAuthStore
-): boolean {
+): Promise<boolean> {
   const rawKey = secretKey || process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN;
   const targetKey = rawKey ? rawKey.trim() : undefined;
 
@@ -54,7 +54,7 @@ export function validateMcpAuth(
   }
 
   // 4. Match against issued OAuth access tokens
-  if (oauthStore.isValidAccessToken(tokenCandidate)) {
+  if (await oauthStore.isValidAccessToken(tokenCandidate)) {
     return true;
   }
 

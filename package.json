@@ -15,7 +15,7 @@
     "test:all": "npm run typecheck && vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@supabase/supabase-js": "^2.45.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -41,6 +41,7 @@
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
     "fake-indexeddb": "^6.2.5",
+    "pg-mem": "^3.0.14",
     "playwright": "^1.62.1",
     "postcss": "^8.4.40",
     "tailwindcss": "^3.4.7",

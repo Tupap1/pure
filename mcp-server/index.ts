@@ -275,9 +275,27 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
       return;
     }
 
-    // 3. Health check GET /health
+    // 3. Health check GET /health & Root Info GET /
     if (normalizedPath.endsWith('/health')) {
       return handleHealthCheck(req, res);
+    }
+
+    if (normalizedPath === '/' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          status: 'ok',
+          server: 'pure-mcp-server',
+          version: '1.0.0',
+          message: 'Servidor MCP de Pure Academic activo.',
+          endpoints: {
+            health: `${baseUrl}/health`,
+            sse: `${baseUrl}/sse`,
+            mcp: `${baseUrl}/mcp`,
+          },
+        })
+      );
+      return;
     }
 
     // 4. OAuth 2.0 PKCE Endpoints
@@ -286,22 +304,32 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
       req.on('data', (chunk) => {
         body += chunk.toString();
       });
-      req.on('end', () => {
+      req.on('end', async () => {
         let payload: any = {};
         try {
           if (body) payload = JSON.parse(body);
         } catch (e) {}
 
-        const client = oauthStore.registerClient(payload);
-        res.writeHead(201, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            client_id: client.clientId,
-            client_name: client.clientName,
-            redirect_uris: client.redirectUris,
-            token_endpoint_auth_method: client.tokenEndpointAuthMethod,
-          })
-        );
+        try {
+          const client = await oauthStore.registerClient(payload);
+          res.writeHead(201, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              client_id: client.clientId,
+              client_name: client.clientName,
+              redirect_uris: client.redirectUris,
+              token_endpoint_auth_method: client.tokenEndpointAuthMethod,
+            })
+          );
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              error: 'invalid_request',
+              error_description: err.message || 'Invalid registration request',
+            })
+          );
+        }
       });
       return;
     }
@@ -313,7 +341,7 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
       const codeChallenge = url.searchParams.get('code_challenge') || '';
       const codeChallengeMethod = url.searchParams.get('code_challenge_method') || 'S256';
 
-      if (!redirectUri || !oauthStore.isValidRedirectUri(redirectUri)) {
+      if (!redirectUri || !(await oauthStore.isValidRedirectUri(redirectUri, clientId))) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'invalid_request', error_description: 'Missing or invalid redirect_uri' }));
         return;
@@ -362,7 +390,7 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
       req.on('data', (chunk) => {
         body += chunk.toString();
       });
-      req.on('end', () => {
+      req.on('end', async () => {
         const params = new URLSearchParams(body);
         const password = params.get('password') || '';
         const clientId = params.get('client_id') || '';
@@ -391,13 +419,13 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
           return;
         }
 
-        if (!redirectUri || !oauthStore.isValidRedirectUri(redirectUri)) {
+        if (!redirectUri || !(await oauthStore.isValidRedirectUri(redirectUri, clientId))) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'invalid_request', error_description: 'Invalid redirect_uri' }));
           return;
         }
 
-        const code = oauthStore.createAuthCode({
+        const code = await oauthStore.createAuthCode({
           clientId,
           redirectUri,
           codeChallenge,
@@ -419,7 +447,7 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
       req.on('data', (chunk) => {
         body += chunk.toString();
       });
-      req.on('end', () => {
+      req.on('end', async () => {
         let grantType = '';
         let code = '';
         let clientId = '';
@@ -450,8 +478,9 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
           return;
         }
 
-        const result = oauthStore.verifyAndConsumeAuthCode({
+        const result = await oauthStore.verifyAndConsumeAuthCode({
           code,
+          clientId,
           redirectUri,
           codeVerifier,
         });
@@ -462,7 +491,7 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
           return;
         }
 
-        const accessToken = oauthStore.createAccessToken();
+        const accessToken = await oauthStore.createAccessToken(clientId);
         res.writeHead(200, {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store',
@@ -480,7 +509,7 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
 
     try {
       // 5. Authentication check for protected routes (/mcp, /sse, /messages)
-      if (!validateMcpAuth(req, secretKey, oauthStore)) {
+      if (!(await validateMcpAuth(req, secretKey, oauthStore))) {
         res.writeHead(401, {
           'Content-Type': 'application/json',
           'WWW-Authenticate': `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
