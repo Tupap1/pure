@@ -238,17 +238,85 @@ async function main() {
       return handleHealthCheck(req, res);
     }
 
-    // 3. Explicitly return 404 for OAuth discovery so Claude Web clears its cache and stops trying to use OAuth
+    // 3. Mock OAuth 2.0 Endpoints for Claude Web Custom Connectors
+    // Claude Web enforces OAuth 2.0. We use a mock flow that securely validates the API Key as the client_secret.
     if (
       normalizedPath.endsWith('/.well-known/oauth-authorization-server') ||
       normalizedPath.endsWith('/.well-known/openid-configuration')
     ) {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'OAuth no soportado' }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        issuer: baseUrl,
+        authorization_endpoint: `${baseUrl}/oauth/authorize`,
+        token_endpoint: `${baseUrl}/oauth/token`,
+        response_types_supported: ['code'],
+        grant_types_supported: ['authorization_code'],
+        code_challenge_methods_supported: ['S256', 'plain']
+      }));
       return;
     }
 
-    // OAuth 2.0 Discovery removed to prevent Claude Web from attempting OAuth flow
+    if (normalizedPath.endsWith('/oauth/authorize')) {
+      const redirectUri = url.searchParams.get('redirect_uri');
+      const state = url.searchParams.get('state') || '';
+      if (!redirectUri) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid_request', error_description: 'Missing redirect_uri' }));
+        return;
+      }
+      // Auto-approve and redirect back with a fake code
+      const redirectUrl = new URL(redirectUri);
+      redirectUrl.searchParams.set('code', 'mock_auth_code_123');
+      redirectUrl.searchParams.set('state', state);
+      res.writeHead(302, { Location: redirectUrl.toString() });
+      res.end();
+      return;
+    }
+
+    if (normalizedPath.endsWith('/oauth/token')) {
+      let body = '';
+      req.on('data', chunk => { body += chunk.toString(); });
+      req.on('end', () => {
+        let clientSecret = '';
+        
+        // Extract client_secret depending on content type
+        if (req.headers['content-type']?.includes('application/json')) {
+          try {
+            const json = JSON.parse(body);
+            clientSecret = json.client_secret || '';
+          } catch (e) {}
+        } else {
+          // urlencoded
+          const params = new URLSearchParams(body);
+          clientSecret = params.get('client_secret') || '';
+        }
+        
+        // Basic Auth fallback (Claude might send Basic auth header instead of client_secret in body)
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.toLowerCase().startsWith('basic ')) {
+          const b64 = authHeader.split(' ')[1];
+          const decoded = Buffer.from(b64, 'base64').toString();
+          const [id, secret] = decoded.split(':');
+          if (secret) clientSecret = secret;
+        }
+
+        // Securely validate the provided secret against our MCP_API_KEY
+        if (secretKey && clientSecret !== secretKey) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'invalid_client', error_description: 'Client secret does not match MCP_API_KEY' }));
+          return;
+        }
+
+        // Success! Return the API Key as the access token so Claude uses it via Bearer Auth
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          access_token: secretKey || 'public_token',
+          token_type: 'Bearer',
+          expires_in: 31536000 // 1 year
+        }));
+      });
+      return;
+    }
 
     // 4. Root information GET /
     if ((normalizedPath === '/' || normalizedPath.endsWith('/mcp')) && req.method === 'GET' && !req.headers.accept?.includes('text/event-stream')) {
