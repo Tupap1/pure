@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import http from 'http';
 import { AddressInfo } from 'net';
+import crypto from 'crypto';
+import { createRequestHandler } from '../../mcp-server/index';
 
 vi.mock('../../lib/db/pg-client', () => ({
   pgPool: {
@@ -13,223 +15,27 @@ vi.mock('../../lib/db/pg-client', () => ({
   },
 }));
 
-describe('Claude Web Remote MCP Endpoint & Transport Integration Tests', () => {
+async function parseStreamableResponse(res: Response): Promise<any> {
+  const text = await res.text();
+  if (text.includes('data: ')) {
+    const dataLine = text
+      .split('\n')
+      .find((line) => line.startsWith('data: '))
+      ?.replace('data: ', '')
+      .trim();
+    if (dataLine) return JSON.parse(dataLine);
+  }
+  return JSON.parse(text);
+}
+
+describe('Claude Web Remote MCP Endpoint & Real HTTP Server Integration Tests', () => {
   let server: http.Server;
   let baseUrl: string;
+  const SECRET_KEY = 'test_secret_key_pure_mcp_123';
 
   beforeAll(async () => {
-    // Import server module and spin up an ephemeral HTTP test server
-    const { createMcpServerInstance, TOOLS_LIST } = await import('../../mcp-server/index');
-    const {
-      handleGetAcademicOverview,
-      handleManageUniversities,
-      handleManageProfessors,
-      handleManageSubjects,
-      handleManageSchedules,
-      handleManageDeliverables,
-      handleManageSyllabusTopics,
-      handleIngestAcademicEnrollment,
-      handleParseAndIngestSyllabus,
-      handleFindCrossSubjectSynergies,
-    } = await import('../../mcp-server/tools-handler');
-    const { SSEServerTransport } = await import('@modelcontextprotocol/sdk/server/sse.js');
-
-    async function dispatchToolCall(name: string, args: any) {
-      switch (name) {
-        case 'get_academic_overview':
-          return await handleGetAcademicOverview();
-        case 'ingest_academic_enrollment':
-          return await handleIngestAcademicEnrollment(args?.raw_text);
-        case 'parse_and_ingest_syllabus':
-          return await handleParseAndIngestSyllabus(args?.subject_id, args?.raw_text);
-        case 'find_cross_subject_synergies':
-          return await handleFindCrossSubjectSynergies();
-        case 'manage_universities':
-          return await handleManageUniversities(args?.action, args?.data);
-        case 'manage_professors':
-          return await handleManageProfessors(args?.action, args?.data);
-        case 'manage_subjects':
-          return await handleManageSubjects(args?.action, args?.data);
-        case 'manage_schedules':
-          return await handleManageSchedules(args?.action, args?.data);
-        case 'manage_deliverables':
-          return await handleManageDeliverables(args?.action, args?.data);
-        case 'manage_syllabus_topics':
-          return await handleManageSyllabusTopics(args?.action, args?.data);
-        default:
-          throw new Error(`Herramienta no reconocida: ${name}`);
-      }
-    }
-
-    const transports = new Map<string, any>();
-
-    server = http.createServer(async (req, res) => {
-      // CORS headers
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', '*');
-      res.setHeader('Access-Control-Expose-Headers', '*');
-
-      if (req.method === 'OPTIONS') {
-        res.writeHead(204);
-        res.end();
-        return;
-      }
-
-      const hostHeader = req.headers.host || `localhost:${(server.address() as AddressInfo).port}`;
-      const protocol = 'http';
-      const calculatedBaseUrl = `${protocol}://${hostHeader}`;
-      const url = new URL(req.url || '/', calculatedBaseUrl);
-      const normalizedPath = url.pathname.replace(/\/$/, '') || '/';
-
-      // OpenID / OAuth Authorization Discovery
-      if (
-        url.pathname === '/.well-known/oauth-authorization-server' ||
-        url.pathname === '/.well-known/openid-configuration'
-      ) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            issuer: calculatedBaseUrl,
-            authorization_endpoint: `${calculatedBaseUrl}/oauth/authorize`,
-            token_endpoint: `${calculatedBaseUrl}/oauth/token`,
-            registration_endpoint: `${calculatedBaseUrl}/oauth/register`,
-            scopes_supported: ['mcp'],
-            response_types_supported: ['code'],
-            grant_types_supported: ['authorization_code'],
-          })
-        );
-        return;
-      }
-
-      // Dynamic Client Registration
-      if ((url.pathname === '/oauth/register' || url.pathname === '/register') && req.method === 'POST') {
-        res.writeHead(201, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            client_id: `pure_client_${Date.now()}`,
-            client_secret: `pure_secret_test`,
-            redirect_uris: ['https://claude.ai/oauth/callback'],
-          })
-        );
-        return;
-      }
-
-      // OAuth Access Token Exchange
-      if ((url.pathname === '/oauth/token' || url.pathname === '/token') && req.method === 'POST') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            access_token: `pure_token_${Date.now()}`,
-            token_type: 'Bearer',
-            expires_in: 31536000,
-          })
-        );
-        return;
-      }
-
-      // SSE Connection Endpoint (GET)
-      const isSseRequest =
-        req.method === 'GET' &&
-        (normalizedPath === '/sse' ||
-          normalizedPath === '/mcp' ||
-          normalizedPath === '/.well-known/mcp' ||
-          (normalizedPath === '/' && req.headers.accept?.includes('text/event-stream')));
-
-      if (isSseRequest) {
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache, no-transform');
-        res.setHeader('Connection', 'keep-alive');
-
-        const messagesEndpoint = `${calculatedBaseUrl}/messages`;
-        const transport = new SSEServerTransport(messagesEndpoint, res);
-        transports.set(transport.sessionId, transport);
-
-        const sessionServer = createMcpServerInstance();
-        await sessionServer.connect(transport);
-        return;
-      }
-
-      // JSON-RPC & Streamable HTTP POST Handling
-      if (
-        req.method === 'POST' &&
-        (normalizedPath === '/mcp' ||
-          normalizedPath === '/sse' ||
-          normalizedPath === '/' ||
-          normalizedPath === '/api/mcp')
-      ) {
-        let body = '';
-        req.on('data', (chunk) => (body += chunk));
-        req.on('end', async () => {
-          try {
-            const json = JSON.parse(body || '{}');
-
-            if (json.jsonrpc === '2.0') {
-              const reqId = json.id ?? null;
-              const method = json.method;
-
-              if (method === 'initialize') {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(
-                  JSON.stringify({
-                    jsonrpc: '2.0',
-                    id: reqId,
-                    result: {
-                      protocolVersion: json.params?.protocolVersion || '2024-11-05',
-                      capabilities: { tools: {} },
-                      serverInfo: { name: 'pure-mcp-server', version: '1.0.0' },
-                    },
-                  })
-                );
-                return;
-              }
-
-              if (method === 'tools/list') {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(
-                  JSON.stringify({
-                    jsonrpc: '2.0',
-                    id: reqId,
-                    result: { tools: TOOLS_LIST },
-                  })
-                );
-                return;
-              }
-
-              if (method === 'tools/call') {
-                const toolName = json.params?.name;
-                const toolArgs = json.params?.arguments || {};
-                const result = await dispatchToolCall(toolName, toolArgs);
-
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(
-                  JSON.stringify({
-                    jsonrpc: '2.0',
-                    id: reqId,
-                    result: {
-                      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                    },
-                  })
-                );
-                return;
-              }
-            }
-
-            const toolName = json.tool || json.name;
-            const result = await dispatchToolCall(toolName, json.args || json.arguments || {});
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(result));
-          } catch (err: any) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: err.message }));
-          }
-        });
-        return;
-      }
-
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Not found' }));
-    });
+    const handler = createRequestHandler({ secretKey: SECRET_KEY });
+    server = http.createServer(handler);
 
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', () => resolve());
@@ -245,121 +51,305 @@ describe('Claude Web Remote MCP Endpoint & Transport Integration Tests', () => {
     });
   });
 
-  it('1. should discover OAuth 2.0 metadata with full URLs at /.well-known/oauth-authorization-server', async () => {
-    const res = await fetch(`${baseUrl}/.well-known/oauth-authorization-server`);
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.issuer).toBe(baseUrl);
-    expect(data.authorization_endpoint).toBe(`${baseUrl}/oauth/authorize`);
-    expect(data.token_endpoint).toBe(`${baseUrl}/oauth/token`);
-    expect(data.registration_endpoint).toBe(`${baseUrl}/oauth/register`);
-  });
-
-  it('2. should perform dynamic client registration via /oauth/register', async () => {
-    const res = await fetch(`${baseUrl}/oauth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_name: 'Claude Test Client' }),
-    });
-    expect(res.status).toBe(201);
-    const data = await res.json();
-    expect(data).toHaveProperty('client_id');
-    expect(data).toHaveProperty('client_secret');
-  });
-
-  it('3. should exchange code for Bearer access token via /oauth/token', async () => {
-    const res = await fetch(`${baseUrl}/oauth/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'grant_type=authorization_code&code=test_code',
-    });
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.access_token).toContain('pure_token_');
-    expect(data.token_type).toBe('Bearer');
-  });
-
-  it('4. should establish SSE GET connection on /mcp and emit ABSOLUTE URL message endpoint', async () => {
-    const res = await fetch(`${baseUrl}/mcp`, {
-      headers: { Accept: 'text/event-stream' },
-    });
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toContain('text/event-stream');
-
-    const reader = res.body?.getReader();
-    expect(reader).toBeDefined();
-
-    const decoder = new TextDecoder();
-    let receivedText = '';
-
-    if (reader) {
-      const { value } = await reader.read();
-      receivedText = decoder.decode(value);
-      await reader.cancel();
-    }
-
-    expect(receivedText).toContain('event: endpoint');
-    expect(receivedText).toContain('data: /messages?sessionId=');
-  });
-
-  it('5. should handle JSON-RPC initialize POST request on /mcp', async () => {
+  it('1. POST /mcp initialize -> 200, con serverInfo y protocolVersion en la respuesta', async () => {
     const res = await fetch(`${baseUrl}/mcp`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        Authorization: `Bearer ${SECRET_KEY}`,
+      },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 101,
         method: 'initialize',
-        params: { protocolVersion: '2024-11-05' },
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: {},
+          clientInfo: { name: 'test-client', version: '1.0' },
+        },
       }),
     });
+
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await parseStreamableResponse(res);
     expect(data.jsonrpc).toBe('2.0');
     expect(data.id).toBe(101);
+    expect(data.result).toBeDefined();
     expect(data.result.serverInfo.name).toBe('pure-mcp-server');
+    expect(data.result.protocolVersion).toBeDefined();
   });
 
-  it('6. should handle JSON-RPC tools/list POST request on /mcp', async () => {
+  it('2. POST /mcp tools/list -> devuelve las 10 tools', async () => {
     const res = await fetch(`${baseUrl}/mcp`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        Authorization: `Bearer ${SECRET_KEY}`,
+      },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 102,
         method: 'tools/list',
       }),
     });
+
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await parseStreamableResponse(res);
+    expect(data.jsonrpc).toBe('2.0');
+    expect(data.result.tools).toBeDefined();
     expect(data.result.tools.length).toBeGreaterThanOrEqual(10);
   });
 
-  it('7. should handle JSON-RPC tools/call POST request for get_academic_overview on /mcp', async () => {
+  it('3. POST /mcp tools/call get_academic_overview -> resultado con content', async () => {
     const res = await fetch(`${baseUrl}/mcp`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        Authorization: `Bearer ${SECRET_KEY}`,
+      },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 103,
         method: 'tools/call',
-        params: { name: 'get_academic_overview', arguments: {} },
+        params: {
+          name: 'get_academic_overview',
+          arguments: {},
+        },
       }),
     });
+
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await parseStreamableResponse(res);
+    expect(data.jsonrpc).toBe('2.0');
+    expect(data.result.content).toBeDefined();
     expect(data.result.content[0].type).toBe('text');
     const parsedText = JSON.parse(data.result.content[0].text);
     expect(parsedText.status).toBe('success');
   });
 
-  it('8. should support OPTIONS CORS preflight on /mcp', async () => {
-    const res = await fetch(`${baseUrl}/mcp`, {
-      method: 'OPTIONS',
-      headers: { 'Access-Control-Request-Method': 'POST' },
+  it('4. GET /.well-known/oauth-protected-resource -> 200 con authorization_servers', async () => {
+    const res = await fetch(`${baseUrl}/.well-known/oauth-protected-resource`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.resource).toBe(baseUrl);
+    expect(data.authorization_servers).toContain(baseUrl);
+    expect(data.scopes_supported).toContain('mcp');
+    expect(data.bearer_methods_supported).toContain('header');
+  });
+
+  it('5. GET /.well-known/oauth-authorization-server/mcp -> 200 con OAuth metadata REAL', async () => {
+    const res = await fetch(`${baseUrl}/.well-known/oauth-authorization-server/mcp`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.issuer).toBe(baseUrl);
+    expect(data.authorization_endpoint).toBe(`${baseUrl}/oauth/authorize`);
+    expect(data.token_endpoint).toBe(`${baseUrl}/oauth/token`);
+    expect(data.registration_endpoint).toBe(`${baseUrl}/oauth/register`);
+    expect(data.scopes_supported).toContain('mcp');
+    expect(data.code_challenge_methods_supported).toContain('S256');
+    expect(data.code_challenge_methods_supported).not.toContain('plain');
+  });
+
+  it('6. Flujo PKCE completo: register -> authorize+consent -> token -> usar el token en POST /mcp', async () => {
+    // Step A: Register
+    const regRes = await fetch(`${baseUrl}/oauth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_name: 'Claude Custom Connector PKCE',
+        redirect_uris: ['https://claude.ai/api/mcp/auth_callback'],
+      }),
     });
-    expect(res.status).toBe(204);
-    expect(res.headers.get('access-control-allow-origin')).toBe('*');
-    expect(res.headers.get('access-control-allow-headers')).toBe('*');
+    expect(regRes.status).toBe(201);
+    const regData = await regRes.json();
+    expect(regData.client_id).toBeDefined();
+    expect(regData.token_endpoint_auth_method).toBe('none');
+
+    // Step B: Authorize + Consent POST with PKCE challenge
+    const codeVerifier = crypto.randomBytes(32).toString('base64url');
+    const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+
+    const authRes = await fetch(`${baseUrl}/oauth/authorize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      redirect: 'manual',
+      body: new URLSearchParams({
+        client_id: regData.client_id,
+        redirect_uri: 'https://claude.ai/api/mcp/auth_callback',
+        state: 'pkce_state_test',
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        password: SECRET_KEY,
+      }).toString(),
+    });
+
+    expect(authRes.status).toBe(302);
+    const redirectLocation = authRes.headers.get('location');
+    expect(redirectLocation).toBeDefined();
+
+    const redirectUrl = new URL(redirectLocation!);
+    const code = redirectUrl.searchParams.get('code');
+    expect(code).toBeDefined();
+    expect(redirectUrl.searchParams.get('state')).toBe('pkce_state_test');
+
+    // Step C: Token Exchange
+    const tokenRes = await fetch(`${baseUrl}/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: code!,
+        client_id: regData.client_id,
+        redirect_uri: 'https://claude.ai/api/mcp/auth_callback',
+        code_verifier: codeVerifier,
+      }).toString(),
+    });
+
+    expect(tokenRes.status).toBe(200);
+    expect(tokenRes.headers.get('cache-control')).toBe('no-store');
+    const tokenData = await tokenRes.json();
+    expect(tokenData.access_token).toBeDefined();
+    expect(tokenData.token_type).toBe('Bearer');
+    const oauthAccessToken = tokenData.access_token;
+
+    // Step D: Use issued OAuth token on POST /mcp
+    const mcpRes = await fetch(`${baseUrl}/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        Authorization: `Bearer ${oauthAccessToken}`,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 200,
+        method: 'tools/list',
+      }),
+    });
+
+    expect(mcpRes.status).toBe(200);
+    const mcpData = await parseStreamableResponse(mcpRes);
+    expect(mcpData.result.tools.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it('7. Reusar el mismo authorization code una segunda vez -> 401 invalid_grant', async () => {
+    // Generate auth code
+    const codeVerifier = crypto.randomBytes(32).toString('base64url');
+    const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+
+    const authRes = await fetch(`${baseUrl}/oauth/authorize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      redirect: 'manual',
+      body: new URLSearchParams({
+        client_id: 'pure_client_test',
+        redirect_uri: 'https://claude.ai/api/mcp/auth_callback',
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        password: SECRET_KEY,
+      }).toString(),
+    });
+
+    const redirectUrl = new URL(authRes.headers.get('location')!);
+    const code = redirectUrl.searchParams.get('code')!;
+
+    // First use: Success
+    const tokenRes1 = await fetch(`${baseUrl}/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: 'https://claude.ai/api/mcp/auth_callback',
+        code_verifier: codeVerifier,
+      }).toString(),
+    });
+    expect(tokenRes1.status).toBe(200);
+
+    // Second use: Failure (Replay protection)
+    const tokenRes2 = await fetch(`${baseUrl}/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: 'https://claude.ai/api/mcp/auth_callback',
+        code_verifier: codeVerifier,
+      }).toString(),
+    });
+
+    expect(tokenRes2.status).toBe(401);
+    const errData = await tokenRes2.json();
+    expect(errData.error).toBe('invalid_grant');
+    expect(errData.error_description).toContain('already used');
+  });
+
+  it('8. code_verifier incorrecto -> 401 invalid_grant', async () => {
+    const codeVerifier = crypto.randomBytes(32).toString('base64url');
+    const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+
+    const authRes = await fetch(`${baseUrl}/oauth/authorize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      redirect: 'manual',
+      body: new URLSearchParams({
+        client_id: 'pure_client_test',
+        redirect_uri: 'https://claude.ai/api/mcp/auth_callback',
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        password: SECRET_KEY,
+      }).toString(),
+    });
+
+    const redirectUrl = new URL(authRes.headers.get('location')!);
+    const code = redirectUrl.searchParams.get('code')!;
+
+    // Exchange with WRONG verifier
+    const tokenRes = await fetch(`${baseUrl}/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: 'https://claude.ai/api/mcp/auth_callback',
+        code_verifier: 'wrong_code_verifier_9999999999999999999999999',
+      }).toString(),
+    });
+
+    expect(tokenRes.status).toBe(401);
+    const errData = await tokenRes.json();
+    expect(errData.error).toBe('invalid_grant');
+    expect(errData.error_description).toContain('Invalid code_verifier');
+  });
+
+  it('9. POST /mcp sin token -> 401 CON header WWW-Authenticate', async () => {
+    const res = await fetch(`${baseUrl}/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 301,
+        method: 'initialize',
+      }),
+    });
+
+    expect(res.status).toBe(401);
+    const wwwAuthHeader = res.headers.get('www-authenticate');
+    expect(wwwAuthHeader).toBeDefined();
+    expect(wwwAuthHeader).toContain(`Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`);
+  });
+
+  it('10. GET /sse sin token -> 401 (regresión del bypass)', async () => {
+    const res = await fetch(`${baseUrl}/sse`);
+    expect(res.status).toBe(401);
+    const wwwAuthHeader = res.headers.get('www-authenticate');
+    expect(wwwAuthHeader).toBeDefined();
+    expect(wwwAuthHeader).toContain('Bearer resource_metadata=');
   });
 });

@@ -1,67 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'http';
 import { AddressInfo } from 'net';
+import { createRequestHandler } from '../../mcp-server/index';
 
-describe('TDD: MCP OAuth 2.0 & RFC 7591 Dynamic Client Registration', () => {
+describe('MCP OAuth 2.0 & RFC 7591 Dynamic Client Registration', () => {
   let server: http.Server;
   let baseUrl: string;
+  const SECRET_KEY = 'test_secret_oauth_123';
 
   beforeAll(async () => {
-    server = http.createServer((req, res) => {
-      const hostHeader = req.headers.host || `localhost:${(server.address() as AddressInfo).port}`;
-      const calculatedBaseUrl = `http://${hostHeader}`;
-      const url = new URL(req.url || '/', calculatedBaseUrl);
-
-      // OpenID / OAuth Authorization Discovery
-      if (
-        url.pathname === '/.well-known/oauth-authorization-server' ||
-        url.pathname === '/.well-known/openid-configuration'
-      ) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            issuer: calculatedBaseUrl,
-            authorization_endpoint: `${calculatedBaseUrl}/oauth/authorize`,
-            token_endpoint: `${calculatedBaseUrl}/oauth/token`,
-            registration_endpoint: `${calculatedBaseUrl}/oauth/register`,
-            scopes_supported: ['mcp'],
-            response_types_supported: ['code'],
-            grant_types_supported: ['authorization_code'],
-            token_endpoint_auth_methods_supported: ['client_secret_post', 'none', 'client_secret_basic'],
-          })
-        );
-        return;
-      }
-
-      // Dynamic Client Registration (RFC 7591)
-      if ((url.pathname === '/oauth/register' || url.pathname === '/register') && req.method === 'POST') {
-        res.writeHead(201, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            client_id: `pure_client_${Date.now()}`,
-            client_secret: `pure_secret_test`,
-            redirect_uris: ['https://claude.ai/oauth/callback'],
-          })
-        );
-        return;
-      }
-
-      // OAuth Access Token Exchange
-      if ((url.pathname === '/oauth/token' || url.pathname === '/token') && req.method === 'POST') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            access_token: `pure_token_${Date.now()}`,
-            token_type: 'Bearer',
-            expires_in: 31536000,
-          })
-        );
-        return;
-      }
-
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Not found' }));
-    });
+    const handler = createRequestHandler({ secretKey: SECRET_KEY });
+    server = http.createServer(handler);
 
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', () => resolve());
@@ -93,14 +42,14 @@ describe('TDD: MCP OAuth 2.0 & RFC 7591 Dynamic Client Registration', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_name: 'Claude Custom Connector Test',
-        redirect_uris: ['https://claude.ai/oauth/callback'],
+        redirect_uris: ['https://claude.ai/api/mcp/auth_callback'],
       }),
     });
 
     expect(res.status).toBe(201);
     const registration = await res.json();
     expect(registration).toHaveProperty('client_id');
-    expect(registration).toHaveProperty('client_secret');
     expect(registration.client_id).toContain('pure_client_');
+    expect(registration.token_endpoint_auth_method).toBe('none');
   });
 });
