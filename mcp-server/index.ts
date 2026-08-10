@@ -1,11 +1,14 @@
 import 'dotenv/config';
-import http from 'http';
+import http, { IncomingMessage, ServerResponse } from 'http';
+import crypto from 'crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { validateMcpAuth } from './auth-middleware';
 import { handleHealthCheck } from './health-handler';
+import { OAuthStore, globalOAuthStore } from './oauth-store';
 import {
   handleGetAcademicOverview,
   handleParseAndIngestSyllabus,
@@ -200,22 +203,27 @@ export function createMcpServerInstance() {
   return mcpServer;
 }
 
-async function main() {
-  const port = Number(process.env.MCP_PORT || 3001);
-  const rawKey = process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN;
-  const secretKey = rawKey ? rawKey.trim() : undefined;
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
-  if (!secretKey) {
-    console.warn('⚠️ ADVERTENCIA: MCP_API_KEY / MCP_AUTH_TOKEN no está configurado en el entorno.');
-  }
-
-  // We will maintain a map of active SSE transports
+export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: OAuthStore }): (
+  req: IncomingMessage,
+  res: ServerResponse
+) => Promise<void> {
+  const secretKey = opts?.secretKey || process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN;
+  const oauthStore = opts?.oauthStore || globalOAuthStore;
   const activeTransports = new Map<string, SSEServerTransport>();
 
-  const httpServer = http.createServer(async (req, res) => {
+  return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     // 1. Set CORS Headers
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
     res.setHeader('Access-Control-Allow-Headers', '*');
     res.setHeader('Access-Control-Expose-Headers', '*');
 
@@ -225,197 +233,437 @@ async function main() {
       return;
     }
 
-    const hostHeader = (req.headers['x-forwarded-host'] as string) || req.headers.host || `localhost:${port}`;
+    const hostHeader = (req.headers['x-forwarded-host'] as string) || req.headers.host || `localhost:${process.env.MCP_PORT || 3001}`;
     const protocol = (req.headers['x-forwarded-proto'] as string) || (req.headers['x-forwarded-ssl'] === 'on' ? 'https' : 'http');
-    // Claude Web OAuth Discovery strictly validates the issuer. We must use the exact host requested.
     const baseUrl = `${protocol}://${hostHeader}`;
 
     const url = new URL(req.url || '/', baseUrl);
     const normalizedPath = url.pathname.replace(/\/$/, '') || '/';
 
-    // 2. Health check GET /health
+    // 2. TAREA 3: Order of Routing - ALL .well-known routes FIRST (matching with startsWith)
+    if (normalizedPath.startsWith('/.well-known/oauth-protected-resource')) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          resource: baseUrl,
+          authorization_servers: [baseUrl],
+          scopes_supported: ['mcp'],
+          bearer_methods_supported: ['header'],
+        })
+      );
+      return;
+    }
+
+    if (
+      normalizedPath.startsWith('/.well-known/oauth-authorization-server') ||
+      normalizedPath.startsWith('/.well-known/openid-configuration')
+    ) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          issuer: baseUrl,
+          authorization_endpoint: `${baseUrl}/oauth/authorize`,
+          token_endpoint: `${baseUrl}/oauth/token`,
+          registration_endpoint: `${baseUrl}/oauth/register`,
+          scopes_supported: ['mcp'],
+          response_types_supported: ['code'],
+          grant_types_supported: ['authorization_code'],
+          code_challenge_methods_supported: ['S256'],
+          token_endpoint_auth_methods_supported: ['none'],
+        })
+      );
+      return;
+    }
+
+    // 3. Health check GET /health
     if (normalizedPath.endsWith('/health')) {
       return handleHealthCheck(req, res);
     }
 
-    // 3. Mock OAuth 2.0 Endpoints for Claude Web Custom Connectors
-    // Claude Web enforces OAuth 2.0. We use a mock flow that securely validates the API Key as the client_secret.
-    if (
-      normalizedPath.endsWith('/.well-known/oauth-authorization-server') ||
-      normalizedPath.endsWith('/.well-known/openid-configuration')
-    ) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        issuer: baseUrl,
-        authorization_endpoint: `${baseUrl}/oauth/authorize`,
-        token_endpoint: `${baseUrl}/oauth/token`,
-        registration_endpoint: `${baseUrl}/oauth/register`,
-        response_types_supported: ['code'],
-        grant_types_supported: ['authorization_code'],
-        code_challenge_methods_supported: ['S256', 'plain'],
-        token_endpoint_auth_methods_supported: ['client_secret_post', 'none', 'client_secret_basic']
-      }));
-      return;
-    }
-
-    if (normalizedPath.endsWith('/oauth/register')) {
+    // 4. OAuth 2.0 PKCE Endpoints
+    if (normalizedPath === '/oauth/register' && req.method === 'POST') {
       let body = '';
-      req.on('data', chunk => { body += chunk.toString(); });
+      req.on('data', (chunk) => {
+        body += chunk.toString();
+      });
       req.on('end', () => {
         let payload: any = {};
         try {
           if (body) payload = JSON.parse(body);
         } catch (e) {}
 
-        const clientId = `pure_client_${Date.now()}`;
+        const client = oauthStore.registerClient(payload);
         res.writeHead(201, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          client_id: clientId,
-          client_name: payload.client_name || 'Claude Custom Connector',
-          redirect_uris: payload.redirect_uris || ['https://claude.ai/oauth/callback'],
-          token_endpoint_auth_method: 'none'
-        }));
+        res.end(
+          JSON.stringify({
+            client_id: client.clientId,
+            client_name: client.clientName,
+            redirect_uris: client.redirectUris,
+            token_endpoint_auth_method: client.tokenEndpointAuthMethod,
+          })
+        );
       });
       return;
     }
 
-    if (normalizedPath.endsWith('/oauth/authorize')) {
+    if (normalizedPath === '/oauth/authorize' && req.method === 'GET') {
       const redirectUri = url.searchParams.get('redirect_uri');
       const state = url.searchParams.get('state') || '';
-      if (!redirectUri) {
+      const clientId = url.searchParams.get('client_id') || '';
+      const codeChallenge = url.searchParams.get('code_challenge') || '';
+      const codeChallengeMethod = url.searchParams.get('code_challenge_method') || 'S256';
+
+      if (!redirectUri || !oauthStore.isValidRedirectUri(redirectUri)) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid_request', error_description: 'Missing redirect_uri' }));
+        res.end(JSON.stringify({ error: 'invalid_request', error_description: 'Missing or invalid redirect_uri' }));
         return;
       }
-      // Auto-approve and redirect back with a fake code
-      const redirectUrl = new URL(redirectUri);
-      redirectUrl.searchParams.set('code', 'mock_auth_code_123');
-      redirectUrl.searchParams.set('state', state);
-      res.writeHead(302, { Location: redirectUrl.toString() });
-      res.end();
+
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Pure Academic - Consentimiento OAuth</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+            .card { background: #1e293b; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; max-width: 400px; border: 1px solid #334155; }
+            h2 { margin-top: 0; color: #38bdf8; text-align: center; }
+            p { font-size: 0.95rem; color: #94a3b8; line-height: 1.5; }
+            input[type="password"] { width: 100%; padding: 0.75rem; margin: 1rem 0; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: #fff; box-sizing: border-box; }
+            button { width: 100%; padding: 0.75rem; background: #0284c7; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+            button:hover { background: #0369a1; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>Pure Academic MCP</h2>
+            <p>Conectar con el cliente OAuth (${escapeHtml(clientId || 'Claude Web')}). Ingrese su clave de API (MCP_API_KEY) para autorizar:</p>
+            <form method="POST" action="${baseUrl}/oauth/authorize">
+              <input type="hidden" name="client_id" value="${escapeHtml(clientId)}" />
+              <input type="hidden" name="redirect_uri" value="${escapeHtml(redirectUri)}" />
+              <input type="hidden" name="state" value="${escapeHtml(state)}" />
+              <input type="hidden" name="code_challenge" value="${escapeHtml(codeChallenge)}" />
+              <input type="hidden" name="code_challenge_method" value="${escapeHtml(codeChallengeMethod)}" />
+              <input type="password" name="password" placeholder="MCP API Key" required autofocus />
+              <button type="submit">Autorizar Conexión</button>
+            </form>
+          </div>
+        </body>
+        </html>
+      `);
       return;
     }
 
-    if (normalizedPath.endsWith('/oauth/token')) {
+    if (normalizedPath === '/oauth/authorize' && req.method === 'POST') {
       let body = '';
-      req.on('data', chunk => { body += chunk.toString(); });
+      req.on('data', (chunk) => {
+        body += chunk.toString();
+      });
       req.on('end', () => {
-        let clientSecret = '';
-        
-        // Extract client_secret depending on content type
-        if (req.headers['content-type']?.includes('application/json')) {
-          try {
-            const json = JSON.parse(body);
-            clientSecret = json.client_secret || '';
-          } catch (e) {}
-        } else {
-          // urlencoded
-          const params = new URLSearchParams(body);
-          clientSecret = params.get('client_secret') || '';
-        }
-        
-        // Basic Auth fallback (Claude might send Basic auth header instead of client_secret in body)
-        const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.toLowerCase().startsWith('basic ')) {
-          const b64 = authHeader.split(' ')[1];
-          const decoded = Buffer.from(b64, 'base64').toString();
-          const [id, secret] = decoded.split(':');
-          if (secret) clientSecret = secret;
-        }
+        const params = new URLSearchParams(body);
+        const password = params.get('password') || '';
+        const clientId = params.get('client_id') || '';
+        const redirectUri = params.get('redirect_uri') || '';
+        const state = params.get('state') || '';
+        const codeChallenge = params.get('code_challenge') || '';
+        const codeChallengeMethod = params.get('code_challenge_method') || 'S256';
 
-        // Securely validate the provided secret against our MCP_API_KEY
-        if (secretKey && clientSecret.trim() !== secretKey) {
-          res.writeHead(401, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'invalid_client', error_description: 'Client secret does not match MCP_API_KEY' }));
+        const effectiveSecret = secretKey || process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN || '';
+        const passHash = crypto.createHash('sha256').update(password.trim()).digest();
+        const secretHash = crypto.createHash('sha256').update(effectiveSecret.trim()).digest();
+        const isValid = crypto.timingSafeEqual(passHash, secretHash);
+
+        if (!isValid) {
+          res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(`
+            <!DOCTYPE html>
+            <html>
+            <head><title>Error de Autenticación</title></head>
+            <body style="background:#0f172a;color:#ef4444;font-family:sans-serif;text-align:center;padding-top:50px;">
+              <h2>❌ Clave MCP_API_KEY Incorrecta</h2>
+              <p><a href="javascript:history.back()" style="color:#38bdf8;">Intentar nuevamente</a></p>
+            </body>
+            </html>
+          `);
           return;
         }
 
-        // Success! Return the API Key as the access token so Claude uses it via Bearer Auth
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          access_token: secretKey || 'public_token',
-          token_type: 'Bearer',
-          expires_in: 31536000 // 1 year
-        }));
+        if (!redirectUri || !oauthStore.isValidRedirectUri(redirectUri)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'invalid_request', error_description: 'Invalid redirect_uri' }));
+          return;
+        }
+
+        const code = oauthStore.createAuthCode({
+          clientId,
+          redirectUri,
+          codeChallenge,
+          codeChallengeMethod,
+        });
+
+        const redirectUrl = new URL(redirectUri);
+        redirectUrl.searchParams.set('code', code);
+        if (state) redirectUrl.searchParams.set('state', state);
+
+        res.writeHead(302, { Location: redirectUrl.toString() });
+        res.end();
+      });
+      return;
+    }
+
+    if (normalizedPath === '/oauth/token' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk.toString();
+      });
+      req.on('end', () => {
+        let grantType = '';
+        let code = '';
+        let clientId = '';
+        let redirectUri = '';
+        let codeVerifier = '';
+
+        if (req.headers['content-type']?.includes('application/json')) {
+          try {
+            const json = JSON.parse(body);
+            grantType = json.grant_type || '';
+            code = json.code || '';
+            clientId = json.client_id || '';
+            redirectUri = json.redirect_uri || '';
+            codeVerifier = json.code_verifier || '';
+          } catch (e) {}
+        } else {
+          const params = new URLSearchParams(body);
+          grantType = params.get('grant_type') || '';
+          code = params.get('code') || '';
+          clientId = params.get('client_id') || '';
+          redirectUri = params.get('redirect_uri') || '';
+          codeVerifier = params.get('code_verifier') || '';
+        }
+
+        if (grantType !== 'authorization_code') {
+          res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+          res.end(JSON.stringify({ error: 'unsupported_grant_type', error_description: 'Only authorization_code is supported' }));
+          return;
+        }
+
+        const result = oauthStore.verifyAndConsumeAuthCode({
+          code,
+          redirectUri,
+          codeVerifier,
+        });
+
+        if (!result.valid) {
+          res.writeHead(401, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+          res.end(JSON.stringify({ error: result.error || 'invalid_grant', error_description: result.errorDescription }));
+          return;
+        }
+
+        const accessToken = oauthStore.createAccessToken();
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        });
+        res.end(
+          JSON.stringify({
+            access_token: accessToken,
+            token_type: 'Bearer',
+            expires_in: 86400,
+          })
+        );
       });
       return;
     }
 
     try {
-      // 4. Root information GET /
-      if ((normalizedPath === '/' || normalizedPath.endsWith('/mcp')) && req.method === 'GET' && !req.headers.accept?.includes('text/event-stream')) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+      // 5. Authentication check for protected routes (/mcp, /sse, /messages)
+      if (!validateMcpAuth(req, secretKey, oauthStore)) {
+        res.writeHead(401, {
+          'Content-Type': 'application/json',
+          'WWW-Authenticate': `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
+        });
         res.end(
           JSON.stringify({
-            status: 'ok',
-            server: 'pure-mcp-server',
-            version: '1.0.0',
-            message: 'Servidor MCP de Pure Academic activo.',
-            endpoints: {
-              health: `${baseUrl}/health`,
-              sse: `${baseUrl}/sse`,
-              mcp: `${baseUrl}/mcp`,
-            },
+            jsonrpc: '2.0',
+            error: { code: -32001, message: 'Unauthorized: Missing or invalid Bearer token / API Key' },
+            id: null,
           })
         );
         return;
       }
 
-      // 5. Authentication check for protected routes (/sse, /mcp, /messages)
-      if (!validateMcpAuth(req, secretKey)) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Unauthorized: Missing or invalid Bearer token / API Key' }));
-        return;
+      // 6. Streamable HTTP on /mcp (Stateless Mode)
+      if (normalizedPath === '/mcp' || normalizedPath.endsWith('/mcp')) {
+        // DELETE /mcp -> 405 with JSON-RPC error
+        if (req.method === 'DELETE') {
+          res.writeHead(405, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              error: { code: -32601, message: 'Method not allowed in stateless mode' },
+              id: null,
+            })
+          );
+          return;
+        }
+
+        // GET /mcp without Accept: text/event-stream -> Informational JSON
+        if (req.method === 'GET' && !req.headers.accept?.includes('text/event-stream')) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              status: 'ok',
+              server: 'pure-mcp-server',
+              version: '1.0.0',
+              message: 'Servidor MCP de Pure Academic activo.',
+              endpoints: {
+                health: `${baseUrl}/health`,
+                sse: `${baseUrl}/sse`,
+                mcp: `${baseUrl}/mcp`,
+              },
+            })
+          );
+          return;
+        }
+
+        // GET /mcp with Accept: text/event-stream -> Stream Transport
+        if (req.method === 'GET' && req.headers.accept?.includes('text/event-stream')) {
+          res.setHeader('X-Accel-Buffering', 'no');
+          const pingInterval = setInterval(() => {
+            if (!res.writableEnded) {
+              res.write(': ping\n\n');
+            }
+          }, 25000);
+
+          const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+          const mcpInstance = createMcpServerInstance();
+          await mcpInstance.connect(transport);
+
+          res.on('close', () => {
+            clearInterval(pingInterval);
+            transport.close().catch(() => {});
+            mcpInstance.close().catch(() => {});
+          });
+
+          try {
+            await transport.handleRequest(req, res);
+          } catch (err: any) {
+            if (!res.headersSent) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  error: { code: -32603, message: err.message || 'Internal error' },
+                  id: null,
+                })
+              );
+            }
+          }
+          return;
+        }
+
+        // POST /mcp -> Streamable HTTP Stateless JSON-RPC
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk) => {
+            body += chunk.toString();
+          });
+          req.on('end', async () => {
+            let parsedBody: any;
+            try {
+              parsedBody = body ? JSON.parse(body) : {};
+            } catch (e: any) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  error: { code: -32700, message: 'Parse error: Invalid JSON' },
+                  id: null,
+                })
+              );
+              return;
+            }
+
+            const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+            const mcpInstance = createMcpServerInstance();
+            await mcpInstance.connect(transport);
+
+            res.on('close', () => {
+              transport.close().catch(() => {});
+              mcpInstance.close().catch(() => {});
+            });
+
+            try {
+              await transport.handleRequest(req, res, parsedBody);
+            } catch (err: any) {
+              if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(
+                  JSON.stringify({
+                    jsonrpc: '2.0',
+                    error: { code: -32603, message: err.message || 'Internal error' },
+                    id: parsedBody?.id ?? null,
+                  })
+                );
+              }
+            }
+          });
+          return;
+        }
       }
 
-      // 6. Handle SSE connections
+      // 7. Handle SSE connections (stateful compatibility)
       if (normalizedPath.endsWith('/sse')) {
+        res.setHeader('X-Accel-Buffering', 'no');
+        const pingInterval = setInterval(() => {
+          if (!res.writableEnded) {
+            res.write(': ping\n\n');
+          }
+        }, 25000);
+
         const searchParams = url.search ? url.search : '';
-        // Resolve the /messages endpoint relative to the incoming request path
-        // This ensures that whatever prefix Cloudflare used (e.g. /mcp/sse) is preserved as /mcp/messages
         const basePath = url.pathname.replace(/\/sse$/, '');
         const messagesPath = `${basePath}/messages${searchParams}`;
-        
+
         const transport = new SSEServerTransport(messagesPath, res);
-        
-        // CREATE A NEW MCP SERVER INSTANCE PER CONNECTION
         const mcpServer = createMcpServerInstance();
         await mcpServer.connect(transport);
-        
+
         const sid = transport.sessionId;
         activeTransports.set(sid, transport);
-        
+
+        res.on('close', () => {
+          clearInterval(pingInterval);
+        });
+
         const originalOnClose = transport.onclose;
         transport.onclose = () => {
           originalOnClose?.();
           activeTransports.delete(sid);
         };
-        
-        const originalOnError = transport.onerror;
-        transport.onerror = (err) => {
-          originalOnError?.(err);
-          // We do not delete the session on error, it might be a non-fatal message error
-        };
-        
+
         return;
       }
 
-      // 7. Handle messages
+      // 8. Handle messages
       if (normalizedPath.endsWith('/messages')) {
-        const sessionId = url.searchParams.get('sessionId') || req.headers['mcp-session-id'];
+        const sessionId = url.searchParams.get('sessionId') || (req.headers['mcp-session-id'] as string);
         if (!sessionId || typeof sessionId !== 'string') {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Missing sessionId parameter' }));
           return;
         }
-        
+
         const transport = activeTransports.get(sessionId);
         if (!transport) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Session not found' }));
           return;
         }
-        
+
         await transport.handlePostMessage(req, res);
         return;
       }
@@ -426,15 +674,35 @@ async function main() {
       console.error('Unhandled error in HTTP handler:', err);
       if (!res.headersSent) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Internal Server Error' }));
+        res.end(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            error: { code: -32603, message: 'Internal Server Error' },
+            id: null,
+          })
+        );
       }
     }
-  });
+  };
+}
 
-  httpServer.listen(port, () => {
+async function main() {
+  const port = Number(process.env.MCP_PORT || 3001);
+  const rawKey = process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN;
+  const secretKey = rawKey ? rawKey.trim() : undefined;
+
+  if (!secretKey) {
+    console.error('❌ Error fatal: MCP_API_KEY / MCP_AUTH_TOKEN no está configurado en el entorno.');
+    process.exit(1);
+  }
+
+  const handler = createRequestHandler({ secretKey });
+  const httpServer = http.createServer(handler);
+
+  httpServer.listen(port, '0.0.0.0', () => {
     console.error(`====================================================`);
     console.error(`🚀 Servidor MCP de Pure listo en http://0.0.0.0:${port}`);
-    console.error(`🔑 Autenticación API Key activada: ${secretKey ? secretKey.substring(0, 10) + '...' : 'SIN CLAVE CONFIGURADA'}`);
+    console.error(`🔑 Autenticación API Key activada: ${secretKey.substring(0, 10)}...`);
     console.error(`🏥 Endpoint de Salud: http://0.0.0.0:${port}/health`);
     console.error(`====================================================`);
   });
