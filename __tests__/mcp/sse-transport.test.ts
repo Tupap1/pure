@@ -31,7 +31,7 @@ describe('MCP Multi-Session Server & SSE Transport Suite', () => {
   it('should execute tool calls cleanly through handleGetAcademicOverview', async () => {
     const res = await handleGetAcademicOverview();
     expect(res.status).toBe('success');
-    expect(res.data.universitiesCount).toBeGreaterThan(0);
+    expect(res.data!.universitiesCount).toBeGreaterThan(0);
   });
 
   it('should list /sse and /mcp as valid SSE endpoints in TOOLS_LIST and server contract', () => {

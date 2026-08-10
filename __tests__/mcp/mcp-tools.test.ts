@@ -21,8 +21,8 @@ describe('REQ-09: Servidor MCP Bidireccional para Antigravity AI Bridge', () => 
   it('debe generar el resumen académico global en formato JSON para la IA', async () => {
     const overview = await handleGetAcademicOverview();
     expect(overview.status).toBe('success');
-    expect(overview.data.netFreeTimeHours).toBeDefined();
-    expect(overview.data.universities.length).toBeGreaterThanOrEqual(1);
+    expect(overview.data!.netFreeTimeHours).toBeDefined();
+    expect(overview.data!.universities.length).toBeGreaterThanOrEqual(1);
   });
 
   it('debe parsear e ingestar la matrícula académica del estudiante mediante el MCP', async () => {
@@ -41,7 +41,7 @@ describe('REQ-09: Servidor MCP Bidireccional para Antigravity AI Bridge', () => 
     const result = await handleParseAndIngestSyllabus('subject-123', rawSyllabusText);
     expect(result.status).toBe('success');
     expect(result.topicsParsed).toBeGreaterThan(0);
-    expect(result.topics[0].title).toContain('Cálculo Diferencial');
+    expect(result.topics![0].title).toContain('Cálculo Diferencial');
   });
 
   it('debe ejecutar el detector de sinergias temáticas entre ambas ingenierías para la IA', async () => {

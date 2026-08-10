@@ -138,7 +138,7 @@ describe('MCP Server PostgreSQL Direct Persistence & Survival Across Restarts', 
 
     const overviewResult = await handleGetAcademicOverview();
     expect(overviewResult.status).toBe('success');
-    expect(overviewResult.data.universitiesCount).toBe(1);
+    expect(overviewResult.data!.universitiesCount).toBe(1);
   });
 
   it('should persist professors and syllabus_topics created via MCP tools and support deletion from Postgres', async () => {

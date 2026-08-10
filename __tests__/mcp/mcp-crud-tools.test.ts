@@ -300,7 +300,7 @@ describe('MCP Server - Suite de Herramientas CRUD y Parsing Dinámico', () => {
       const res = await handleIngestAcademicEnrollment(overridesPayload);
       expect(res.status).toBe('success');
 
-      const schedules = res.data.schedules;
+      const schedules = res.data!.schedules;
       const vivamosSch = schedules.find((s: any) => s.subject_id === 'sub-vivamos');
       expect(vivamosSch.classroom).toBe('2-212');
     });
@@ -316,7 +316,7 @@ describe('MCP Server - Suite de Herramientas CRUD y Parsing Dinámico', () => {
       const res = await handleIngestAcademicEnrollment(plainTextPayload);
       expect(res.status).toBe('success');
 
-      const schedules = res.data.schedules;
+      const schedules = res.data!.schedules;
       const geomSch = schedules.find((s: any) => s.subject_id === 'sub-geom');
       expect(geomSch.classroom).toBe('2-209');
     });

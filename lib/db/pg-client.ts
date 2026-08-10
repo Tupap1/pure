@@ -7,7 +7,7 @@ function getConnectionString(): string {
     // Return resilient default connection string for Docker containers & production fallbacks
     const defaultHost = process.env.POSTGRES_HOST || 'pure-db';
     const user = process.env.POSTGRES_USER || 'pure_user';
-    const pass = process.env.POSTGRES_PASSWORD || 'pure_secure_password_2026';
+    const pass = process.env.POSTGRES_PASSWORD || '';
     const dbName = process.env.POSTGRES_DB || 'pure_academic';
     return `postgresql://${user}:${pass}@${defaultHost}:5432/${dbName}?sslmode=disable`;
   }

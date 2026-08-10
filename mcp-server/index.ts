@@ -1,6 +1,7 @@
+import 'dotenv/config';
 import http from 'http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { validateMcpAuth } from './auth-middleware';
@@ -207,13 +208,10 @@ async function main() {
     console.warn('⚠️ ADVERTENCIA: MCP_API_KEY / MCP_AUTH_TOKEN no está configurado en el entorno.');
   }
 
-  // Instantiate unified StreamableHTTPServerTransport
-  const streamableTransport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => `pure_session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-  });
+  // We will maintain a map of active SSE transports
+  const activeTransports = new Map<string, SSEServerTransport>();
 
   const mcpServer = createMcpServerInstance();
-  await mcpServer.connect(streamableTransport);
 
   const httpServer = http.createServer(async (req, res) => {
     // 1. Set CORS Headers
@@ -240,26 +238,7 @@ async function main() {
       return handleHealthCheck(req, res);
     }
 
-    // 3. OAuth 2.0 Discovery
-    if (
-      normalizedPath === '/.well-known/oauth-authorization-server' ||
-      normalizedPath === '/.well-known/openid-configuration'
-    ) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          issuer: baseUrl,
-          authorization_endpoint: `${baseUrl}/oauth/authorize`,
-          token_endpoint: `${baseUrl}/oauth/token`,
-          registration_endpoint: `${baseUrl}/oauth/register`,
-          scopes_supported: ['mcp'],
-          response_types_supported: ['code'],
-          grant_types_supported: ['authorization_code'],
-          token_endpoint_auth_methods_supported: ['client_secret_post', 'none', 'client_secret_basic'],
-        })
-      );
-      return;
-    }
+    // OAuth 2.0 Discovery removed to prevent Claude Web from attempting OAuth flow
 
     // 4. Root information GET /
     if (normalizedPath === '/' && req.method === 'GET' && !req.headers.accept?.includes('text/event-stream')) {
@@ -287,15 +266,37 @@ async function main() {
       return;
     }
 
-    // 6. Handle Streamable HTTP and SSE requests via StreamableHTTPServerTransport
-    if (
-      normalizedPath === '/sse' ||
-      normalizedPath === '/mcp' ||
-      normalizedPath === '/messages' ||
-      normalizedPath === '/.well-known/mcp' ||
-      normalizedPath === '/'
-    ) {
-      await streamableTransport.handleRequest(req, res);
+    // 6. Handle SSE connections
+    if (normalizedPath === '/sse') {
+      const searchParams = url.search ? url.search : '';
+      const transport = new SSEServerTransport(`${baseUrl}/messages${searchParams}`, res);
+      await mcpServer.connect(transport);
+      
+      const sid = transport.sessionId;
+      activeTransports.set(sid, transport);
+      transport.onclose = () => activeTransports.delete(sid);
+      transport.onerror = () => activeTransports.delete(sid);
+      
+      return;
+    }
+
+    // 7. Handle messages
+    if (normalizedPath === '/messages') {
+      const sessionId = url.searchParams.get('sessionId') || req.headers['mcp-session-id'];
+      if (!sessionId || typeof sessionId !== 'string') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing sessionId parameter' }));
+        return;
+      }
+      
+      const transport = activeTransports.get(sessionId);
+      if (!transport) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Session not found' }));
+        return;
+      }
+      
+      await transport.handlePostMessage(req, res);
       return;
     }
 

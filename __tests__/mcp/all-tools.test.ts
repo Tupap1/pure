@@ -145,7 +145,7 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
       });
       const res = await handleIngestAcademicEnrollment(jsonPayload);
       expect(res.status).toBe('success');
-      expect(res.data.subjectsCount).toBeGreaterThanOrEqual(1);
+      expect(res.data!.subjectsCount).toBeGreaterThanOrEqual(1);
     });
 
     it('should extract classroom overrides from plain text for existing subjects', async () => {
@@ -175,7 +175,7 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite', () => {
       const res = await handleParseAndIngestSyllabus('sub-test-1', rawSyllabus);
       expect(res.status).toBe('success');
       expect(res.topicsParsed).toBe(5);
-      expect(res.topics[0].title).toBe('Unidad 1: Introducción a la Inteligencia Artificial');
+      expect(res.topics![0].title).toBe('Unidad 1: Introducción a la Inteligencia Artificial');
     });
   });
 
