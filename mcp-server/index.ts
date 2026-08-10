@@ -211,8 +211,6 @@ async function main() {
   // We will maintain a map of active SSE transports
   const activeTransports = new Map<string, SSEServerTransport>();
 
-  const mcpServer = createMcpServerInstance();
-
   const httpServer = http.createServer(async (req, res) => {
     // 1. Set CORS Headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -353,6 +351,9 @@ async function main() {
       const messagesPath = `${basePath}/messages${searchParams}`;
       
       const transport = new SSEServerTransport(messagesPath, res);
+      
+      // CREATE A NEW MCP SERVER INSTANCE PER CONNECTION
+      const mcpServer = createMcpServerInstance();
       await mcpServer.connect(transport);
       
       const sid = transport.sessionId;
