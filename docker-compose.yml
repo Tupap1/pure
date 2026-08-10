@@ -16,7 +16,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: pure_academic_app
     ports:
       - "3000:3000"
     environment:
@@ -32,7 +31,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.mcp
-    container_name: pure_mcp_server
     command: ["npx", "tsx", "mcp-server/index.ts"]
     ports:
       - "3001:3001"
