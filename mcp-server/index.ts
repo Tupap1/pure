@@ -33,11 +33,14 @@ export const TOOLS_LIST = [
   },
   {
     name: 'ingest_academic_enrollment',
-    description: 'Procesa e ingesta la matrícula real del estudiante (materias Nivel I, créditos, grupos y horarios con aulas asignadas). Debe proporcionar raw_text con los datos.',
+    description: 'Procesa e ingesta la matrícula del estudiante. raw_text debe ser un string JSON con los arrays "universities", "professors", "subjects" y "schedules" (convención day_of_week: 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado, 7=Domingo). Ejemplo mínimo: {"universities":[{"id":"u1","name":"UdeA"}],"professors":[{"id":"p1","university_id":"u1","name":"Dr. Curie"}],"subjects":[{"id":"s1","university_id":"u1","professor_id":"p1","name":"Cálculo"}],"schedules":[{"id":"sch1","subject_id":"s1","day_of_week":1,"start_time":"08:00","end_time":"10:00","classroom":"2-209"}]}',
     inputSchema: {
       type: 'object',
       properties: {
-        raw_text: { type: 'string', description: 'Texto o JSON estructurado de materias y horarios matriculados' },
+        raw_text: {
+          type: 'string',
+          description: 'String JSON con { universities, professors, subjects, schedules }. Convención day_of_week: 1=Lunes..7=Domingo. Ejemplo: {"universities":[{"id":"u1","name":"UdeA"}],"subjects":[{"id":"s1","university_id":"u1","name":"Cálculo"}],"schedules":[{"id":"sch1","subject_id":"s1","day_of_week":1,"start_time":"08:00","end_time":"10:00","classroom":"2-209"}]}',
+        },
       },
       required: ['raw_text'],
     },
@@ -155,10 +158,15 @@ export function createMcpServerInstance() {
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 
-  mcpServer.tool('ingest_academic_enrollment', 'Procesa e ingesta la matrícula real del estudiante.', { raw_text: z.string() }, async ({ raw_text }) => {
-    const res = await handleIngestAcademicEnrollment(raw_text);
-    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
-  });
+  mcpServer.tool(
+    'ingest_academic_enrollment',
+    'Procesa e ingesta la matrícula del estudiante. raw_text debe ser un string JSON con los arrays "universities", "professors", "subjects" y "schedules" (convención day_of_week: 1=Lunes..7=Domingo). Ejemplo mínimo: {"universities":[{"id":"u1","name":"UdeA"}],"professors":[{"id":"p1","university_id":"u1","name":"Dr. Curie"}],"subjects":[{"id":"s1","university_id":"u1","professor_id":"p1","name":"Cálculo"}],"schedules":[{"id":"sch1","subject_id":"s1","day_of_week":1,"start_time":"08:00","end_time":"10:00","classroom":"2-209"}]}',
+    { raw_text: z.string().describe('String JSON con { universities, professors, subjects, schedules } (day_of_week 1=Lunes..7=Domingo)') },
+    async ({ raw_text }) => {
+      const res = await handleIngestAcademicEnrollment(raw_text);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
 
   mcpServer.tool('parse_and_ingest_syllabus', 'Recibe un texto de temario y lo convierte en árbol de ejes temáticos.', { subject_id: z.string(), raw_text: z.string() }, async ({ subject_id, raw_text }) => {
     const res = await handleParseAndIngestSyllabus(subject_id, raw_text);

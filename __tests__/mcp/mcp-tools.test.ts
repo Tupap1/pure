@@ -26,7 +26,11 @@ describe('REQ-09: Servidor MCP Bidireccional para Antigravity AI Bridge', () => 
   });
 
   it('debe parsear e ingestar la matrícula académica del estudiante mediante el MCP', async () => {
-    const enrollment = await handleIngestAcademicEnrollment();
+    const jsonText = JSON.stringify({
+      universities: [{ id: 'u1', name: 'Uni 1' }],
+      subjects: [{ id: 's1', university_id: 'u1', name: 'Materia 1' }],
+    });
+    const enrollment = await handleIngestAcademicEnrollment(jsonText);
     expect(enrollment.status).toBe('success');
     expect(enrollment.data).toBeDefined();
   });

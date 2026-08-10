@@ -131,53 +131,123 @@ export async function handleFindCrossSubjectSynergies() {
 }
 
 export async function handleIngestAcademicEnrollment(rawEnrollmentText?: string) {
-  try {
-    if (rawEnrollmentText) {
-      try {
-        const parsed = JSON.parse(rawEnrollmentText);
-        if (parsed.universities) {
-          for (const u of parsed.universities) await saveUniversityToDb(u);
-        }
-        if (parsed.professors) {
-          for (const p of parsed.professors) await saveProfessorToDb(p);
-        }
-        if (parsed.subjects) {
-          for (const s of parsed.subjects) await saveSubjectToDb(s);
-        }
-        if (parsed.schedules) {
-          for (const sc of parsed.schedules) await saveScheduleToDb(sc);
-        }
+  if (!rawEnrollmentText || !rawEnrollmentText.trim()) {
+    return {
+      status: 'error',
+      error: 'invalid_input',
+      message: 'No se proporcionó texto de matrícula (raw_text es obligatorio). Formato esperado: JSON estructurado con { universities, professors, subjects, schedules } (convención day_of_week: 1=Lunes..7=Domingo).',
+    };
+  }
 
-        if (parsed.classroomOverrides) {
-          const currentSchedulesRes = await fetchSchedulesFromDb();
-          const schedulesArray = Array.isArray(currentSchedulesRes) ? currentSchedulesRes : [];
-          for (const [subId, newClassroom] of Object.entries(parsed.classroomOverrides)) {
-            const matching = schedulesArray.filter((sch: any) => sch && sch.subject_id === subId);
-            for (const sch of matching) {
-              await saveScheduleToDb({ ...sch, classroom: newClassroom });
-            }
+  let parsedJson: any = null;
+  let isJson = false;
+
+  try {
+    parsedJson = JSON.parse(rawEnrollmentText);
+    if (typeof parsedJson === 'object' && parsedJson !== null) {
+      isJson = true;
+    }
+  } catch {
+    isJson = false;
+  }
+
+  if (isJson) {
+    // JSON Branch: Any DB write exception MUST propagate as status "error", NEVER falling through to plain text parsing!
+    try {
+      let universitiesIngested = 0;
+      let professorsIngested = 0;
+      let subjectsIngested = 0;
+      let schedulesIngested = 0;
+      let classroomsUpdatedCount = 0;
+
+      if (Array.isArray(parsedJson.universities)) {
+        for (const u of parsedJson.universities) {
+          await saveUniversityToDb(u);
+          universitiesIngested++;
+        }
+      }
+      if (Array.isArray(parsedJson.professors)) {
+        for (const p of parsedJson.professors) {
+          await saveProfessorToDb(p);
+          professorsIngested++;
+        }
+      }
+      if (Array.isArray(parsedJson.subjects)) {
+        for (const s of parsedJson.subjects) {
+          await saveSubjectToDb(s);
+          subjectsIngested++;
+        }
+      }
+      if (Array.isArray(parsedJson.schedules)) {
+        for (const sc of parsedJson.schedules) {
+          await saveScheduleToDb(sc);
+          schedulesIngested++;
+        }
+      }
+
+      if (parsedJson.classroomOverrides && typeof parsedJson.classroomOverrides === 'object') {
+        const currentSchedulesRes = await fetchSchedulesFromDb();
+        const schedulesArray = Array.isArray(currentSchedulesRes) ? currentSchedulesRes : [];
+        for (const [subId, newClassroom] of Object.entries(parsedJson.classroomOverrides)) {
+          const matching = schedulesArray.filter((sch: any) => sch && sch.subject_id === subId);
+          for (const sch of matching) {
+            await saveScheduleToDb({ ...sch, classroom: newClassroom as string });
+            classroomsUpdatedCount++;
           }
         }
-      } catch {
-        // Plain text parsing
-        const lines = rawEnrollmentText.split('\n');
-        const subsRes = await fetchSubjectsFromDb();
-        const schedsRes = await fetchSchedulesFromDb();
-        const subsArray = Array.isArray(subsRes) ? subsRes : [];
-        const schedsArray = Array.isArray(schedsRes) ? schedsRes : [];
+      }
 
-        for (const line of lines) {
-          const parts = line.split(':');
-          if (parts.length === 2) {
-            const key = parts[0].trim().toLowerCase();
-            const val = parts[1].trim();
+      const totalChanges = universitiesIngested + professorsIngested + subjectsIngested + schedulesIngested + classroomsUpdatedCount;
 
-            for (const sub of subsArray) {
-              if (sub.name.toLowerCase().includes(key)) {
-                const matchingScheds = schedsArray.filter((sch: any) => sch.subject_id === sub.id);
-                for (const sch of matchingScheds) {
-                  await saveScheduleToDb({ ...sch, classroom: val });
-                }
+      if (totalChanges === 0) {
+        return {
+          status: 'error',
+          error: 'invalid_input',
+          message: 'El JSON proporcionado no contiene ninguna de las claves esperadas: universities, professors, subjects, schedules o classroomOverrides.',
+        };
+      }
+
+      return {
+        status: 'success',
+        message: 'Matrícula e información de aulas procesada exitosamente en el Servidor MCP.',
+        data: {
+          universitiesCount: universitiesIngested,
+          professorsCount: professorsIngested,
+          subjectsCount: subjectsIngested,
+          schedulesCount: schedulesIngested,
+          classroomsUpdated: classroomsUpdatedCount,
+        },
+      };
+    } catch (dbErr: any) {
+      return {
+        status: 'error',
+        message: dbErr.message || 'Error al guardar los datos de matrícula en la base de datos.',
+      };
+    }
+  }
+
+  // Plain Text Branch (only entered when rawEnrollmentText is NOT valid JSON)
+  try {
+    const lines = rawEnrollmentText.split('\n');
+    const subsRes = await fetchSubjectsFromDb();
+    const schedsRes = await fetchSchedulesFromDb();
+    const subsArray = Array.isArray(subsRes) ? subsRes : [];
+    const schedsArray = Array.isArray(schedsRes) ? schedsRes : [];
+    let classroomsUpdatedCount = 0;
+
+    for (const line of lines) {
+      const parts = line.split(':');
+      if (parts.length === 2) {
+        const key = parts[0].trim().toLowerCase();
+        const val = parts[1].trim();
+
+        if (key && val) {
+          for (const sub of subsArray) {
+            if (sub.name && sub.name.toLowerCase().includes(key)) {
+              const matchingScheds = schedsArray.filter((sch: any) => sch && sch.subject_id === sub.id);
+              for (const sch of matchingScheds) {
+                await saveScheduleToDb({ ...sch, classroom: val });
+                classroomsUpdatedCount++;
               }
             }
           }
@@ -185,33 +255,27 @@ export async function handleIngestAcademicEnrollment(rawEnrollmentText?: string)
       }
     }
 
-    const overview = await fetchAcademicOverviewFromDb();
-    const universities = await fetchUniversitiesFromDb();
-    const professors = await fetchProfessorsFromDb();
-    const subjects = await fetchSubjectsFromDb();
-    const schedules = await fetchSchedulesFromDb();
-
-    const unisArr = Array.isArray(universities) ? universities : universities ? [universities] : [];
-    const profsArr = Array.isArray(professors) ? professors : professors ? [professors] : [];
-    const subsArr = Array.isArray(subjects) ? subjects : subjects ? [subjects] : [];
-    const schedsArr = Array.isArray(schedules) ? schedules : schedules ? [schedules] : [];
+    if (classroomsUpdatedCount === 0) {
+      return {
+        status: 'error',
+        error: 'invalid_input',
+        message: 'El texto de entrada no es un JSON válido ni contiene actualizaciones de aulas para materias existentes (formato esperado: JSON con { universities, professors, subjects, schedules } (day_of_week: 1=Lunes..7=Domingo) o "Nombre Materia: Aula").',
+      };
+    }
 
     return {
       status: 'success',
-      message: 'Matrícula e información de aulas procesada exitosamente en el Servidor MCP.',
+      message: 'Aulas actualizadas exitosamente a partir de texto plano.',
       data: {
-        universitiesCount: overview?.universitiesCount || unisArr.length,
-        professorsCount: overview?.professorsCount || profsArr.length,
-        subjectsCount: overview?.subjectsCount || subsArr.length,
-        schedulesCount: overview?.schedulesCount || schedsArr.length,
-        universities: unisArr,
-        professors: profsArr,
-        subjects: subsArr,
-        schedules: schedsArr,
+        schedules: await fetchSchedulesFromDb(),
+        classroomsUpdated: classroomsUpdatedCount,
       },
     };
-  } catch (error: any) {
-    return { status: 'error', message: error.message || 'Error al ingestar matrícula' };
+  } catch (err: any) {
+    return {
+      status: 'error',
+      message: err.message || 'Error al procesar texto de matrícula',
+    };
   }
 }
 

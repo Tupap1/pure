@@ -61,24 +61,32 @@ Retorna el resumen académico global del estudiante, incluyendo horas de tiempo 
 ---
 
 ### 2. `ingest_academic_enrollment`
-Procesa e ingesta la estructura completa de la matrícula del estudiante para las dos carreras universitarias concurrentes:
-1. **Universidad de Antioquia (UdeA)**: Ingeniería Aeroespacial (Presencial).
-2. **Universidad de Cartagena (UdeC)**: Ingeniería de Software a Distancia (Sábados Alternados A/B).
+Procesa e ingesta la estructura completa de la matrícula del estudiante. El parámetro `raw_text` debe ser un string JSON con los arrays `universities`, `professors`, `subjects` y `schedules` (convención `day_of_week`: 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado, 7=Domingo).
 
 - **Firma / Esquema**:
   ```json
   {
     "name": "ingest_academic_enrollment",
-    "description": "Procesa e ingesta la matrícula real del estudiante (materias Nivel I, créditos, grupos y horarios con aulas asignadas).",
+    "description": "Procesa e ingesta la matrícula del estudiante. raw_text debe ser un string JSON con { universities, professors, subjects, schedules }.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "raw_text": {
           "type": "string",
-          "description": "Texto opcional de las materias y horarios matriculados"
+          "description": "String JSON con { universities, professors, subjects, schedules }. Convención day_of_week: 1=Lunes..7=Domingo."
         }
-      }
+      },
+      "required": ["raw_text"]
     }
+  }
+  ```
+- **Ejemplo de Entrada (`raw_text`)**:
+  ```json
+  {
+    "universities": [{ "id": "u1", "name": "Universidad de Antioquia" }],
+    "professors": [{ "id": "p1", "university_id": "u1", "name": "Dra. Curie", "email": "curie@udea.edu.co" }],
+    "subjects": [{ "id": "s1", "university_id": "u1", "professor_id": "p1", "name": "Cálculo Multivariable", "credits": 4 }],
+    "schedules": [{ "id": "sch1", "subject_id": "s1", "day_of_week": 1, "start_time": "08:00", "end_time": "10:00", "classroom": "Aula 2-209" }]
   }
   ```
 - **Entidades Ingestadas**:

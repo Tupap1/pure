@@ -72,8 +72,8 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite (con pg-mem
 
     it('should handle empty or undefined raw_text gracefully', async () => {
       const res = await handleIngestAcademicEnrollment();
-      expect(res.status).toBe('success');
-      expect(res.data).toBeDefined();
+      expect(res.status).toBe('error');
+      expect(res.error).toBe('invalid_input');
     });
   });
 

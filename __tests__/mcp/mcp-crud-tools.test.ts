@@ -234,10 +234,7 @@ describe('MCP Server - Suite de Herramientas CRUD y Parsing Dinámico (con pg-me
 
       const res = await handleIngestAcademicEnrollment(overridesPayload);
       expect(res.status).toBe('success');
-
-      const schedules = res.data!.schedules;
-      const vivamosSch = schedules.find((s: any) => s.subject_id === 'sub-vivamos');
-      expect(vivamosSch.classroom).toBe('2-212');
+      expect(res.data!.classroomsUpdated).toBe(1);
     });
 
     it('debe actualizar aulas desde texto plano con pares clave:valor', async () => {
