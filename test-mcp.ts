@@ -3,7 +3,7 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import 'dotenv/config';
 
 async function main() {
-  const apiKey = process.env.MCP_API_KEY || 'Stability8-Showcase4-Lavish9-Petition3';
+  const apiKey = process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN || 'test_secret_key_123';
   const url = `https://mcp.btw-one.com/sse?apiKey=${apiKey}`;
   
   console.log(`Connecting to ${url}...`);
