@@ -202,7 +202,8 @@ export function createMcpServerInstance() {
 
 async function main() {
   const port = Number(process.env.MCP_PORT || 3001);
-  const secretKey = process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN;
+  const rawKey = process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN;
+  const secretKey = rawKey ? rawKey.trim() : undefined;
 
   if (!secretKey) {
     console.warn('⚠️ ADVERTENCIA: MCP_API_KEY / MCP_AUTH_TOKEN no está configurado en el entorno.');
@@ -300,7 +301,7 @@ async function main() {
         }
 
         // Securely validate the provided secret against our MCP_API_KEY
-        if (secretKey && clientSecret !== secretKey) {
+        if (secretKey && clientSecret.trim() !== secretKey) {
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'invalid_client', error_description: 'Client secret does not match MCP_API_KEY' }));
           return;

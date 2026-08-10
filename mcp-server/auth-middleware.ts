@@ -1,7 +1,8 @@
 import { IncomingMessage } from 'http';
 
 export function validateMcpAuth(req: IncomingMessage, secretKey?: string): boolean {
-  const targetKey = secretKey || process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN;
+  const rawKey = secretKey || process.env.MCP_API_KEY || process.env.MCP_AUTH_TOKEN;
+  const targetKey = rawKey ? rawKey.trim() : undefined;
 
   // 1. Allow public health check GET /health
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
@@ -15,7 +16,7 @@ export function validateMcpAuth(req: IncomingMessage, secretKey?: string): boole
   }
 
   // If no secret key is configured in env or passed as parameter, reject protected routes
-  if (!targetKey || targetKey.trim() === '') {
+  if (!targetKey) {
     return false;
   }
 
@@ -24,7 +25,7 @@ export function validateMcpAuth(req: IncomingMessage, secretKey?: string): boole
   if (authHeader) {
     const parts = authHeader.split(' ');
     if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
-      if (parts[1] === targetKey) {
+      if (parts[1].trim() === targetKey) {
         return true;
       }
     }
@@ -32,13 +33,13 @@ export function validateMcpAuth(req: IncomingMessage, secretKey?: string): boole
 
   // 4. Check x-api-key header
   const apiKeyHeader = req.headers['x-api-key'];
-  if (apiKeyHeader && apiKeyHeader === targetKey) {
+  if (apiKeyHeader && typeof apiKeyHeader === 'string' && apiKeyHeader.trim() === targetKey) {
     return true;
   }
 
   // 5. Check ?apiKey= query parameter (for browser SSE eventsource connections)
   const paramKey = url.searchParams.get('apiKey') || url.searchParams.get('api_key') || url.searchParams.get('token');
-  if (paramKey && paramKey === targetKey) {
+  if (paramKey && paramKey.trim() === targetKey) {
     return true;
   }
 
