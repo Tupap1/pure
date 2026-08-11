@@ -260,6 +260,11 @@ export async function fetchSchedulesFromDb(id?: string) {
 }
 
 export async function saveScheduleToDb(sched: any) {
+  const periodicity = sched.periodicity || 'semanal';
+  if (!['semanal', 'sabado_a', 'sabado_b'].includes(periodicity)) {
+    throw new Error(`Valor de periodicidad inválido: '${sched.periodicity}'. Debe ser 'semanal', 'sabado_a' o 'sabado_b'.`);
+  }
+
   const record = {
     id: sched.id || `sch-${Date.now()}`,
     subject_id: sched.subject_id,
@@ -267,7 +272,7 @@ export async function saveScheduleToDb(sched: any) {
     start_time: sched.start_time,
     end_time: sched.end_time,
     classroom: sched.classroom || null,
-    periodicity: sched.periodicity || 'semanal',
+    periodicity,
   };
 
   await pgPool.query(

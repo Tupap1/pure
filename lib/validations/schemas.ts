@@ -60,7 +60,8 @@ export const ScheduleSchema = z.object({
   end_time: z.string().transform(formatTimeStr).pipe(
     z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Formato de hora fin inválido (ej: 10:00)' })
   ),
-  classroom: z.string().optional()
+  classroom: z.string().optional(),
+  periodicity: z.enum(['semanal', 'sabado_a', 'sabado_b']).optional().default('semanal')
 }).refine(data => {
   const [startH, startM] = data.start_time.split(':').map(Number);
   const [endH, endM] = data.end_time.split(':').map(Number);

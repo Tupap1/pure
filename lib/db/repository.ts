@@ -91,6 +91,7 @@ export async function saveSchedule(sched: ScheduleEntity) {
   const record = {
     ...sched,
     id: sched.id || `sch-${Date.now()}`,
+    periodicity: sched.periodicity || 'semanal',
     created_at: sched.created_at || nowIso(),
   };
 

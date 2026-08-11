@@ -33,13 +33,13 @@ export const TOOLS_LIST = [
   },
   {
     name: 'ingest_academic_enrollment',
-    description: 'Procesa e ingesta la matrícula del estudiante. raw_text debe ser un string JSON con los arrays "universities", "professors", "subjects" y "schedules" (convención day_of_week: 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado, 7=Domingo). Ejemplo mínimo: {"universities":[{"id":"u1","name":"UdeA"}],"professors":[{"id":"p1","university_id":"u1","name":"Dr. Curie"}],"subjects":[{"id":"s1","university_id":"u1","professor_id":"p1","name":"Cálculo"}],"schedules":[{"id":"sch1","subject_id":"s1","day_of_week":1,"start_time":"08:00","end_time":"10:00","classroom":"2-209"}]}',
+    description: 'Procesa e ingesta la matrícula del estudiante. raw_text debe ser un string JSON con los arrays "universities", "professors", "subjects" y "schedules" (convención day_of_week: 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado, 7=Domingo; periodicity: "semanal" | "sabado_a" | "sabado_b", donde sabado_a y sabado_b son quincenales alternas). Ejemplo mínimo: {"universities":[{"id":"u1","name":"UdeA"}],"professors":[{"id":"p1","university_id":"u1","name":"Dr. Curie"}],"subjects":[{"id":"s1","university_id":"u1","professor_id":"p1","name":"Cálculo"}],"schedules":[{"id":"sch1","subject_id":"s1","day_of_week":6,"start_time":"08:00","end_time":"10:00","classroom":"2-209","periodicity":"sabado_a"}]}',
     inputSchema: {
       type: 'object',
       properties: {
         raw_text: {
           type: 'string',
-          description: 'String JSON con { universities, professors, subjects, schedules }. Convención day_of_week: 1=Lunes..7=Domingo. Ejemplo: {"universities":[{"id":"u1","name":"UdeA"}],"subjects":[{"id":"s1","university_id":"u1","name":"Cálculo"}],"schedules":[{"id":"sch1","subject_id":"s1","day_of_week":1,"start_time":"08:00","end_time":"10:00","classroom":"2-209"}]}',
+          description: 'String JSON con { universities, professors, subjects, schedules }. Convención day_of_week: 1=Lunes..7=Domingo. periodicity: "semanal" | "sabado_a" | "sabado_b" (sabado_a/sabado_b son quincenales alternas). Ejemplo: {"universities":[{"id":"u1","name":"UdeA"}],"subjects":[{"id":"s1","university_id":"u1","name":"Cálculo"}],"schedules":[{"id":"sch1","subject_id":"s1","day_of_week":6,"start_time":"08:00","end_time":"10:00","classroom":"2-209","periodicity":"sabado_a"}]}',
         },
       },
       required: ['raw_text'],
@@ -72,7 +72,7 @@ export const TOOLS_LIST = [
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
-        data: { type: 'object', description: 'Datos de la universidad (id, name, modality, scale_min, scale_max, passing_grade, color)' },
+        data: { type: 'object', description: 'Datos de la universidad (id, name, modality, scale_min, scale_max, passing_grade, color, has_alternating_saturdays, first_sabado_a_date)' },
       },
       required: ['action'],
     },
@@ -103,12 +103,12 @@ export const TOOLS_LIST = [
   },
   {
     name: 'manage_schedules',
-    description: 'Operaciones CRUD sobre Horarios y Aulas de clase (crear, leer, actualizar, eliminar).',
+    description: 'Operaciones CRUD sobre Horarios y Aulas de clase (crear, leer, actualizar, eliminar). periodicity: "semanal" | "sabado_a" | "sabado_b" (sabado_a/sabado_b son quincenales alternas).',
     inputSchema: {
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
-        data: { type: 'object', description: 'Datos del horario (id, subject_id, day_of_week, start_time, end_time, classroom)' },
+        data: { type: 'object', description: 'Datos del horario (id, subject_id, day_of_week, start_time, end_time, classroom, periodicity: "semanal" | "sabado_a" | "sabado_b")' },
       },
       required: ['action'],
     },
