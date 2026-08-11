@@ -1,0 +1,50 @@
+# Ambas imágenes hacen `COPY . .`, así que todo lo que quede aquí se transfiere al
+# builder. Sin este archivo el contexto llega a ~580 MB / 19k archivos en cuanto
+# alguien corre `npm ci` en el checkout, y BuildKit se atasca en "transferring
+# context" antes siquiera de empezar a compilar.
+
+# Dependencias: cada Dockerfile corre su propio `npm ci`, y copiar las del host
+# encima sobrescribiría ese resultado con binarios de otra plataforma.
+node_modules
+
+# Artefactos de build: la imagen web genera su propio .next
+.next
+out
+build
+coverage
+.vitest
+*.tsbuildinfo
+
+# Historial de git
+.git
+.gitignore
+.github
+
+# Secretos: las variables las inyecta docker-compose en runtime; no deben quedar
+# horneadas en la imagen.
+.env
+.env.local
+.env.*.local
+
+# Meta de Docker (no se usa dentro de la imagen)
+Dockerfile
+Dockerfile.mcp
+docker-compose.yml
+.dockerignore
+
+# Herramientas de editor / asistentes
+.vscode
+.idea
+.claude
+.gemini
+.cursor
+*.swp
+*.swo
+
+# Logs y ruido del SO
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
