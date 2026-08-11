@@ -30,9 +30,14 @@ export const CommandCenter: React.FC = () => {
 
   if (!isLoaded) {
     return (
-      <div className="p-12 text-center text-slate-500 dark:text-slate-400 font-mono text-xs flex items-center justify-center gap-2">
-        <Zap className="w-4 h-4 text-sky-600 dark:text-sky-400 animate-spin" />
-        Sincronizando estado académico local...
+      <div className="space-y-6 animate-pulse" role="status" aria-label="Sincronizando estado académico local">
+        <div className="h-24 rounded-xl bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-20 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+          ))}
+        </div>
+        <div className="h-64 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
       </div>
     );
   }
@@ -122,7 +127,7 @@ export const CommandCenter: React.FC = () => {
             <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto shadow-sm">
               <GraduationCap className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+            <h3 className="text-lg font-heading font-bold text-slate-900 dark:text-slate-100 tracking-tight">
               Sin materias registradas
             </h3>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
@@ -174,7 +179,7 @@ export const CommandCenter: React.FC = () => {
               {/* Deliverables Card */}
               <Card className="space-y-4 p-5">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
+                  <h3 className="text-sm font-heading font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
                     <CalendarDays className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                     Entregas & Parciales Próximos ({urgentDeliverables.length})
                   </h3>
@@ -198,9 +203,9 @@ export const CommandCenter: React.FC = () => {
                       return (
                         <div
                           key={deliv.id}
-                          className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80 transition-colors"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700/80 transition-colors"
                         >
-                          <div className="space-y-1 min-w-0 pr-3">
+                          <div className="space-y-1 min-w-0 sm:pr-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <Badge variant={sub?.modality === 'presencial' ? 'aeroespacial' : 'software'}>
                                 {sub?.name || 'Materia'}
@@ -214,7 +219,12 @@ export const CommandCenter: React.FC = () => {
                               Límite: <span className="text-slate-800 dark:text-slate-200 font-medium">{formattedDate}</span> • Peso Evaluativo: <span className="text-sky-600 dark:text-sky-400 font-semibold">{deliv.weight_percentage}%</span>
                             </p>
                           </div>
-                          <Button variant="synergy" size="sm" onClick={() => handleMarkAsDone(deliv.id!)}>
+                          <Button
+                            variant="synergy"
+                            size="sm"
+                            className="w-full sm:w-auto min-h-[44px] sm:min-h-0 shrink-0"
+                            onClick={() => handleMarkAsDone(deliv.id!)}
+                          >
                             <CheckCircle2 className="w-3.5 h-3.5" /> Entregado
                           </Button>
                         </div>
@@ -241,7 +251,7 @@ export const CommandCenter: React.FC = () => {
             <div className="lg:col-span-5 space-y-6">
               <Card className="p-5 space-y-5">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
+                  <h3 className="text-sm font-heading font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
                     <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     Balance de Tiempo Semanal (168h)
                   </h3>
@@ -309,7 +319,7 @@ export const CommandCenter: React.FC = () => {
 
             <Card className="p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
+                <h3 className="text-sm font-heading font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
                   <BarChart3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                   Evolución de Promedio Académico
                 </h3>

@@ -78,8 +78,26 @@ export const ConfigDashboard: React.FC = () => {
   const [schedErrors, setSchedErrors] = useState<Record<string, string>>({});
 
   if (!isLoaded) {
-    return <div className="p-8 text-center text-slate-400 font-mono">Cargando directorio...</div>;
+    return (
+      <div className="space-y-8 animate-pulse pb-16" role="status" aria-label="Cargando directorio">
+        <div className="h-16 rounded-lg bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-28 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+          ))}
+        </div>
+      </div>
+    );
   }
+
+  const handleClearAllData = () => {
+    const confirmed = window.confirm(
+      'Esto eliminará permanentemente todas tus universidades, profesores, materias, horarios, temarios y entregas guardados en este dispositivo. Esta acción no se puede deshacer. ¿Continuar?'
+    );
+    if (confirmed) {
+      clearAllData();
+    }
+  };
 
   // --- UNIVERSITY HANDLERS ---
   const openAddUni = () => {
@@ -313,29 +331,27 @@ export const ConfigDashboard: React.FC = () => {
       {/* Header & Global Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+          <h2 className="text-xl font-heading font-bold tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0" />
             Configuración & Directorio Base (CRUD Completo)
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Administra y edita universidades, profesores, asignaturas y clases guardados en tu base de datos local.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => clearAllData()}>
-            <RotateCcw className="w-3.5 h-3.5" /> Limpiar Todo
-          </Button>
-        </div>
+        <Button variant="danger" size="sm" className="w-full sm:w-auto" onClick={handleClearAllData}>
+          <RotateCcw className="w-3.5 h-3.5" /> Limpiar Todo
+        </Button>
       </div>
 
       {/* 1. Universidades Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <GraduationCap className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h3 className="text-base font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <GraduationCap className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0" />
             Universidades ({universities.length})
           </h3>
-          <Button variant="aeroespacial" size="sm" onClick={openAddUni}>
+          <Button variant="aeroespacial" size="sm" className="w-full sm:w-auto" onClick={openAddUni}>
             <Plus className="w-3.5 h-3.5" /> Agregar Universidad
           </Button>
         </div>
@@ -370,17 +386,19 @@ export const ConfigDashboard: React.FC = () => {
                       </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => openEditUni(uni)}
-                      className="text-slate-400 hover:text-sky-500 transition-colors p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                      aria-label={`Editar ${uni.name}`}
+                      className="text-slate-400 hover:text-sky-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center"
                       title="Editar Universidad"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteUni(uni.id!)}
-                      className="text-slate-400 hover:text-rose-500 transition-colors p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                      aria-label={`Eliminar ${uni.name}`}
+                      className="text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center"
                       title="Eliminar Universidad"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -410,14 +428,15 @@ export const ConfigDashboard: React.FC = () => {
 
       {/* 2. Profesores Directory Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h3 className="text-base font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
             Directorio de Profesores ({professors.length})
           </h3>
           <Button
             variant="primary"
             size="sm"
+            className="w-full sm:w-auto"
             onClick={openAddProf}
             disabled={universities.length === 0}
           >
@@ -455,17 +474,19 @@ export const ConfigDashboard: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => openEditProf(prof)}
-                      className="text-slate-400 hover:text-sky-500 transition-colors p-1.5"
+                      aria-label={`Editar ${prof.name}`}
+                      className="text-slate-400 hover:text-sky-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center"
                       title="Editar Profesor"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteProf(prof.id!)}
-                      className="text-slate-400 hover:text-rose-500 transition-colors p-1.5"
+                      aria-label={`Eliminar ${prof.name}`}
+                      className="text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center"
                       title="Eliminar Profesor"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -480,14 +501,15 @@ export const ConfigDashboard: React.FC = () => {
 
       {/* 3. Materias / Asignaturas Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h3 className="text-base font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             Asignaturas / Materias ({subjects.length})
           </h3>
           <Button
             variant="aeroespacial"
             size="sm"
+            className="w-full sm:w-auto"
             onClick={openAddSubject}
             disabled={universities.length === 0}
           >
@@ -534,17 +556,19 @@ export const ConfigDashboard: React.FC = () => {
                         {uni?.name} {prof ? `• Profe: ${prof.name}` : ''}
                       </p>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => openEditSubject(sub)}
-                        className="text-slate-400 hover:text-sky-500 transition-colors p-1.5"
+                        aria-label={`Editar ${sub.name}`}
+                        className="text-slate-400 hover:text-sky-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center"
                         title="Editar Materia"
                       >
                         <Edit3 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteSubject(sub.id!)}
-                        className="text-slate-400 hover:text-rose-500 transition-colors p-1.5"
+                        aria-label={`Eliminar ${sub.name}`}
+                        className="text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center"
                         title="Eliminar Materia"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -552,7 +576,7 @@ export const ConfigDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800 pt-2 font-mono">
+                  <div className="grid grid-cols-2 gap-y-1 gap-x-3 sm:flex sm:items-center sm:justify-between text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800 pt-2 font-mono">
                     <span>Créditos: {sub.credits}</span>
                     <span>Dificultad: {sub.difficulty}/5</span>
                     <span>Nota Meta: {sub.target_grade}</span>
@@ -567,14 +591,15 @@ export const ConfigDashboard: React.FC = () => {
 
       {/* 4. Horarios de Clases Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h3 className="text-base font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
             Horarios Semanales Registrados ({schedules.length})
           </h3>
           <Button
             variant="primary"
             size="sm"
+            className="w-full sm:w-auto"
             onClick={openAddSchedule}
             disabled={subjects.length === 0}
           >
@@ -605,20 +630,22 @@ export const ConfigDashboard: React.FC = () => {
                     </div>
                     <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{sched.classroom}</div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => openEditSchedule(sched)}
-                      className="text-slate-400 hover:text-sky-500 transition-colors p-1"
+                      aria-label={`Editar horario de ${sub?.name || 'materia'}`}
+                      className="text-slate-400 hover:text-sky-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center"
                       title="Editar Horario"
                     >
-                      <Edit3 className="w-3.5 h-3.5" />
+                      <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteSchedule(sched.id!)}
-                      className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                      aria-label={`Eliminar horario de ${sub?.name || 'materia'}`}
+                      className="text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center"
                       title="Eliminar Horario"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </Card>
@@ -662,7 +689,7 @@ export const ConfigDashboard: React.FC = () => {
             </select>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Escala Min</label>
               <input
@@ -691,11 +718,16 @@ export const ConfigDashboard: React.FC = () => {
               />
             </div>
           </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => { setIsAddUniOpen(false); setEditingUni(null); }}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+            <Button variant="ghost" className="w-full sm:w-auto" onClick={() => { setIsAddUniOpen(false); setEditingUni(null); }}>
               Cancelar
             </Button>
-            <Button variant="aeroespacial" onClick={handleSaveUni}>
+            <Button
+              variant="aeroespacial"
+              className="w-full sm:w-auto"
+              onClick={handleSaveUni}
+              disabled={!uniName.trim()}
+            >
               {editingUni ? 'Guardar Cambios' : 'Guardar Universidad'}
             </Button>
           </div>
@@ -750,11 +782,16 @@ export const ConfigDashboard: React.FC = () => {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => { setIsAddProfOpen(false); setEditingProf(null); }}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+            <Button variant="ghost" className="w-full sm:w-auto" onClick={() => { setIsAddProfOpen(false); setEditingProf(null); }}>
               Cancelar
             </Button>
-            <Button variant="synergy" onClick={handleSaveProf}>
+            <Button
+              variant="synergy"
+              className="w-full sm:w-auto"
+              onClick={handleSaveProf}
+              disabled={!profName.trim() || !profUniId}
+            >
               {editingProf ? 'Guardar Cambios' : 'Guardar Profesor'}
             </Button>
           </div>
@@ -840,7 +877,7 @@ export const ConfigDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Créditos</label>
               <input
@@ -873,11 +910,16 @@ export const ConfigDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => { setIsAddSubjectOpen(false); setEditingSubject(null); }}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+            <Button variant="ghost" className="w-full sm:w-auto" onClick={() => { setIsAddSubjectOpen(false); setEditingSubject(null); }}>
               Cancelar
             </Button>
-            <Button variant="aeroespacial" onClick={handleSaveSubject}>
+            <Button
+              variant="aeroespacial"
+              className="w-full sm:w-auto"
+              onClick={handleSaveSubject}
+              disabled={!subName.trim() || !subUniId}
+            >
               {editingSubject ? 'Guardar Cambios' : 'Guardar Materia'}
             </Button>
           </div>
@@ -910,7 +952,7 @@ export const ConfigDashboard: React.FC = () => {
             </select>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Día</label>
               <select
@@ -981,11 +1023,16 @@ export const ConfigDashboard: React.FC = () => {
             );
           })()}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => { setIsAddScheduleOpen(false); setEditingSchedule(null); }}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+            <Button variant="ghost" className="w-full sm:w-auto" onClick={() => { setIsAddScheduleOpen(false); setEditingSchedule(null); }}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={handleSaveSchedule}>
+            <Button
+              variant="primary"
+              className="w-full sm:w-auto"
+              onClick={handleSaveSchedule}
+              disabled={!schedSubjectId || !schedStart.trim() || !schedEnd.trim()}
+            >
               {editingSchedule ? 'Guardar Cambios' : 'Guardar Horario'}
             </Button>
           </div>

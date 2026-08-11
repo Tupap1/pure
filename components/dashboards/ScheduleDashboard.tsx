@@ -53,7 +53,12 @@ export const ScheduleDashboard: React.FC = () => {
   const [schedErrors, setSchedErrors] = useState<Record<string, string>>({});
 
   if (!isLoaded) {
-    return <div className="p-8 text-center text-slate-400 font-mono">Cargando horario...</div>;
+    return (
+      <div className="space-y-6 animate-pulse pb-4" role="status" aria-label="Cargando horario">
+        <div className="h-14 rounded-lg bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
+        <div className="h-64 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+      </div>
+    );
   }
 
   const mappedSlots = schedules.map((s) => {
@@ -180,7 +185,7 @@ export const ScheduleDashboard: React.FC = () => {
             Master Schedule & Matriz de Traslapes
           </h2>
         </div>
-        <Button variant="aeroespacial" onClick={handleOpenAddSchedule} className="shrink-0 flex items-center gap-1.5">
+        <Button variant="aeroespacial" onClick={handleOpenAddSchedule} className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-1.5">
           <Plus className="w-4 h-4" /> Asignar Horario
         </Button>
       </div>
@@ -195,7 +200,7 @@ export const ScheduleDashboard: React.FC = () => {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="danger">⚠️ Traslape Detectado</Badge>
+                  <Badge variant="danger">Traslape Detectado</Badge>
                   <span className="text-xs font-mono text-rose-600 dark:text-rose-300 font-bold">
                     Empalme de {conflicts[0].overlapMinutes} mins
                   </span>
@@ -212,7 +217,7 @@ export const ScheduleDashboard: React.FC = () => {
       {schedules.length === 0 ? (
         <Card className="p-12 text-center border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
           <CalendarIcon className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No hay horarios registrados</h3>
+          <h3 className="text-base font-heading font-bold tracking-tight text-slate-800 dark:text-slate-200">No hay horarios registrados</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto mb-4">
             Asigna días, horas inicio/fin y aulas a tus materias registradas.
           </p>
@@ -374,7 +379,7 @@ export const ScheduleDashboard: React.FC = () => {
             {schedErrors.subject_id && <p className="text-xs text-rose-500 font-medium mt-1">{schedErrors.subject_id}</p>}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Día</label>
               <select
@@ -441,11 +446,16 @@ export const ScheduleDashboard: React.FC = () => {
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+            <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
-            <Button variant="aeroespacial" onClick={handleSaveSchedule}>
+            <Button
+              variant="aeroespacial"
+              className="w-full sm:w-auto"
+              onClick={handleSaveSchedule}
+              disabled={!schedSubjectId || !schedStart.trim() || !schedEnd.trim()}
+            >
               {editingSchedId ? 'Guardar Cambios' : 'Guardar Horario'}
             </Button>
           </div>

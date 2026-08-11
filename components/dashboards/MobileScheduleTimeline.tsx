@@ -32,10 +32,20 @@ export const MobileScheduleTimeline: React.FC = () => {
   const [absenceRecords, setAbsenceRecords] = useState<Record<string, string[]>>({});
 
   if (!isLoaded) {
-    return <div className="p-4 text-center text-xs font-mono text-slate-400">Cargando timeline...</div>;
+    return (
+      <div className="space-y-4 max-w-md mx-auto animate-pulse" role="status" aria-label="Cargando timeline">
+        <div className="h-24 rounded-2xl bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
+        <div className="h-10 rounded-xl bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
+        <div className="space-y-2.5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-20 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
-  const shortDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const shortDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   const fullDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   const dayNumbers = [18, 19, 20, 21, 22, 23, 24];
 
@@ -97,10 +107,12 @@ export const MobileScheduleTimeline: React.FC = () => {
       </div>
 
       {/* Sub-Tab View Switcher */}
-      <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-mono">
+      <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-mono" role="tablist">
         <button
+          role="tab"
+          aria-selected={activeTab === 'timeline'}
           onClick={() => setActiveTab('timeline')}
-          className={`flex-1 py-1.5 font-bold rounded-lg transition-all ${
+          className={`flex-1 min-h-[44px] font-bold rounded-lg transition-all ${
             activeTab === 'timeline'
               ? 'bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm'
               : 'text-slate-500 dark:text-slate-400'
@@ -109,8 +121,10 @@ export const MobileScheduleTimeline: React.FC = () => {
           Agenda por Horas
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'attendance'}
           onClick={() => setActiveTab('attendance')}
-          className={`flex-1 py-1.5 font-bold rounded-lg transition-all ${
+          className={`flex-1 min-h-[44px] font-bold rounded-lg transition-all ${
             activeTab === 'attendance'
               ? 'bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 shadow-sm'
               : 'text-slate-500 dark:text-slate-400'
@@ -202,9 +216,15 @@ export const MobileScheduleTimeline: React.FC = () => {
                         0{absences.length}
                       </div>
                       <div className="text-[9px] text-slate-500 dark:text-slate-400 leading-tight">Fallas</div>
-                      <div className="text-[9px] text-purple-600 dark:text-purple-400 font-bold cursor-pointer hover:underline pt-0.5">
+                      <button
+                        onClick={() => {
+                          setSelectedSubjectId(sched.subject_id);
+                          setActiveTab('attendance');
+                        }}
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-end -mr-2 -mb-2 text-[9px] text-purple-600 dark:text-purple-400 font-bold hover:underline"
+                      >
                         DETALLES
-                      </div>
+                      </button>
                     </div>
                   </div>
                 );
@@ -223,7 +243,7 @@ export const MobileScheduleTimeline: React.FC = () => {
                 <button
                   key={sub.id}
                   onClick={() => setSelectedSubjectId(sub.id!)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-heading font-bold transition-all shrink-0 border ${
+                  className={`px-3 min-h-[44px] rounded-lg text-xs font-heading font-bold transition-all shrink-0 border ${
                     isSelected
                       ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border-cyan-500/40 glow-aeroespacial'
                       : 'bg-white dark:bg-[#0d1322] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-400'
@@ -280,7 +300,9 @@ export const MobileScheduleTimeline: React.FC = () => {
                         <button
                           key={dateStr}
                           onClick={() => toggleAbsenceDate(activeSubject.id!, dateStr)}
-                          className={`h-8 rounded-lg text-xs font-mono transition-all flex items-center justify-center border ${
+                          aria-label={`Marcar falla el día ${dayNum}`}
+                          aria-pressed={isAbsent}
+                          className={`h-11 rounded-lg text-xs font-mono transition-all flex items-center justify-center border ${
                             isAbsent
                               ? 'bg-rose-500 text-white font-bold border-rose-400 shadow-sm animate-pulse'
                               : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'

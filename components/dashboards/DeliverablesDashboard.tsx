@@ -36,7 +36,16 @@ export const DeliverablesDashboard: React.FC = () => {
   const [delivErrors, setDelivErrors] = useState<Record<string, string>>({});
 
   if (!isLoaded) {
-    return <div className="p-8 text-center text-slate-400 font-mono">Cargando entregas...</div>;
+    return (
+      <div className="space-y-6 animate-pulse pb-16" role="status" aria-label="Cargando entregas">
+        <div className="h-14 rounded-lg bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-32 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const filteredDeliverables = deliverables.filter((item) => {
@@ -130,24 +139,23 @@ export const DeliverablesDashboard: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <CheckSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          <h2 className="text-xl font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <CheckSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             Entregas, Evaluaciones & Exámenes (CRUD Completo)
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Registro y edición de actividades con calculadora de nota mínima requerida.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="synergy"
-            size="sm"
-            onClick={openAddModal}
-            disabled={subjects.length === 0}
-          >
-            <Plus className="w-4 h-4" /> Registrar Actividad
-          </Button>
-        </div>
+        <Button
+          variant="synergy"
+          size="sm"
+          className="w-full sm:w-auto"
+          onClick={openAddModal}
+          disabled={subjects.length === 0}
+        >
+          <Plus className="w-4 h-4" /> Registrar Actividad
+        </Button>
       </div>
 
       {/* Required Grade Calculator Card */}
@@ -188,7 +196,7 @@ export const DeliverablesDashboard: React.FC = () => {
       {deliverables.length === 0 ? (
         <Card className="p-12 text-center border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
           <CheckSquare className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No hay entregas pendientes</h3>
+          <h3 className="text-base font-heading font-bold tracking-tight text-slate-800 dark:text-slate-200">No hay entregas pendientes</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
             {subjects.length === 0
               ? 'Registra primero tus materias para poder agendar evaluaciones y talleres.'
@@ -207,10 +215,12 @@ export const DeliverablesDashboard: React.FC = () => {
       ) : (
         <>
           {/* Filter Tabs */}
-          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 overflow-x-auto" role="tablist" aria-label="Filtrar entregas">
             <button
+              role="tab"
+              aria-selected={filterGroup === 'all'}
               onClick={() => setFilterGroup('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              className={`shrink-0 px-3 min-h-[44px] rounded-lg text-xs font-semibold transition-colors ${
                 filterGroup === 'all'
                   ? 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -219,8 +229,10 @@ export const DeliverablesDashboard: React.FC = () => {
               Todas ({deliverables.length})
             </button>
             <button
+              role="tab"
+              aria-selected={filterGroup === 'individual'}
               onClick={() => setFilterGroup('individual')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+              className={`shrink-0 px-3 min-h-[44px] rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 filterGroup === 'individual'
                   ? 'bg-sky-100 dark:bg-sky-950/80 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-800'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -229,8 +241,10 @@ export const DeliverablesDashboard: React.FC = () => {
               <User className="w-3.5 h-3.5" /> Individuales
             </button>
             <button
+              role="tab"
+              aria-selected={filterGroup === 'group'}
               onClick={() => setFilterGroup('group')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+              className={`shrink-0 px-3 min-h-[44px] rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 filterGroup === 'group'
                   ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -267,26 +281,28 @@ export const DeliverablesDashboard: React.FC = () => {
                       </p>
                     )}
                   </div>
-                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-y-1 text-xs">
                     <span className="text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
                       {deliv.is_group ? <Users className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> : <User className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />}
                       {deliv.is_group ? 'Grupal' : 'Individual'}
                     </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-slate-700 dark:text-slate-300 font-mono text-[11px]">Peso: {deliv.weight_percentage}%</span>
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-slate-700 dark:text-slate-300 font-mono text-[11px] mr-1">Peso: {deliv.weight_percentage}%</span>
                       <button
                         onClick={() => openEditModal(deliv)}
-                        className="text-slate-400 hover:text-sky-500 transition-colors p-1"
+                        aria-label={`Editar ${deliv.title}`}
                         title="Editar Actividad"
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-sky-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                       >
-                        <Edit3 className="w-3.5 h-3.5" />
+                        <Edit3 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteDeliverable(deliv.id!)}
-                        className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                        aria-label={`Eliminar ${deliv.title}`}
                         title="Eliminar Actividad"
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -407,11 +423,16 @@ export const DeliverablesDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => { setIsAddModalOpen(false); setEditingDeliv(null); }}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+            <Button variant="ghost" className="w-full sm:w-auto" onClick={() => { setIsAddModalOpen(false); setEditingDeliv(null); }}>
               Cancelar
             </Button>
-            <Button variant="synergy" onClick={handleSaveDeliverable}>
+            <Button
+              variant="synergy"
+              className="w-full sm:w-auto"
+              onClick={handleSaveDeliverable}
+              disabled={!title.trim() || !subjectId}
+            >
               {editingDeliv ? 'Guardar Cambios' : 'Guardar Actividad'}
             </Button>
           </div>

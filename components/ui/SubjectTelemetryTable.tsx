@@ -14,7 +14,8 @@ import {
   ChevronDown,
   ChevronUp,
   Building2,
-  Target
+  Target,
+  Mail
 } from 'lucide-react';
 
 interface SubjectTelemetryTableProps {
@@ -59,7 +60,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none font-mono text-xs">
           <button
             onClick={() => setSelectedUniId('all')}
-            className={`px-3 py-1 rounded-lg border font-bold transition-all shrink-0 ${
+            className={`px-3 min-h-[44px] rounded-lg border font-bold transition-all shrink-0 ${
               selectedUniId === 'all'
                 ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm'
                 : 'bg-slate-100 dark:bg-[#0d1322] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800'
@@ -74,7 +75,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
               <button
                 key={uni.id}
                 onClick={() => setSelectedUniId(uni.id!)}
-                className={`px-3 py-1 rounded-lg border font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                className={`px-3 min-h-[44px] rounded-lg border font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-purple-600 text-white border-purple-500 shadow-sm glow-software'
                     : 'bg-slate-100 dark:bg-[#0d1322] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800'
@@ -188,7 +189,8 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                 </div>
                 <button
                   onClick={() => toggleExpand(sub.id!)}
-                  className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400 font-bold hover:underline"
+                  aria-expanded={isExpanded}
+                  className="min-h-[44px] px-2 -mr-2 flex items-center gap-1 text-cyan-600 dark:text-cyan-400 font-bold hover:underline"
                 >
                   <span>{isExpanded ? 'Ocultar' : 'Detalles'}</span>
                   {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -203,8 +205,9 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                     <span>Docente: {prof?.name || 'No asignado'}</span>
                   </div>
                   {prof?.email && (
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 pl-5.5 truncate">
-                      ✉️ {prof.email}
+                    <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 pl-0.5 truncate">
+                      <Mail className="w-3 h-3 text-slate-400 shrink-0 ml-0.5" />
+                      {prof.email}
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 pt-0.5">
