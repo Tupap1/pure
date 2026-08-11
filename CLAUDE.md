@@ -47,17 +47,23 @@ Net free time is always `168h - (class hours + 49h sleep + DME study hours)`.
 
 ### MCP server (`mcp-server/`) — a separate app from Next.js
 
-`mcp-server/index.ts` runs its own process (not part of the Next.js build) with dual transport: stdio (local agents/IDEs) and Express-based HTTP/SSE on `MCP_PORT` (cloud agents, e.g. Claude Web, via Cloudflare Tunnel — SSE endpoint `/sse`, message endpoint `/message`, CORS open). `mcp-server/tools-handler.ts` implements the tool handlers; `mcp-server/db-repository.ts` talks to Postgres directly (independent of the Next.js Dexie/sync path); `mcp-server/auth-middleware.ts` validates bearer tokens for the HTTP transport; `mcp-server/health-handler.ts` backs the `/health` endpoint. `mcp-server/instructions.md` and `mcp-server/README.md` document the tool catalog in depth — read those before adding or changing a tool.
+`mcp-server/index.ts` runs its own process (not part of the Next.js build). The HTTP request handler is exported as `createRequestHandler()` specifically so tests can mount the real server instead of reimplementing its routing — never test the MCP server by rebuilding its routes in the test file.
+
+Transports: **Streamable HTTP on `POST /mcp` is the primary one** (stateless — a fresh `McpServer` + transport per request, which is what Claude Web and other remote clients use); stdio serves local agents/IDEs; the legacy `GET /sse` + `POST /messages` pair is kept only for backwards compatibility. `/health` and `GET /` are public; everything else requires a bearer token.
+
+`mcp-server/tools-handler.ts` implements the tool handlers; `mcp-server/db-repository.ts` re-exports `lib/db/repository-pg.ts`, which talks to Postgres directly (independent of the Next.js Dexie/sync path); `mcp-server/auth-middleware.ts` validates bearer tokens (async — it may hit Postgres); `mcp-server/oauth-store.ts` holds the OAuth 2.0 state; `mcp-server/health-handler.ts` backs `/health`. `mcp-server/instructions.md` and `mcp-server/README.md` document the tool catalog in depth — read those before adding or changing a tool.
+
+`ingest_academic_enrollment` takes `raw_text` as a **JSON string** with `universities`/`professors`/`subjects`/`schedules` arrays (`day_of_week`: 1=Monday..7=Sunday). Plain prose only renames classrooms on already-existing schedules; it never creates entities.
 
 **Data rule**: all reads/writes of academic data (universities, subjects, professors, schedules, syllabus, deliverables, DME metrics) must go exclusively through the MCP tool handlers (`ingest_academic_enrollment`, `get_academic_overview`, `parse_and_ingest_syllabus`, `find_cross_subject_synergies`, and the `manage_*` CRUD tools). Never hardcode seed data directly into frontend components or DB helpers — route it through the MCP tool pipeline instead.
 
 ### Auth
 
-OAuth 2.0 mock/bridge for Claude Web and other MCP clients lives in `mcp-server/auth-middleware.ts` and the oauth-related tests in `__tests__/mcp/oauth.test.ts` / `auth.test.ts`. This is being hardened toward a real OAuth 2.0 authorization server (RFC 6749: whitelisted `redirect_uri`, `state` for CSRF, PKCE, single-use short-lived auth codes, `Cache-Control: no-store` on token responses, constant-time secret comparison). Treat auth code changes as security-sensitive: wrap HTTP route handlers in try/catch, never hardcode secrets (use `.env`), and check for replay/timing-attack issues.
+The server is a real OAuth 2.0 authorization server with PKCE (S256), used by Claude Web to connect as a remote MCP connector. `mcp-server/oauth-store.ts` persists clients, authorization codes and access tokens in Postgres (migration `003_oauth_tables.sql`); codes are consumed atomically in a single `UPDATE … WHERE used = FALSE … RETURNING` so a replay fails at the database level. `redirect_uri` is restricted by host whitelist (claude.ai, claude.com, localhost, 127.0.0.1). The consent screen at `GET /oauth/authorize` gates issuance on `MCP_API_KEY`, compared with `crypto.timingSafeEqual`. 401s carry `WWW-Authenticate` pointing at `/.well-known/oauth-protected-resource`.
 
-### UI structure
+`MCP_API_KEY` is mandatory — the server exits at boot without it. It doubles as a master bearer token alongside issued OAuth tokens.
 
-`components/dashboards/` holds the five main screens (CommandCenter, ScheduleDashboard + MobileScheduleTimeline, DeliverablesDashboard, SyllabusDashboard, ConfigDashboard — the last is tabbed CRUD for universities/subjects/professors and includes buttons to trigger MCP ingestion or reset the local IndexedDB). `components/ui/` holds atomic pieces including the custom SVG visualizations (ProgressRing, DailyLoadStackedBar, StudyHeatmap, SemesterProgressChart). `lib/hooks/usePureData.ts` is the main data-access hook wrapping Dexie; `useSyncEngine.ts` drives the sync loop; `useTheme.ts` handles light/dark.
+Treat auth code changes as security-sensitive: wrap HTTP route handlers in try/catch, never hardcode secrets (use `.env`), and check for replay/timing-attack issues. Note that `oauth-store.ts` falls back to in-memory storage when Postgres is unreachable, and swallows the error — so a missing migration makes persistence silently degrade instead of failing loudly.
 
 ### Design system
 
@@ -65,4 +71,6 @@ Dark-first "Titanium Cybernetic" aesthetic (deep obsidian `#05080e` backgrounds,
 
 ## Deployment
 
-Docker multi-stage build (`Dockerfile` for the Next.js app in `standalone` mode, `Dockerfile.mcp` for the MCP server) orchestrated via `docker-compose.yml`: web app on `3000`, MCP SSE server on `3001`. See `docs/MCP-HTTP-SETUP.md` / `docs/setup/mcp-http-setup.md` for exposing the MCP server remotely via Cloudflare Tunnel.
+Docker Compose (`docker-compose.yml`); see `docs/MCP-HTTP-SETUP.md` / `docs/setup/mcp-http-setup.md` for exposing the MCP server remotely via Cloudflare Tunnel.
+
+**Migrations do not run in the MCP container.** Only the web image has the migrating entrypoint (`docker-entrypoint.sh`), and both services share the same `pure-db`. Deploying `pure-mcp` alone leaves new migrations unapplied — and because `oauth-store.ts` degrades to memory in silence, OAuth tokens then vanish on every restart with no error. After a deploy that adds a migration, run `docker compose exec pure-mcp npm run db:migrate` explicitly.
