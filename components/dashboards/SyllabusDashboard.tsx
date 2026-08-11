@@ -16,6 +16,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { calculateSyllabusProgress, findSynergiesBetweenTopics } from '@/lib/domain/syllabus';
+import { dedupeByIdentity, subjectIdentity } from '@/lib/domain/entity-identity';
 
 const MASTERY_SELECT_STYLES: Record<SyllabusTopicEntity['mastery_status'], string> = {
   no_iniciado: 'bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700 focus:ring-slate-400',
@@ -49,7 +50,19 @@ export const SyllabusDashboard: React.FC = () => {
     );
   }
 
-  const activeSubject = subjects.find((s) => s.id === selectedSubjectId) || subjects[0];
+  // Una materia por identidad lógica. Si el caché local todavía arrastra versiones
+  // obsoletas de una re-ingesta (mismo nombre, `id` distinto), gana la que tiene temario.
+  const topicCountBySubject = syllabusTopics.reduce<Record<string, number>>((acc, t) => {
+    acc[t.subject_id] = (acc[t.subject_id] || 0) + 1;
+    return acc;
+  }, {});
+  const uniqueSubjects = dedupeByIdentity(
+    subjects,
+    subjectIdentity,
+    (s) => topicCountBySubject[s.id || ''] || 0
+  );
+
+  const activeSubject = uniqueSubjects.find((s) => s.id === selectedSubjectId) || uniqueSubjects[0];
   const activeTopics = syllabusTopics.filter((t) => t.subject_id === (activeSubject?.id || ''));
   const overallProgress = calculateSyllabusProgress(activeTopics as any);
 
@@ -125,7 +138,7 @@ export const SyllabusDashboard: React.FC = () => {
         )}
       </div>
 
-      {subjects.length === 0 ? (
+      {uniqueSubjects.length === 0 ? (
         <Card className="p-12 text-center border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
           <BookOpen className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
           <h3 className="text-base font-heading font-bold tracking-tight text-slate-800 dark:text-slate-200">No hay materias configuradas</h3>
@@ -183,7 +196,7 @@ export const SyllabusDashboard: React.FC = () => {
             role="tablist"
             aria-label="Seleccionar materia"
           >
-            {subjects.map((sub) => (
+            {uniqueSubjects.map((sub) => (
               <button
                 key={sub.id}
                 role="tab"

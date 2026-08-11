@@ -1,42 +1,13 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { pureDB } from '../db/dexie-schema';
+import { pullRemoteState } from '../sync/sync-engine';
 import { useEffect } from 'react';
 
 export function usePureData() {
   useEffect(() => {
-    // Sync with PostgreSQL server API on mount
-    fetch('/api/sync')
-      .then((res) => res.json())
-      .then(async (res) => {
-        if (res.status === 'success' && res.data) {
-          const { universities, professors, subjects, schedules, deliverables, syllabusTopics } = res.data;
-
-          if (universities && universities.length > 0) {
-            await pureDB.transaction(
-              'rw',
-              [
-                pureDB.universities,
-                pureDB.professors,
-                pureDB.subjects,
-                pureDB.schedules,
-                pureDB.deliverables,
-                pureDB.syllabusTopics,
-              ],
-              async () => {
-                await pureDB.universities.bulkPut(universities);
-                if (professors?.length) await pureDB.professors.bulkPut(professors);
-                if (subjects?.length) await pureDB.subjects.bulkPut(subjects);
-                if (schedules?.length) await pureDB.schedules.bulkPut(schedules);
-                if (deliverables?.length) await pureDB.deliverables.bulkPut(deliverables);
-                if (syllabusTopics?.length) await pureDB.syllabusTopics.bulkPut(syllabusTopics);
-              }
-            );
-          }
-        }
-      })
-      .catch((err) => {
-        console.warn('PostgreSQL sync fetch error:', err);
-      });
+    // Sync with PostgreSQL server API on mount. pullRemoteState hace el upsert y además
+    // poda las filas locales ensombrecidas por el remoto (duplicados de re-ingestas).
+    void pullRemoteState();
   }, []);
 
   const universities = useLiveQuery(() => pureDB.universities.toArray(), [], []);

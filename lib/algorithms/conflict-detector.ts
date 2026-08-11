@@ -44,6 +44,29 @@ export function getSlotPeriodicity(slot: Partial<ScheduleSlot>): 'semanal' | 'sa
 }
 
 /**
+ * Dos periodicidades pueden chocar salvo que sean sábados alternos opuestos:
+ * un `sabado_a` y un `sabado_b` nunca caen en la misma semana.
+ */
+export function periodicitiesCollide(
+  pA: 'semanal' | 'sabado_a' | 'sabado_b',
+  pB: 'semanal' | 'sabado_a' | 'sabado_b'
+): boolean {
+  return !((pA === 'sabado_a' && pB === 'sabado_b') || (pA === 'sabado_b' && pB === 'sabado_a'));
+}
+
+/**
+ * Indica si un bloque se dicta en la variante de sábado indicada. Las clases semanales
+ * ocurren todas las semanas, así que aparecen tanto en Sábado A como en Sábado B.
+ */
+export function occursOnSabadoVariant(
+  slot: Partial<ScheduleSlot>,
+  variant: 'sabado_a' | 'sabado_b'
+): boolean {
+  const periodicity = getSlotPeriodicity(slot);
+  return periodicity === 'semanal' || periodicity === variant;
+}
+
+/**
   Convierte una hora en formato "HH:MM" a minutos transcurridos desde las 00:00
  */
 function timeToMinutes(timeStr: string): number {
@@ -69,7 +92,7 @@ export function detectScheduleConflicts(slots: ScheduleSlot[]): ScheduleConflict
         const pB = getSlotPeriodicity(slotB);
 
         // Si una es Sábado A y la otra Sábado B, NO hay conflicto (se dictan en semanas distintas)
-        if ((pA === 'sabado_a' && pB === 'sabado_b') || (pA === 'sabado_b' && pB === 'sabado_a')) {
+        if (!periodicitiesCollide(pA, pB)) {
           continue;
         }
 

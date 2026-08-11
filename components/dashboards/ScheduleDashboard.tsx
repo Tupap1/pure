@@ -18,7 +18,7 @@ import {
   Grid,
   List
 } from 'lucide-react';
-import { detectScheduleConflicts, getSabadoTypeForDate } from '@/lib/algorithms/conflict-detector';
+import { detectScheduleConflicts, getSabadoTypeForDate, occursOnSabadoVariant } from '@/lib/algorithms/conflict-detector';
 import { filterSchedulesByDay, sortSchedulesByTime } from '@/lib/algorithms/schedule-mobile-transformer';
 import { ScheduleSchema, validateEntity } from '@/lib/validations/schemas';
 import { pureDB, ScheduleEntity } from '@/lib/db/dexie-schema';
@@ -79,12 +79,62 @@ export const ScheduleDashboard: React.FC = () => {
 
   const mainUni = universities.find((u) => u.has_alternating_saturdays) || universities[0];
   const currentSabadoType = getSabadoTypeForDate(new Date(), mainUni?.first_sabado_a_date || '2026-08-01');
-  const currentSabadoLabel = currentSabadoType === 'sabado_a' ? 'Sábado A' : 'Sábado B';
 
   const conflicts = detectScheduleConflicts(mappedSlots);
   const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   const shortDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+
+  // El sábado se parte en dos columnas cuando hay clases quincenales: un bloque de
+  // Sábado A y uno de Sábado B a la misma hora no coinciden nunca, así que fusionarlos
+  // en una sola columna inventa empalmes que no existen.
+  const hasAlternatingSaturdays =
+    universities.some((u) => u.has_alternating_saturdays) ||
+    schedules.some((s) => s.periodicity === 'sabado_a' || s.periodicity === 'sabado_b');
+
+  type ScheduleColumn = {
+    key: string;
+    dayNum: number;
+    label: string;
+    sabadoVariant?: 'sabado_a' | 'sabado_b';
+  };
+
+  const columns: ScheduleColumn[] = days.flatMap((day, dIdx) => {
+    const dayNum = dIdx + 1;
+    if (dayNum === 6 && hasAlternatingSaturdays) {
+      return [
+        { key: 'sat-a', dayNum: 6, label: 'Sábado A', sabadoVariant: 'sabado_a' as const },
+        { key: 'sat-b', dayNum: 6, label: 'Sábado B', sabadoVariant: 'sabado_b' as const },
+      ];
+    }
+    return [{ key: `day-${dayNum}`, dayNum, label: day }];
+  });
+
+  const universityBySubjectId = (subjectId: string) => {
+    const sub = subjects.find((sb) => sb.id === subjectId);
+    return universities.find((u) => u.id === sub?.university_id);
+  };
+
+  const schedulesInColumn = (column: ScheduleColumn, hour: string) =>
+    schedules.filter((s) => {
+      if (s.day_of_week !== column.dayNum) return false;
+      if (!(s.start_time <= hour && s.end_time > hour)) return false;
+      if (!column.sabadoVariant) return true;
+      return occursOnSabadoVariant(
+        {
+          classroom: s.classroom,
+          periodicity: s.periodicity,
+          has_alternating_saturdays: universityBySubjectId(s.subject_id)?.has_alternating_saturdays,
+        },
+        column.sabadoVariant
+      );
+    });
+
+  const isColumnToday = (column: ScheduleColumn) => {
+    if (todayNum !== column.dayNum) return false;
+    if (!column.sabadoVariant) return true;
+    return column.sabadoVariant === currentSabadoType;
+  };
 
   const gridHours = [
     '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
@@ -235,25 +285,31 @@ export const ScheduleDashboard: React.FC = () => {
           {/* DESKTOP VIEW: Full 7-Day Matrix Table (visible on screens >= 640px) */}
           <div className="hidden sm:block bg-white dark:bg-slate-950 rounded-xl overflow-x-auto border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
 
-            <table className="w-full text-left border-collapse min-w-[800px]">
+            <table className="w-full text-left border-collapse min-w-[900px]">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/80 text-xs text-slate-700 dark:text-slate-300 font-mono">
                   <th className="p-3 text-center w-20 border-r border-slate-200 dark:border-slate-800">Hora</th>
-                  {days.map((day, dIdx) => {
-                    const dayNum = dIdx + 1;
-                    const isToday = todayNum === dayNum;
+                  {columns.map((column) => {
+                    const isToday = isColumnToday(column);
+                    const isCurrentSabado =
+                      column.sabadoVariant !== undefined && column.sabadoVariant === currentSabadoType;
                     return (
                       <th
-                        key={day}
+                        key={column.key}
                         className={`p-3 text-center border-r border-slate-200 dark:border-slate-800/80 last:border-r-0 relative ${
                           isToday ? 'bg-sky-500/15 dark:bg-sky-500/20 font-bold text-sky-600 dark:text-sky-300' : ''
                         }`}
                       >
                         <div className="flex items-center justify-center gap-1.5">
-                          <span>{day === 'Sábado' ? `Sábado (${currentSabadoLabel})` : day}</span>
+                          <span>{column.label}</span>
                           {isToday && (
                             <span className="px-1.5 py-0.5 text-[9px] font-bold bg-rose-500 text-white rounded-full shadow-sm animate-pulse">
                               HOY
+                            </span>
+                          )}
+                          {!isToday && isCurrentSabado && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full">
+                              ESTA SEMANA
                             </span>
                           )}
                         </div>
@@ -272,21 +328,20 @@ export const ScheduleDashboard: React.FC = () => {
                       <td className="p-2.5 font-mono text-center text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
                         {hour}
                       </td>
-                      {days.map((day, dIdx) => {
-                        const dayNum = dIdx + 1; // 1 = Lunes
-                        const isTodayColumn = todayNum === dayNum;
+                      {columns.map((column) => {
+                        const isTodayColumn = isColumnToday(column);
                         const showLiveTimeLine = isTodayColumn && isCurrentHourRow;
                         const topPercentage = (currentMinNum / 60) * 100;
 
-                        const matchingSchedules = schedules.filter(
-                          (s) => s.day_of_week === dayNum && s.start_time <= hour && s.end_time > hour
-                        );
+                        // Cada columna ya agrupa solo periodicidades que coexisten en la
+                        // misma semana, así que dos bloques aquí sí son un empalme real.
+                        const matchingSchedules = schedulesInColumn(column, hour);
 
                         const hasConflict = matchingSchedules.length > 1;
 
                         return (
                           <td
-                            key={dIdx}
+                            key={column.key}
                             className={`p-1 border-r border-slate-200 dark:border-slate-800/40 last:border-r-0 align-top h-16 relative ${
                               isTodayColumn ? 'bg-sky-500/[0.03] dark:bg-sky-500/[0.05]' : ''
                             }`}
@@ -315,7 +370,11 @@ export const ScheduleDashboard: React.FC = () => {
                                   <span className="flex items-center gap-1"><AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400" /> EMPALME</span>
                                   <Pencil className="w-3 h-3 text-rose-500" />
                                 </div>
-                                <div className="text-[9px] truncate">{matchingSchedules[0]?.classroom || 'Conflicto'}</div>
+                                <div className="text-[9px] leading-snug">
+                                  {matchingSchedules
+                                    .map((s) => subjects.find((sb) => sb.id === s.subject_id)?.name || 'Clase')
+                                    .join(' / ')}
+                                </div>
                               </div>
                             ) : (
                               matchingSchedules.map((sched) => {
