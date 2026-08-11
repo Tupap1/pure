@@ -69,6 +69,7 @@ export const ConfigDashboard: React.FC = () => {
   const [schedStart, setSchedStart] = useState('08:00');
   const [schedEnd, setSchedEnd] = useState('10:00');
   const [schedClassroom, setSchedClassroom] = useState('');
+  const [schedPeriodicity, setSchedPeriodicity] = useState<'semanal' | 'sabado_a' | 'sabado_b'>('semanal');
 
   // Form Error States
   const [uniErrors, setUniErrors] = useState<Record<string, string>>({});
@@ -255,6 +256,7 @@ export const ConfigDashboard: React.FC = () => {
     setSchedStart('08:00');
     setSchedEnd('10:00');
     setSchedClassroom('');
+    setSchedPeriodicity('semanal');
     setSchedErrors({});
     setIsAddScheduleOpen(true);
   };
@@ -266,6 +268,7 @@ export const ConfigDashboard: React.FC = () => {
     setSchedStart(sched.start_time);
     setSchedEnd(sched.end_time);
     setSchedClassroom(sched.classroom || '');
+    setSchedPeriodicity(sched.periodicity || 'semanal');
     setSchedErrors({});
   };
 
@@ -276,6 +279,7 @@ export const ConfigDashboard: React.FC = () => {
       start_time: schedStart,
       end_time: schedEnd,
       classroom: schedClassroom || 'Aula por definir',
+      periodicity: Number(schedDay) === 6 ? schedPeriodicity : 'semanal',
     };
 
     const validation = validateEntity(ScheduleSchema, schedData);
@@ -955,6 +959,27 @@ export const ConfigDashboard: React.FC = () => {
               placeholder="Ej: Aula 2-305"
             />
           </div>
+
+          {(() => {
+            const selSub = subjects.find((s) => s.id === schedSubjectId);
+            const selUni = universities.find((u) => u.id === selSub?.university_id);
+            const showPeriodicity = Number(schedDay) === 6 && (selUni?.has_alternating_saturdays ?? true);
+            if (!showPeriodicity) return null;
+            return (
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Periodicidad Sábado</label>
+                <select
+                  value={schedPeriodicity}
+                  onChange={(e) => setSchedPeriodicity(e.target.value as any)}
+                  className={inputClass}
+                >
+                  <option value="semanal">Semanal (Todos los sábados)</option>
+                  <option value="sabado_a">Sábado A (Quincenal)</option>
+                  <option value="sabado_b">Sábado B (Quincenal)</option>
+                </select>
+              </div>
+            );
+          })()}
 
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="ghost" onClick={() => { setIsAddScheduleOpen(false); setEditingSchedule(null); }}>

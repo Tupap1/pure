@@ -2,7 +2,7 @@ import React from 'react';
 import { Clock, Cpu, Sun, Moon } from 'lucide-react';
 import { usePureData } from '@/lib/hooks/usePureData';
 import { useTheme } from '@/lib/hooks/useTheme';
-import { calculateDME, calculateNetFreeTime } from '@/lib/algorithms/study-hours-dme';
+import { calculateDME, calculateNetFreeTime, calculateTotalClassHours } from '@/lib/algorithms/study-hours-dme';
 
 import { DashboardTab } from './Sidebar';
 
@@ -28,11 +28,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
     return sum + calculateDME(s as any).recommendedWeeklyHours;
   }, 0);
 
-  const classHours = schedules.reduce((sum, s) => {
-    const startHour = parseInt(s.start_time.split(':')[0], 10);
-    const endHour = parseInt(s.end_time.split(':')[0], 10);
-    return sum + Math.max(0, endHour - startHour);
-  }, 0);
+  const classHours = calculateTotalClassHours(schedules);
 
   const netFreeTimeHours = calculateNetFreeTime({
     classHours,

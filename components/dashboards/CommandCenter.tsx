@@ -22,7 +22,7 @@ import {
   Activity,
   Layers
 } from 'lucide-react';
-import { calculateDME, calculateNetFreeTime } from '@/lib/algorithms/study-hours-dme';
+import { calculateDME, calculateNetFreeTime, calculateTotalClassHours } from '@/lib/algorithms/study-hours-dme';
 import { pureDB } from '@/lib/db/dexie-schema';
 
 export const CommandCenter: React.FC = () => {
@@ -41,11 +41,7 @@ export const CommandCenter: React.FC = () => {
     return sum + calculateDME(s as any).recommendedWeeklyHours;
   }, 0);
 
-  const classHours = schedules.reduce((sum, s) => {
-    const startHour = parseInt(s.start_time.split(':')[0], 10);
-    const endHour = parseInt(s.end_time.split(':')[0], 10);
-    return sum + Math.max(0, endHour - startHour);
-  }, 0);
+  const classHours = calculateTotalClassHours(schedules);
 
   const sleepHoursTotal = 7 * 7; // 49h weekly
 

@@ -18,7 +18,7 @@ import {
   Grid,
   List
 } from 'lucide-react';
-import { detectScheduleConflicts } from '@/lib/algorithms/conflict-detector';
+import { detectScheduleConflicts, getSabadoTypeForDate } from '@/lib/algorithms/conflict-detector';
 import { filterSchedulesByDay, sortSchedulesByTime } from '@/lib/algorithms/schedule-mobile-transformer';
 import { ScheduleSchema, validateEntity } from '@/lib/validations/schemas';
 import { pureDB, ScheduleEntity } from '@/lib/db/dexie-schema';
@@ -29,23 +29,14 @@ const getTodayDayOfWeek = (): number => {
 };
 
 export const ScheduleDashboard: React.FC = () => {
-  const { isLoaded, subjects, schedules, universities } = usePureData();
-
-  // Today & Live Time State
+  const { isLoaded, universities, subjects, schedules } = usePureData();
   const todayNum = getTodayDayOfWeek();
+
   const [selectedMobileDay, setSelectedMobileDay] = useState<number>(todayNum);
-  const [mobileViewMode, setMobileViewMode] = useState<'timeline' | 'grid' | 'list'>('timeline');
-  const [now, setNow] = useState<Date>(new Date());
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(new Date());
-    }, 30000); // Actualizar cada 30 segundos
-    return () => clearInterval(timer);
-  }, []);
-
-  const currentHourNum = now.getHours();
-  const currentMinNum = now.getMinutes();
+  const currentHourNum = new Date().getHours();
+  const currentMinNum = new Date().getMinutes();
   const currentHourStr = String(currentHourNum).padStart(2, '0');
   const currentMinStr = String(currentMinNum).padStart(2, '0');
   const currentTimeFormatted = `${currentHourStr}:${currentMinStr}`;
@@ -58,6 +49,7 @@ export const ScheduleDashboard: React.FC = () => {
   const [schedStart, setSchedStart] = useState('08:00');
   const [schedEnd, setSchedEnd] = useState('10:00');
   const [schedClassroom, setSchedClassroom] = useState('');
+  const [schedPeriodicity, setSchedPeriodicity] = useState<'semanal' | 'sabado_a' | 'sabado_b'>('semanal');
   const [schedErrors, setSchedErrors] = useState<Record<string, string>>({});
 
   if (!isLoaded) {
@@ -74,8 +66,15 @@ export const ScheduleDashboard: React.FC = () => {
       day_of_week: s.day_of_week,
       start_time: s.start_time,
       end_time: s.end_time,
+      classroom: s.classroom,
+      periodicity: s.periodicity,
+      has_alternating_saturdays: uni?.has_alternating_saturdays,
     };
   });
+
+  const mainUni = universities.find((u) => u.has_alternating_saturdays) || universities[0];
+  const currentSabadoType = getSabadoTypeForDate(new Date(), mainUni?.first_sabado_a_date || '2026-08-01');
+  const currentSabadoLabel = currentSabadoType === 'sabado_a' ? 'Sábado A' : 'Sábado B';
 
   const conflicts = detectScheduleConflicts(mappedSlots);
   const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -109,6 +108,7 @@ export const ScheduleDashboard: React.FC = () => {
     setSchedStart('08:00');
     setSchedEnd('10:00');
     setSchedClassroom('');
+    setSchedPeriodicity('semanal');
     setSchedErrors({});
     setIsModalOpen(true);
   };
@@ -120,6 +120,7 @@ export const ScheduleDashboard: React.FC = () => {
     setSchedStart(sched.start_time);
     setSchedEnd(sched.end_time);
     setSchedClassroom(sched.classroom || '');
+    setSchedPeriodicity(sched.periodicity || 'semanal');
     setSchedErrors({});
     setIsModalOpen(true);
   };
@@ -131,6 +132,7 @@ export const ScheduleDashboard: React.FC = () => {
       start_time: schedStart,
       end_time: schedEnd,
       classroom: schedClassroom || 'Aula por definir',
+      periodicity: Number(schedDay) === 6 ? schedPeriodicity : 'semanal',
     };
 
     const validation = validateEntity(ScheduleSchema, schedData);
@@ -243,7 +245,7 @@ export const ScheduleDashboard: React.FC = () => {
                         }`}
                       >
                         <div className="flex items-center justify-center gap-1.5">
-                          <span>{day}</span>
+                          <span>{day === 'Sábado' ? `Sábado (${currentSabadoLabel})` : day}</span>
                           {isToday && (
                             <span className="px-1.5 py-0.5 text-[9px] font-bold bg-rose-500 text-white rounded-full shadow-sm animate-pulse">
                               HOY
@@ -423,6 +425,21 @@ export const ScheduleDashboard: React.FC = () => {
               placeholder="Ej: Salón 301 - Edificio Tecnológico"
             />
           </div>
+
+          {Number(schedDay) === 6 && (
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Periodicidad Sábado</label>
+              <select
+                value={schedPeriodicity}
+                onChange={(e) => setSchedPeriodicity(e.target.value as any)}
+                className={inputClass}
+              >
+                <option value="semanal">Semanal (Todos los sábados)</option>
+                <option value="sabado_a">Sábado A (Quincenal)</option>
+                <option value="sabado_b">Sábado B (Quincenal)</option>
+              </select>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="ghost" onClick={() => setIsModalOpen(false)}>

@@ -14,6 +14,7 @@ import {
   Info
 } from 'lucide-react';
 import { filterSchedulesByDay, sortSchedulesByTime } from '@/lib/algorithms/schedule-mobile-transformer';
+import { getSabadoTypeForDate, getSlotPeriodicity } from '@/lib/algorithms/conflict-detector';
 
 const getTodayDayOfWeek = (): number => {
   const d = new Date().getDay();
@@ -21,7 +22,7 @@ const getTodayDayOfWeek = (): number => {
 };
 
 export const MobileScheduleTimeline: React.FC = () => {
-  const { isLoaded, subjects, schedules } = usePureData();
+  const { isLoaded, universities, subjects, schedules } = usePureData();
   const todayNum = getTodayDayOfWeek();
 
   const [selectedDay, setSelectedDay] = useState<number>(todayNum);
@@ -134,13 +135,32 @@ export const MobileScheduleTimeline: React.FC = () => {
             <div className="space-y-2.5">
               {daySchedules.map((sched) => {
                 const sub = subjects.find((s) => s.id === sched.subject_id);
+                const uni = universities.find((u) => u.id === sub?.university_id);
                 const isPresencial = sub?.modality === 'presencial';
                 const absences = absenceRecords[sched.subject_id] || [];
+
+                let isAttenuated = false;
+                let periodicityBadgeText = '';
+
+                if (selectedDay === 6 && (uni?.has_alternating_saturdays ?? true)) {
+                  const currentSabadoType = getSabadoTypeForDate(new Date(), uni?.first_sabado_a_date || '2026-08-01');
+                  const schedPeriodicity = getSlotPeriodicity({
+                    classroom: sched.classroom,
+                    periodicity: sched.periodicity,
+                    has_alternating_saturdays: uni?.has_alternating_saturdays,
+                  });
+                  if (schedPeriodicity !== 'semanal' && schedPeriodicity !== currentSabadoType) {
+                    isAttenuated = true;
+                    periodicityBadgeText = schedPeriodicity === 'sabado_a' ? 'Sábado A • No dicta hoy' : 'Sábado B • No dicta hoy';
+                  }
+                }
 
                 return (
                   <div
                     key={sched.id}
-                    className="p-4 rounded-xl bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800/90 flex items-center justify-between gap-3 shadow-sm hover:border-cyan-500/40 transition-all"
+                    className={`p-4 rounded-xl bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800/90 flex items-center justify-between gap-3 shadow-sm hover:border-cyan-500/40 transition-all ${
+                      isAttenuated ? 'opacity-40 grayscale-[30%]' : ''
+                    }`}
                   >
                     {/* Left: Time Slots */}
                     <div className="text-center font-mono shrink-0 pr-3 border-r border-slate-200 dark:border-slate-800">
@@ -154,8 +174,15 @@ export const MobileScheduleTimeline: React.FC = () => {
 
                     {/* Center: Course Code & Name & Room Badge */}
                     <div className="space-y-1 min-w-0 flex-1">
-                      <div className="text-[10px] font-mono font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">
-                        {sub?.code || 'ASIGNATURA'}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-mono font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">
+                          {sub?.code || 'ASIGNATURA'}
+                        </span>
+                        {isAttenuated && (
+                          <span className="px-1.5 py-0.5 text-[9px] font-mono font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md border border-amber-500/30">
+                            {periodicityBadgeText}
+                          </span>
+                        )}
                       </div>
                       <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate font-heading">
                         {sub?.name || 'Materia'}
