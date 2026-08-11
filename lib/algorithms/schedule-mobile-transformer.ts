@@ -1,3 +1,5 @@
+import { getSlotPeriodicity } from './conflict-detector';
+
 export interface ScheduleItem {
   id?: string;
   subject_id: string;
@@ -5,6 +7,8 @@ export interface ScheduleItem {
   start_time: string;
   end_time: string;
   classroom?: string;
+  periodicity?: 'semanal' | 'sabado_a' | 'sabado_b';
+  has_alternating_saturdays?: boolean;
 }
 
 /**
@@ -34,6 +38,13 @@ function timeToMinutes(timeStr: string): number {
  */
 export function isOverlapping<T extends ScheduleItem>(s1: T, s2: T): boolean {
   if (s1.id && s2.id && s1.id === s2.id) return false;
+
+  const p1 = getSlotPeriodicity(s1 as any);
+  const p2 = getSlotPeriodicity(s2 as any);
+  if ((p1 === 'sabado_a' && p2 === 'sabado_b') || (p1 === 'sabado_b' && p2 === 'sabado_a')) {
+    return false;
+  }
+
   const start1 = timeToMinutes(s1.start_time);
   const end1 = timeToMinutes(s1.end_time);
   const start2 = timeToMinutes(s2.start_time);

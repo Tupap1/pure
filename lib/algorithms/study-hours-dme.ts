@@ -78,10 +78,43 @@ export function calculateDME(
   };
 }
 
+import { getSlotPeriodicity } from './conflict-detector';
+
 export interface NetFreeTimeParams {
   classHours: number;
   dmeHours: number;
   sleepHoursPerNight: number;
+}
+
+function parseTimeToMinutes(timeStr: string): number {
+  const [h, m] = (timeStr || '00:00').split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+export interface ClassScheduleHoursInput {
+  start_time: string;
+  end_time: string;
+  periodicity?: 'semanal' | 'sabado_a' | 'sabado_b';
+  classroom?: string;
+  has_alternating_saturdays?: boolean;
+}
+
+/**
+ * Calcula la suma total de horas semanales de clase.
+ * Duración calculada en minutos para soportar fracciones (ej: 09:00 a 10:30 = 1.5h).
+ * Pondera 0.5 para horarios de Sábado A / Sábado B.
+ */
+export function calculateTotalClassHours(schedules: ClassScheduleHoursInput[]): number {
+  return schedules.reduce((sum, s) => {
+    const startMins = parseTimeToMinutes(s.start_time);
+    const endMins = parseTimeToMinutes(s.end_time);
+    const durationHours = Math.max(0, (endMins - startMins) / 60);
+
+    const periodicity = getSlotPeriodicity(s);
+    const weight = (periodicity === 'sabado_a' || periodicity === 'sabado_b') ? 0.5 : 1.0;
+
+    return sum + (durationHours * weight);
+  }, 0);
 }
 
 /**

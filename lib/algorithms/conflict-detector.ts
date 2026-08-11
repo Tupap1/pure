@@ -7,6 +7,7 @@ export interface ScheduleSlot {
   end_time: string;    // "HH:MM" (ej: "10:00")
   classroom?: string;
   periodicity?: 'semanal' | 'sabado_a' | 'sabado_b';
+  has_alternating_saturdays?: boolean;
 }
 
 export interface ScheduleConflict {
@@ -29,7 +30,8 @@ export function getSabadoTypeForDate(targetDate: Date, anchorDateStr: string = '
 /**
  * Helper to determine slot periodicity from periodicity property or classroom text.
  */
-export function getSlotPeriodicity(slot: ScheduleSlot): 'semanal' | 'sabado_a' | 'sabado_b' {
+export function getSlotPeriodicity(slot: Partial<ScheduleSlot>): 'semanal' | 'sabado_a' | 'sabado_b' {
+  if (slot.has_alternating_saturdays === false) return 'semanal';
   if (slot.periodicity) return slot.periodicity;
   const text = (slot.classroom || '').toLowerCase();
   if (text.includes('sábado a') || text.includes('sabado a') || text.includes('semana a') || text.includes('sábado 1') || text.includes('sabado 1')) {
