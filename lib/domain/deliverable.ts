@@ -23,6 +23,41 @@ export function sortDeliverablesByUrgency(deliverables: DeliverableEntity[]): De
     .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 }
 
+/**
+ * Formats a deliverable's due_date (date-only) without applying local timezone offsets.
+ * Parses the YYYY-MM-DD components directly so that midnight UTC dates like
+ * "2026-08-27T00:00:00.000Z" render as August 27th across all timezones.
+ */
+export function formatDeliverableDate(
+  dueDateStr: string,
+  options: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' },
+  locale: string = 'es-ES'
+): string {
+  if (!dueDateStr) return '';
+
+  const datePart = dueDateStr.split('T')[0];
+  const parts = datePart.split('-');
+  if (parts.length !== 3) {
+    return dueDateStr;
+  }
+
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+
+  if (isNaN(year) || isNaN(month) || isNaN(day)) {
+    return dueDateStr;
+  }
+
+  // Construct UTC Date object at noon to avoid DST edge-cases
+  const utcDate = new Date(Date.UTC(year, month, day, 12, 0, 0));
+
+  return new Intl.DateTimeFormat(locale, {
+    ...options,
+    timeZone: 'UTC',
+  }).format(utcDate);
+}
+
 export interface SubjectGradeProgress {
   subject_id: string;
   totalConfiguredWeight: number;

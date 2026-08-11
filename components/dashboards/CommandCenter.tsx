@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { calculateDME, calculateNetFreeTime, calculateTotalClassHours } from '@/lib/algorithms/study-hours-dme';
 import { pureDB } from '@/lib/db/dexie-schema';
+import { formatDeliverableDate } from '@/lib/domain/deliverable';
 
 export const CommandCenter: React.FC = () => {
   const { isLoaded, universities, subjects, deliverables, schedules, professors } = usePureData();
@@ -81,10 +82,13 @@ export const CommandCenter: React.FC = () => {
     for (let i = 27; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       const dayOfWeek = d.getDay();
 
-      const delivsOnDate = deliverables.filter((del) => del.due_date?.startsWith(dateStr));
+      const delivsOnDate = deliverables.filter((del) => del.due_date?.slice(0, 10) === dateStr);
       const completedDelivs = delivsOnDate.filter((del) => del.status === 'entregado');
 
       let hours = 0;
@@ -194,7 +198,7 @@ export const CommandCenter: React.FC = () => {
                   <div className="space-y-2.5">
                     {urgentDeliverables.slice(0, 4).map((deliv) => {
                       const sub = subjects.find((s) => s.id === deliv.subject_id);
-                      const formattedDate = new Date(deliv.due_date).toLocaleDateString('es-ES', {
+                      const formattedDate = formatDeliverableDate(deliv.due_date, {
                         weekday: 'short',
                         day: 'numeric',
                         month: 'short',

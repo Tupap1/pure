@@ -15,6 +15,7 @@ import {
   Edit3
 } from 'lucide-react';
 import { calculateRequiredGradeForRemaining } from '@/lib/domain/subject';
+import { formatDeliverableDate } from '@/lib/domain/deliverable';
 import { DeliverableSchema, validateEntity } from '@/lib/validations/schemas';
 
 export const DeliverablesDashboard: React.FC = () => {
@@ -79,17 +80,28 @@ export const DeliverablesDashboard: React.FC = () => {
     setWeight(deliv.weight_percentage);
     setIsGroup(deliv.is_group);
     setComplexity(deliv.complexity);
-    setDueDate(deliv.due_date ? new Date(deliv.due_date).toISOString().slice(0, 16) : '');
+    setDueDate(deliv.due_date ? deliv.due_date.replace('Z', '').slice(0, 16) : '');
     setStatus(deliv.status);
     setGrade(deliv.grade);
     setDelivErrors({});
   };
 
   const handleSaveDeliverable = async () => {
+    let formattedDueDate = new Date().toISOString();
+    if (dueDate) {
+      if (dueDate.length === 10) {
+        formattedDueDate = `${dueDate}T00:00:00.000Z`;
+      } else if (dueDate.includes('T')) {
+        formattedDueDate = dueDate.endsWith('Z') ? dueDate : `${dueDate}:00.000Z`;
+      } else {
+        formattedDueDate = new Date(dueDate).toISOString();
+      }
+    }
+
     const delivData = {
       subject_id: subjectId,
       title,
-      due_date: dueDate ? new Date(dueDate).toISOString() : new Date().toISOString(),
+      due_date: formattedDueDate,
       weight_percentage: Number(weight),
       type: 'Parcial',
       is_group: isGroup,
@@ -275,6 +287,11 @@ export const DeliverablesDashboard: React.FC = () => {
                       {deliv.title}
                     </h4>
                     {deliv.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{deliv.description}</p>}
+                    {deliv.due_date && (
+                      <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-1">
+                        Límite: <span className="font-semibold text-slate-700 dark:text-slate-200">{formatDeliverableDate(deliv.due_date)}</span>
+                      </p>
+                    )}
                     {deliv.grade !== undefined && deliv.grade !== null && (
                       <p className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold mt-1">
                         Nota Obtenida: {deliv.grade.toFixed(2)}

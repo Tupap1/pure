@@ -4,6 +4,7 @@ import {
   sortDeliverablesByUrgency,
   calculateSubjectGradeProgress,
   generateDeliverablesFromPreset,
+  formatDeliverableDate,
   PRESETS,
   DeliverableFilterOptions,
   Deliverable
@@ -88,5 +89,25 @@ describe('REQ-05: Entregas, Evaluaciones y Filtros de Tareas', () => {
     expect(generated).toHaveLength(5);
     const sum = generated.reduce((acc, item) => acc + item.weight_percentage, 0);
     expect(sum).toBe(100);
+  });
+
+  it('debe formatear due_date ("2026-08-27T00:00:00.000Z") manteniendo el día 27 (jueves) sin desfase por zona horaria', () => {
+    const formatted = formatDeliverableDate('2026-08-27T00:00:00.000Z', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+    expect(formatted).toContain('27');
+    expect(formatted.toLowerCase()).toContain('jue');
+    expect(formatted).not.toContain('26');
+  });
+
+  it('debe formatear due_date en formato date-only ("2026-08-27") correctamente', () => {
+    const formatted = formatDeliverableDate('2026-08-27', {
+      day: 'numeric',
+      month: 'long',
+    });
+    expect(formatted).toContain('27');
+    expect(formatted.toLowerCase()).toContain('agosto');
   });
 });
