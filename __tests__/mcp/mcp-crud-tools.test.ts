@@ -154,6 +154,41 @@ describe('MCP Server - Suite de Herramientas CRUD y Parsing Dinámico (con pg-me
       const deleteRes = await handleManageSchedules('delete', { id: 'sch-test-aero' });
       expect(deleteRes?.status).toBe('success');
     });
+
+    it('debe crear con periodicity "sabado_b", persistir y rechazar valores de periodicity inválidos', async () => {
+      await handleManageUniversities('create', { id: 'u-2', name: 'U2' });
+      await handleManageSubjects('create', { id: 'sub-fisica', university_id: 'u-2', name: 'Física I' });
+
+      // Crear con periodicity sabado_b
+      const createRes = await handleManageSchedules('create', {
+        id: 'sch-test-sabado-b',
+        subject_id: 'sub-fisica',
+        day_of_week: 6,
+        start_time: '08:00',
+        end_time: '12:00',
+        classroom: 'Aula A304',
+        periodicity: 'sabado_b',
+      });
+      expect(createRes?.status).toBe('success');
+      expect(createRes?.data.periodicity).toBe('sabado_b');
+
+      // Leer de vuelta
+      const readRes = await handleManageSchedules('read', { id: 'sch-test-sabado-b' });
+      const sched = Array.isArray(readRes?.data) ? readRes?.data[0] : readRes?.data;
+      expect(sched.periodicity).toBe('sabado_b');
+
+      // Intento de guardar valor inválido
+      const invalidRes = await handleManageSchedules('create', {
+        id: 'sch-test-invalid',
+        subject_id: 'sub-fisica',
+        day_of_week: 6,
+        start_time: '08:00',
+        end_time: '12:00',
+        periodicity: 'quincenal_invalido',
+      });
+      expect(invalidRes?.status).toBe('error');
+      expect(invalidRes?.message).toContain('inválido');
+    });
   });
 
   describe('CRUD de Entregables / Parciales (manage_deliverables)', () => {

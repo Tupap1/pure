@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDME, calculateNetFreeTime } from '@/lib/algorithms/study-hours-dme';
+import { calculateDME, calculateNetFreeTime, calculateTotalClassHours } from '@/lib/algorithms/study-hours-dme';
 
 describe('REQ-06: Algoritmo de Dosis Mínima Eficaz (DME) y Tiempo Libre', () => {
   it('debe calcular las horas semanales DME basadas en el estándar de Educación Superior (2h estudio independiente / crédito)', () => {
@@ -45,5 +45,26 @@ describe('REQ-06: Algoritmo de Dosis Mínima Eficaz (DME) y Tiempo Libre', () =>
     });
 
     expect(netFreeTime).toBe(89);
+  });
+
+  it('debe ponderar con 0.5 las clases quincenales (sabado_a / sabado_b) al calcular el total de horas de clase', () => {
+    const schedules = [
+      { start_time: '08:00', end_time: '12:00', periodicity: 'sabado_a' as const }, // 4h quincenal -> 2h
+      { start_time: '14:00', end_time: '18:00', periodicity: 'sabado_b' as const }, // 4h quincenal -> 2h
+      { start_time: '18:00', end_time: '20:00', periodicity: 'semanal' as const },  // 2h semanal -> 2h
+    ];
+
+    const totalHours = calculateTotalClassHours(schedules);
+    expect(totalHours).toBe(6); // 2 + 2 + 2 = 6h
+  });
+
+  it('debe calcular duraciones exactas con minutos fraccionales (ej: 09:00 a 10:30 es 1.5h)', () => {
+    const schedules = [
+      { start_time: '09:00', end_time: '10:30', periodicity: 'semanal' as const }, // 1.5h
+      { start_time: '14:00', end_time: '17:30', periodicity: 'sabado_a' as const }, // 3.5h * 0.5 = 1.75h
+    ];
+
+    const totalHours = calculateTotalClassHours(schedules);
+    expect(totalHours).toBe(3.25);
   });
 });

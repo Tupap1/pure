@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { describe, it, expect } from 'vitest';
 import { SubjectSchema, UniversitySchema, ScheduleSchema } from '@/lib/validations/schemas';
 import { SubjectEntity, UniversityEntity, ScheduleEntity } from '@/lib/db/dexie-schema';
@@ -34,5 +36,30 @@ describe('TDD / SDD: Type & Schema Consistency Validation', () => {
 
     const parseResult = UniversitySchema.safeParse(validUni);
     expect(parseResult.success).toBe(true);
+  });
+
+  it('should validate ScheduleSchema and ScheduleEntity round-trip consistency including periodicity', () => {
+    const validSchedule: ScheduleEntity = {
+      subject_id: 'sub-101',
+      day_of_week: 6,
+      start_time: '08:00',
+      end_time: '12:00',
+      classroom: 'Aula A304',
+      periodicity: 'sabado_b',
+    };
+
+    const parseResult = ScheduleSchema.safeParse(validSchedule);
+    expect(parseResult.success).toBe(true);
+    if (parseResult.success) {
+      expect(parseResult.data.periodicity).toBe('sabado_b');
+    }
+  });
+
+  it('should verify that Postgres schema files contain periodicity column in schedules table', () => {
+    const pgClientCode = fs.readFileSync(path.join(process.cwd(), 'lib/db/pg-client.ts'), 'utf-8');
+    const migrationCode = fs.readFileSync(path.join(process.cwd(), 'db/migrations/002_add_sabado_ab_columns.sql'), 'utf-8');
+
+    expect(pgClientCode).toContain('periodicity');
+    expect(migrationCode.toLowerCase()).toContain('alter table schedules add column if not exists periodicity');
   });
 });
