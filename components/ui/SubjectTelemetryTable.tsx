@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SubjectEntity, ProfessorEntity, UniversityEntity } from '@/lib/db/dexie-schema';
-import { calculateDME } from '@/lib/algorithms/study-hours-dme';
+import { useAcademicLoad } from '@/lib/hooks/useAcademicLoad';
+import type { SubjectAcademicLoad } from '@/lib/algorithms/academic-load';
 import { Badge } from './Badge';
 import { Card } from './Card';
 import { EmptyState } from './EmptyState';
@@ -23,6 +24,105 @@ interface SubjectTelemetryTableProps {
   universities?: UniversityEntity[];
 }
 
+const BreakdownRow: React.FC<{ label: string; value: string; strong?: boolean }> = ({
+  label,
+  value,
+  strong,
+}) => (
+  <div className="flex items-baseline justify-between gap-3">
+    <span className={`text-slate-500 dark:text-slate-400 ${strong ? 'font-semibold text-slate-700 dark:text-slate-300' : ''}`}>
+      {label}
+    </span>
+    <span className={`font-mono shrink-0 ${strong ? 'font-bold text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}>
+      {value}
+    </span>
+  </div>
+);
+
+/**
+ * Desglose de cómo se llega a las horas de una materia.
+ *
+ * Presenta dos cifras deliberadamente separadas: lo que exige la norma y la recomendación
+ * ajustada a la situación del estudiante, con los factores que las separan. Fundirlas en un
+ * solo número haría pasar una sugerencia del sistema por una exigencia legal.
+ */
+const NormativeBreakdown: React.FC<{ load: SubjectAcademicLoad }> = ({ load }) => {
+  const { creditLoad, dme, percentageSharedTopics, upcomingDeliverablesWeight } = load;
+  const { breakdown } = dme;
+  const adjusted = dme.recommendedWeeklyHours !== dme.normativeWeeklyHours;
+
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="space-y-1">
+        <div className="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400 font-semibold">
+          Según el Decreto 1075 de 2015
+        </div>
+        <BreakdownRow
+          label={`${creditLoad.credits} créditos × 48 h por semestre`}
+          value={`${creditLoad.semesterHours} h`}
+        />
+        <BreakdownRow label="Repartido en 16 semanas" value={`${creditLoad.weeklyTotalHours.toFixed(1)} h/sem`} />
+        <BreakdownRow
+          label={creditLoad.hasNoSchedule ? 'Clase (sin horario registrado)' : 'Menos tu clase real'}
+          value={`− ${creditLoad.weeklyClassHours.toFixed(1)} h/sem`}
+        />
+        <BreakdownRow label="Trabajo independiente" value={`${creditLoad.weeklyIndependentHours.toFixed(1)} h/sem`} strong />
+        {creditLoad.accompanimentRatio !== null && (
+          <div className="text-[10px] text-slate-400 dark:text-slate-500">
+            Relación acompañamiento : independiente de 1 a{' '}
+            <span className="font-mono">{creditLoad.accompanimentRatio.toFixed(1)}</span>
+          </div>
+        )}
+        {creditLoad.exceedsNorm && (
+          <div className="text-[10px] text-amber-600 dark:text-amber-400">
+            Las horas de clase ya superan el total que exige la norma para estos créditos.
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1 pt-1.5 border-t border-surface-border">
+        <div className="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400 font-semibold">
+          Ajustado a tu situación
+        </div>
+        <BreakdownRow
+          label={`Dificultad ${load.subject.difficulty} de 5`}
+          value={`× ${breakdown.difficultyMultiplier.toFixed(2)}`}
+        />
+        <BreakdownRow
+          label={
+            load.subject.current_grade
+              ? `Margen de nota (${load.subject.current_grade.toFixed(2)} frente a ${load.subject.target_grade.toFixed(2)})`
+              : 'Margen de nota (aún sin notas)'
+          }
+          value={`× ${breakdown.marginFactor.toFixed(2)}`}
+        />
+        <BreakdownRow
+          label={
+            percentageSharedTopics > 0
+              ? `Sinergia entre carreras (${Math.round(percentageSharedTopics * 100)}% de temas compartidos)`
+              : 'Sinergia entre carreras (sin temas compartidos)'
+          }
+          value={`× ${breakdown.synergyFactor.toFixed(2)}`}
+        />
+        <BreakdownRow
+          label={
+            upcomingDeliverablesWeight > 0
+              ? `Entregas en 7 días (${upcomingDeliverablesWeight}% evaluativo)`
+              : 'Entregas en 7 días (ninguna)'
+          }
+          value={`+ ${breakdown.urgencyBonus.toFixed(2)} h`}
+        />
+        <BreakdownRow label="Sugerido para ti" value={`${dme.recommendedWeeklyHours.toFixed(1)} h/sem`} strong />
+        {!adjusted && (
+          <div className="text-[10px] text-slate-400 dark:text-slate-500">
+            Sin ajustes activos: coincide con lo que exige la norma.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
   subjects,
   professors = [],
@@ -30,6 +130,10 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
 }) => {
   const [selectedUniId, setSelectedUniId] = useState<string>('all');
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
+
+  // Misma fuente que el encabezado y el Command Center, para que las horas no discrepen.
+  const { perSubject } = useAcademicLoad();
+  const loadBySubject = new Map(perSubject.map((item) => [item.subject.id, item]));
 
   if (!subjects || subjects.length === 0) {
     return (
@@ -89,7 +193,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
       {/* MOBILE ADAPTIVE CARDS (< 768px) */}
       <div className="block md:hidden space-y-2.5">
         {filteredSubjects.map((sub) => {
-          const dme = calculateDME(sub as any);
+          const load = loadBySubject.get(sub.id);
           const prof = professors.find((p) => p.id === sub.professor_id);
           const uni = universities.find((u) => u.id === sub.university_id);
           const hasGrade = sub.current_grade !== undefined && sub.current_grade > 0;
@@ -155,7 +259,10 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                 <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                   <span className="font-mono">{sub.credits} Créditos</span>
                   <span>•</span>
-                  <span className="text-purple-600 dark:text-purple-400 font-bold font-mono">DME: {dme.recommendedWeeklyHours.toFixed(1)}h/sem</span>
+                  <span className="text-purple-600 dark:text-purple-400">
+                    Independiente:{' '}
+                    <strong className="font-mono">{(load?.creditLoad.weeklyIndependentHours ?? 0).toFixed(1)} h/sem</strong>
+                  </span>
                 </div>
                 <button
                   onClick={() => toggleExpand(sub.id!)}
@@ -180,10 +287,11 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                       <span>{prof.email}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 pt-0.5">
-                    <Clock className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                    <span>Dificultad: <strong className="font-mono">{sub.difficulty} / 5</strong></span>
-                  </div>
+                  {load && (
+                    <div className="pt-1.5 border-t border-surface-border">
+                      <NormativeBreakdown load={load} />
+                    </div>
+                  )}
                 </div>
               )}
             </Card>
@@ -198,25 +306,24 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
             <tr className="border-b border-surface-border bg-surface-subtle text-xs font-sans text-slate-500 dark:text-slate-400 font-semibold">
               <th className="p-3 pl-4">Asignatura & Código</th>
               <th className="p-3">Docente</th>
-              <th className="p-3 text-center">Carga & DME</th>
+              <th className="p-3 text-center">Créditos & carga</th>
               <th className="p-3">Progreso vs Meta</th>
               <th className="p-3 text-right pr-4">Estado</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border text-xs">
             {filteredSubjects.map((sub) => {
-              const dme = calculateDME(sub as any);
+              const load = loadBySubject.get(sub.id);
               const prof = professors.find((p) => p.id === sub.professor_id);
               const uni = universities.find((u) => u.id === sub.university_id);
               const hasGrade = sub.current_grade !== undefined && sub.current_grade > 0;
               const isAboveTarget = (sub.current_grade || 0) >= sub.target_grade;
               const isPassing = (sub.current_grade || 0) >= (uni?.passing_grade || 3.0);
+              const isExpanded = expandedSubjectId === sub.id;
 
               return (
-                <tr
-                  key={sub.id}
-                  className="hover:bg-surface-subtle/50 transition-colors"
-                >
+                <React.Fragment key={sub.id}>
+                <tr className="hover:bg-surface-subtle/50 transition-colors">
                   {/* Subject Name & Code & Badge */}
                   <td className="p-3 pl-4">
                     <div className="space-y-1">
@@ -249,8 +356,14 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                     <div className="text-slate-800 dark:text-slate-200 font-bold font-mono text-xs">
                       {sub.credits} crd
                     </div>
-                    <div className="text-xs text-purple-600 dark:text-purple-400 font-mono font-medium">
-                      {dme.recommendedWeeklyHours.toFixed(1)}h/sem DME
+                    <div
+                      className="text-xs text-purple-600 dark:text-purple-400 font-medium"
+                      title="Trabajo independiente que exige el Decreto 1075: créditos × 3 h/sem menos tus horas de clase"
+                    >
+                      <span className="font-mono">
+                        {(load?.creditLoad.weeklyIndependentHours ?? 0).toFixed(1)} h/sem
+                      </span>{' '}
+                      indep.
                     </div>
                   </td>
 
@@ -266,21 +379,42 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
 
                   {/* Telemetry Status Badge */}
                   <td className="p-3 text-right pr-4">
-                    {!hasGrade ? (
-                      <Badge variant="outline">En Diagnóstico</Badge>
-                    ) : isAboveTarget ? (
-                      <Badge variant="synergy" className="inline-flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Excelente
-                      </Badge>
-                    ) : isPassing ? (
-                      <Badge variant="aeroespacial">En Rango</Badge>
-                    ) : (
-                      <Badge variant="danger" className="inline-flex items-center gap-1">
-                        <ShieldAlert className="w-3 h-3" /> Atención
-                      </Badge>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                      {!hasGrade ? (
+                        <Badge variant="outline">En Diagnóstico</Badge>
+                      ) : isAboveTarget ? (
+                        <Badge variant="synergy" className="inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Excelente
+                        </Badge>
+                      ) : isPassing ? (
+                        <Badge variant="aeroespacial">En Rango</Badge>
+                      ) : (
+                        <Badge variant="danger" className="inline-flex items-center gap-1">
+                          <ShieldAlert className="w-3 h-3" /> Atención
+                        </Badge>
+                      )}
+                      <button
+                        onClick={() => toggleExpand(sub.id!)}
+                        aria-expanded={isExpanded}
+                        aria-label={`${isExpanded ? 'Ocultar' : 'Ver'} el desglose de horas de ${sub.name}`}
+                        className="p-1 rounded text-cyan-600 dark:text-cyan-400 hover:bg-surface-subtle transition-colors shrink-0"
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </td>
                 </tr>
+
+                {isExpanded && load && (
+                  <tr className="bg-surface-subtle/60">
+                    <td colSpan={5} className="p-3 pl-4">
+                      <div className="max-w-xl">
+                        <NormativeBreakdown load={load} />
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               );
             })}
           </tbody>
