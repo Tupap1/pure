@@ -1,8 +1,7 @@
 import React from 'react';
-import { Clock, Cpu, Sun, Moon } from 'lucide-react';
-import { usePureData } from '@/lib/hooks/usePureData';
+import { Clock, Cpu, Sun, Moon, AlertTriangle } from 'lucide-react';
 import { useTheme } from '@/lib/hooks/useTheme';
-import { calculateDME, calculateNetFreeTime, calculateTotalClassHours } from '@/lib/algorithms/study-hours-dme';
+import { useAcademicLoad } from '@/lib/hooks/useAcademicLoad';
 
 import { DashboardTab } from './Sidebar';
 
@@ -19,22 +18,10 @@ const TAB_TITLES: Record<DashboardTab, string> = {
 };
 
 export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
-  const { subjects, schedules } = usePureData();
+  const { normativeIndependentHours, netFreeTime, isOverloaded } = useAcademicLoad();
   const { theme, toggleTheme } = useTheme();
 
   const title = TAB_TITLES[activeTab] || TAB_TITLES.command;
-
-  const totalDMEHours = subjects.reduce((sum, s) => {
-    return sum + calculateDME(s as any).recommendedWeeklyHours;
-  }, 0);
-
-  const classHours = calculateTotalClassHours(schedules);
-
-  const netFreeTimeHours = calculateNetFreeTime({
-    classHours,
-    dmeHours: totalDMEHours,
-    sleepHoursPerNight: 7,
-  });
 
   return (
     <header className="sticky top-0 z-20 bg-white/90 dark:bg-[#090d18]/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 sm:px-6 py-3.5 flex items-center justify-between transition-colors">
@@ -47,28 +34,50 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
 
       {/* Metric Quick Indicators & Theme Toggle */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Net Free Time Metric */}
-        <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
-          <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        {/* Net Free Time — puede ser negativo cuando la carga no cabe en la semana */}
+        <div
+          className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg border ${
+            isOverloaded
+              ? 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-900/70'
+              : 'bg-slate-100 dark:bg-slate-900/80 border-slate-200 dark:border-slate-800'
+          }`}
+          title={
+            isOverloaded
+              ? 'Sobrecarga: la carga académica más el sueño superan las 168h de la semana'
+              : 'Tiempo libre neto: 168h menos clase, trabajo independiente y sueño'
+          }
+        >
+          {isOverloaded ? (
+            <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-600 dark:text-red-400 shrink-0" />
+          ) : (
+            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          )}
           <div>
-            <div className="text-[9px] sm:text-[10px] uppercase font-mono text-slate-500 dark:text-slate-400 font-medium leading-none">
-              Libre Net
+            <div className="text-[9px] sm:text-[10px] uppercase text-slate-500 dark:text-slate-400 font-medium leading-none tracking-wide">
+              {isOverloaded ? 'Sobrecarga' : 'Libre'}
             </div>
-            <div className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 leading-tight">
-              {netFreeTimeHours.toFixed(1)}h
+            <div
+              className={`text-xs font-mono font-bold leading-tight ${
+                isOverloaded ? 'text-red-700 dark:text-red-400' : 'text-slate-900 dark:text-slate-100'
+              }`}
+            >
+              {netFreeTime.toFixed(1)}h/sem
             </div>
           </div>
         </div>
 
-        {/* DME Metric */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
+        {/* Trabajo independiente exigido por la norma de créditos */}
+        <div
+          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800"
+          title="Trabajo independiente semanal según el Decreto 1075 de 2015: 48h por crédito por semestre, menos tus horas de clase"
+        >
           <Cpu className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
           <div>
-            <div className="text-[10px] uppercase font-mono text-slate-500 dark:text-slate-400 font-medium leading-none">
-              DME Semanal
+            <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-medium leading-none tracking-wide">
+              Independiente
             </div>
             <div className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 leading-tight">
-              {totalDMEHours.toFixed(1)}h
+              {normativeIndependentHours.toFixed(1)}h/sem
             </div>
           </div>
         </div>

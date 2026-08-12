@@ -1,22 +1,23 @@
 import React from 'react';
-import { Badge } from './Badge';
+import { normalizeGrade } from '@/lib/domain/university';
 
 export interface SemesterData {
   semester: string; // e.g. "Cálculo Diferencial" or "2585132"
   name?: string;     // Full name if available
   gpa: number;      // Current grade e.g. 0.00 or 4.20
   credits: number;  // e.g. 3
+  /** Meta propia de la asignatura. Cada materia fija la suya. */
+  targetGrade: number;
+  /** Escala de la universidad a la que pertenece la materia. */
+  scaleMin: number;
+  scaleMax: number;
 }
 
 interface SemesterProgressChartProps {
   data?: SemesterData[];
-  targetGPA?: number;
 }
 
-export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
-  data = [],
-  targetGPA = 4.5,
-}) => {
+export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({ data = [] }) => {
   if (!data || data.length === 0) {
     return (
       <div className="w-full space-y-3">
@@ -26,7 +27,7 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
               Desempeño Académico por Asignatura
             </h4>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Progreso ponderado sobre escala 0.0 - 5.0
+              Nota actual frente a la meta, en la escala de cada universidad
             </p>
           </div>
         </div>
@@ -51,10 +52,10 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
             Desempeño & Proyección por Asignatura
           </h4>
           <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            Calificaciones actuales respecto a la meta ({targetGPA.toFixed(1)})
+            Nota actual frente a la meta, en la escala de cada universidad
           </p>
         </div>
-        <div className="flex items-center gap-3 text-[11px] font-mono">
+        <div className="flex items-center gap-3 text-[11px]">
           <span className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400">
             <span className="w-2.5 h-2.5 rounded-sm bg-cyan-500"></span> Nota
           </span>
@@ -66,10 +67,12 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
 
       <div className="p-4 bg-slate-50/50 dark:bg-[#07090e] border border-slate-200 dark:border-slate-800 rounded-xl space-y-3 max-h-[320px] overflow-y-auto pr-1 scrollbar-none">
         {data.map((item, idx) => {
-          const maxGrade = 5.0;
-          const currentPct = Math.min(100, Math.max(0, (item.gpa / maxGrade) * 100));
-          const targetPct = Math.min(100, Math.max(0, (targetGPA / maxGrade) * 100));
-          const isAboveTarget = item.gpa >= targetGPA;
+          // La posición en la barra se normaliza contra la escala real de la universidad,
+          // de modo que una nota sobre 100 y una sobre 5.0 sean visualmente comparables.
+          const scale = { scale_min: item.scaleMin, scale_max: item.scaleMax };
+          const currentPct = Math.min(100, Math.max(0, normalizeGrade(item.gpa, scale)));
+          const targetPct = Math.min(100, Math.max(0, normalizeGrade(item.targetGrade, scale)));
+          const isAboveTarget = item.gpa >= item.targetGrade;
 
           return (
             <div
@@ -92,7 +95,9 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
                   <span className="font-bold text-slate-900 dark:text-slate-100">
                     {item.gpa.toFixed(2)}
                   </span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400">/ 5.0</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                    / {item.scaleMax.toFixed(1)}
+                  </span>
                 </div>
               </div>
 
@@ -102,7 +107,7 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({
                 <div
                   className="absolute top-0 bottom-0 w-0.5 bg-emerald-400 z-10 opacity-80"
                   style={{ left: `${targetPct}%` }}
-                  title={`Meta: ${targetGPA.toFixed(1)}`}
+                  title={`Meta: ${item.targetGrade.toFixed(2)}`}
                 />
                 {/* Filled Progress Bar */}
                 <div

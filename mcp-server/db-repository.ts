@@ -1,5 +1,6 @@
 export {
   fetchAcademicOverviewFromDb,
+  fetchAcademicLoadInputsFromDb,
   fetchAllDataFromDb,
   fetchUniversitiesFromDb,
   saveUniversityToDb,

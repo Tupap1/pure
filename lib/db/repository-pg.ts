@@ -22,6 +22,39 @@ export async function fetchAcademicOverviewFromDb() {
   };
 }
 
+/**
+ * Trae únicamente lo necesario para calcular la carga académica: materias, horarios y la
+ * política de sábados de cada universidad. Más liviano que `fetchAllDataFromDb`, que además
+ * arrastra profesores, entregables y syllabus.
+ */
+export async function fetchAcademicLoadInputsFromDb() {
+  const [unis, subs, scheds] = await Promise.all([
+    pgPool.query('SELECT * FROM universities ORDER BY name ASC'),
+    pgPool.query('SELECT * FROM subjects ORDER BY name ASC'),
+    pgPool.query('SELECT * FROM schedules ORDER BY day_of_week ASC, start_time ASC'),
+  ]);
+
+  return {
+    universities: unis.rows.map((u) => ({
+      ...u,
+      scale_min: Number(u.scale_min),
+      scale_max: Number(u.scale_max),
+      passing_grade: Number(u.passing_grade),
+    })),
+    subjects: subs.rows.map((s) => ({
+      ...s,
+      credits: Number(s.credits),
+      difficulty: Number(s.difficulty),
+      target_grade: Number(s.target_grade),
+      current_grade: Number(s.current_grade),
+    })),
+    schedules: scheds.rows.map((sc) => ({
+      ...sc,
+      day_of_week: Number(sc.day_of_week),
+    })),
+  };
+}
+
 export async function fetchAllDataFromDb() {
   const [unis, profs, subs, scheds, delivs, topics] = await Promise.all([
     pgPool.query('SELECT * FROM universities ORDER BY name ASC'),

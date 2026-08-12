@@ -328,7 +328,22 @@ export const CommandCenter: React.FC = () => {
                   Evolución de Promedio Académico
                 </h3>
               </div>
-              <SemesterProgressChart data={subjects.map((s) => ({ semester: s.code || s.name.substring(0, 6), gpa: s.current_grade || 0, credits: s.credits }))} targetGPA={4.5} />
+              <SemesterProgressChart
+                data={subjects.map((s) => {
+                  // Cada materia se mide contra su propia meta y contra la escala de su
+                  // universidad, no contra un 4.5 sobre 5.0 fijo para todas.
+                  const uni = universities.find((u) => u.id === s.university_id);
+                  return {
+                    semester: s.code || s.name.substring(0, 6),
+                    name: s.name,
+                    gpa: s.current_grade || 0,
+                    credits: s.credits,
+                    targetGrade: s.target_grade,
+                    scaleMin: uni?.scale_min ?? 0,
+                    scaleMax: uni?.scale_max ?? 5,
+                  };
+                })}
+              />
             </Card>
           </div>
         </>

@@ -1,7 +1,8 @@
-import { calculateNetFreeTime } from '../lib/algorithms/study-hours-dme';
+import { computeAcademicLoad } from '../lib/algorithms/academic-load';
 import { findSynergiesBetweenTopics, SyllabusTopic } from '../lib/domain/syllabus';
 import {
   fetchAcademicOverviewFromDb,
+  fetchAcademicLoadInputsFromDb,
   fetchUniversitiesFromDb,
   saveUniversityToDb,
   deleteUniversityFromDb,
@@ -24,15 +25,45 @@ import {
 
 export async function handleGetAcademicOverview() {
   try {
-    const overview = await fetchAcademicOverviewFromDb();
+    const [overview, loadInputs] = await Promise.all([
+      fetchAcademicOverviewFromDb(),
+      fetchAcademicLoadInputsFromDb(),
+    ]);
     if (!overview) {
       return { status: 'error', message: 'No se pudo cargar la vista académica desde PostgreSQL' };
     }
 
+    // La carga se deriva de las materias y horarios reales. Sin materias registradas no hay
+    // nada que calcular, y devolver un número igualmente sería inventarlo.
+    const hasSubjects = loadInputs.subjects.length > 0;
+    const load = hasSubjects
+      ? computeAcademicLoad(loadInputs.subjects as any, loadInputs.schedules as any, loadInputs.universities as any)
+      : null;
+
     return {
       status: 'success',
       data: {
-        netFreeTimeHours: calculateNetFreeTime({ classHours: 28, dmeHours: 24, sleepHoursPerNight: 7 }),
+        creditRule: {
+          regulation: 'Decreto 1075 de 2015 (compila el Decreto 1295 de 2010)',
+          hoursPerCreditPerSemester: 48,
+          semesterWeeks: 16,
+          note: 'Cada crédito son 48h de trabajo académico por semestre (3h/semana): acompañamiento directo del docente más trabajo independiente. Las horas independientes se derivan restando las horas de clase reales del horario.',
+        },
+        academicLoad: load
+          ? {
+              totalCredits: load.totalCredits,
+              classHoursPerWeek: load.classHours,
+              independentHoursPerWeek: load.normativeIndependentHours,
+              totalAcademicHoursPerWeek: load.totalAcademicHours,
+              sleepHoursPerWeek: load.sleepHours,
+              subjectsWithoutSchedule: load.subjectsWithoutSchedule,
+            }
+          : null,
+        netFreeTimeHours: load ? load.netFreeTime : null,
+        isOverloaded: load ? load.isOverloaded : null,
+        netFreeTimeNote: load
+          ? 'Resultado de 168h menos clase, trabajo independiente y 49h de sueño. Un valor negativo significa que la carga académica no cabe en la semana.'
+          : 'No hay materias registradas: no es posible derivar el tiempo libre neto.',
         universities: overview.universities,
         universitiesCount: overview.universitiesCount,
         professorsCount: overview.professorsCount,
