@@ -1,4 +1,11 @@
-import type { SubjectEntity, ScheduleEntity, UniversityEntity } from '../db/dexie-schema';
+import type {
+  SubjectEntity,
+  ScheduleEntity,
+  UniversityEntity,
+  DeliverableEntity,
+  SyllabusTopicEntity,
+} from '../db/dexie-schema';
+import { findSynergiesBetweenTopics, type SyllabusTopic } from '../domain/syllabus';
 import {
   calculateCreditLoad,
   calculateDME,
@@ -14,6 +21,9 @@ import {
 /** Horas de sueño asumidas por noche. 7h × 7 días = 49h semanales. */
 export const SLEEP_HOURS_PER_NIGHT = 7;
 
+/** Días hacia adelante que cuentan como "entrega inminente" para el bonus de urgencia. */
+export const URGENCY_WINDOW_DAYS = 7;
+
 export interface SubjectAcademicLoad {
   subject: SubjectEntity;
   university?: UniversityEntity;
@@ -21,6 +31,10 @@ export interface SubjectAcademicLoad {
   creditLoad: CreditLoadBreakdown;
   /** Exigencia normativa y recomendación ajustada, con el desglose de factores. */
   dme: DMEResult;
+  /** Fracción (0 a 1) de los temas de la materia que comparten contenido con otra carrera. */
+  percentageSharedTopics: number;
+  /** Suma de los pesos % de las entregas pendientes de la materia en los próximos 7 días. */
+  upcomingDeliverablesWeight: number;
 }
 
 export interface AcademicLoadSummary {
@@ -70,6 +84,81 @@ function toHoursInput(
 }
 
 /**
+ * Fracción de los temas de cada materia que se solapan con los de otra carrera.
+ *
+ * Alimenta el factor de sinergia del DME: lo que ya se estudia para una materia no hay que
+ * volver a estudiarlo entero para la otra. `findSynergiesBetweenTopics` ya descarta las
+ * coincidencias dentro de la misma materia, así que basta una pasada sobre todos los temas.
+ */
+function computeSharedTopicRatios(syllabusTopics: SyllabusTopicEntity[]): Map<string, number> {
+  const ratios = new Map<string, number>();
+  if (syllabusTopics.length === 0) return ratios;
+
+  const totalBySubject = new Map<string, number>();
+  for (const topic of syllabusTopics) {
+    totalBySubject.set(topic.subject_id, (totalBySubject.get(topic.subject_id) || 0) + 1);
+  }
+
+  const matchedBySubject = new Map<string, Set<string>>();
+  const addMatch = (subjectId: string, topicId?: string) => {
+    if (!topicId) return;
+    const bucket = matchedBySubject.get(subjectId);
+    if (bucket) bucket.add(topicId);
+    else matchedBySubject.set(subjectId, new Set([topicId]));
+  };
+
+  const topics = syllabusTopics as unknown as SyllabusTopic[];
+  for (const match of findSynergiesBetweenTopics(topics, topics)) {
+    addMatch(match.topicA.subject_id, match.topicA.id);
+    addMatch(match.topicB.subject_id, match.topicB.id);
+  }
+
+  for (const [subjectId, total] of totalBySubject) {
+    const matched = matchedBySubject.get(subjectId)?.size || 0;
+    ratios.set(subjectId, total > 0 ? Math.min(1, matched / total) : 0);
+  }
+
+  return ratios;
+}
+
+/**
+ * Peso evaluativo pendiente de cada materia dentro de la ventana de urgencia.
+ *
+ * Solo cuentan las entregas todavía pendientes: una ya entregada no genera presión de estudio
+ * por más que su fecha límite siga en el futuro.
+ */
+function computeUpcomingWeights(
+  deliverables: DeliverableEntity[],
+  referenceDate: Date
+): Map<string, number> {
+  const weights = new Map<string, number>();
+  const from = referenceDate.getTime();
+  const to = from + URGENCY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+  for (const deliverable of deliverables) {
+    if (deliverable.status !== 'pendiente' || !deliverable.due_date) continue;
+
+    const due = new Date(deliverable.due_date).getTime();
+    if (Number.isNaN(due) || due < from || due > to) continue;
+
+    const current = weights.get(deliverable.subject_id) || 0;
+    weights.set(deliverable.subject_id, current + (deliverable.weight_percentage || 0));
+  }
+
+  return weights;
+}
+
+export interface AcademicLoadOptions {
+  /** Entregas pendientes, para el bonus de urgencia del DME. */
+  deliverables?: DeliverableEntity[];
+  /** Temario, para el descuento por sinergia entre carreras. */
+  syllabusTopics?: SyllabusTopicEntity[];
+  semesterWeeks?: number;
+  /** Fecha desde la que se mide la ventana de urgencia. Inyectable para pruebas. */
+  referenceDate?: Date;
+}
+
+/**
  * Calcula la carga académica completa a partir de los datos reales del estudiante.
  *
  * Es la única fuente de estas cifras: el encabezado, el dashboard y la tabla de materias la
@@ -79,9 +168,18 @@ export function computeAcademicLoad(
   subjects: SubjectEntity[],
   schedules: ScheduleEntity[],
   universities: UniversityEntity[] = [],
-  semesterWeeks: number = DEFAULT_SEMESTER_WEEKS
+  options: AcademicLoadOptions = {}
 ): AcademicLoadSummary {
+  const {
+    deliverables = [],
+    syllabusTopics = [],
+    semesterWeeks = DEFAULT_SEMESTER_WEEKS,
+    referenceDate = new Date(),
+  } = options;
+
   const universityById = new Map(universities.map((u) => [u.id, u]));
+  const sharedTopicRatios = computeSharedTopicRatios(syllabusTopics);
+  const upcomingWeights = computeUpcomingWeights(deliverables, referenceDate);
 
   const schedulesBySubject = new Map<string, ScheduleEntity[]>();
   for (const schedule of schedules) {
@@ -100,11 +198,16 @@ export function computeAcademicLoad(
     );
 
     const creditLoad = calculateCreditLoad(subject, subjectSchedules, semesterWeeks);
+    const percentageSharedTopics = sharedTopicRatios.get(subject.id || '') || 0;
+    const upcomingDeliverablesWeight = upcomingWeights.get(subject.id || '') || 0;
+
     const dme = calculateDME(subject as any, {
       baseIndependentHours: creditLoad.weeklyIndependentHours,
+      percentageSharedTopics,
+      upcomingDeliverablesWeight7Days: upcomingDeliverablesWeight,
     });
 
-    return { subject, university, creditLoad, dme };
+    return { subject, university, creditLoad, dme, percentageSharedTopics, upcomingDeliverablesWeight };
   });
 
   // Las horas de clase se suman sobre TODOS los horarios, incluidos los que apuntan a una

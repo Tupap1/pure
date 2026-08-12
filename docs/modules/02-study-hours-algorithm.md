@@ -38,11 +38,17 @@ $$F_{\text{margen}} = \begin{cases}
 ### 4. Factor de Descuento por Sinergia Temática
 $$F_{\text{sinergia}} = 1.0 - (0.3 \times \text{PorcentajeTemasCompartidos})$$
 
+`PorcentajeTemasCompartidos` se deriva del temario real, no se configura a mano: es la fracción de temas de la materia que `findSynergiesBetweenTopics` (`lib/domain/syllabus.ts`) empareja con temas de **otra** materia. Lo que ya se estudia para una carrera no hay que volver a estudiarlo entero para la otra.
+
 ### 5. Término de Bonus por Urgencia de Entregables
 $$\text{Urgencia7Días} = \text{PesoPorcentajeEvaluacionesPróximas7Días} \times 0.05$$
 
+Solo suman las entregas con estado `pendiente` y fecha límite dentro de los 7 días siguientes: una entrega ya realizada no genera presión de estudio aunque su fecha siga en el futuro.
+
 ### 6. Fórmula Final de Dosis Mínima Eficaz ($H_{\text{DME}}$)
 $$H_{\text{DME}} = (H_{\text{independiente\_base}} \times M_{\text{dificultad}} \times F_{\text{margen}} \times F_{\text{sinergia}}) + \text{Urgencia7Días}$$
+
+Los factores ajustan **solo la recomendación**. `calculateDME` devuelve las dos cifras por separado — `normativeWeeklyHours` (la exigencia del decreto, que ningún factor mueve) y `recommendedWeeklyHours` (la anterior ya ajustada) — para que la interfaz nunca presente una sugerencia del sistema como si fuera la exigencia legal. El desglose completo se ve al expandir una materia en la tabla de telemetría.
 
 ---
 

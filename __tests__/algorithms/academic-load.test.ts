@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { computeAcademicLoad, buildDailyLoad } from '@/lib/algorithms/academic-load';
-import type { SubjectEntity, ScheduleEntity, UniversityEntity } from '@/lib/db/dexie-schema';
+import type {
+  SubjectEntity,
+  ScheduleEntity,
+  UniversityEntity,
+  DeliverableEntity,
+  SyllabusTopicEntity,
+} from '@/lib/db/dexie-schema';
 
 function university(overrides: Partial<UniversityEntity> & { id: string; name: string }): UniversityEntity {
   return {
@@ -160,5 +166,136 @@ describe('buildDailyLoad — Distribución diaria de carga horaria real', () => 
     expect(daily[0].independentHours).toBe(4);
     expect(daily[0].freeHours).toBe(-3);
     expect(daily[0].isOverloaded).toBe(true);
+  });
+});
+
+describe('computeAcademicLoad — sinergia entre carreras y urgencia de entregas', () => {
+  const REFERENCE = new Date(2026, 7, 12, 9, 0, 0); // 12 de agosto de 2026, hora local
+
+  function deliverable(
+    overrides: Partial<DeliverableEntity> & { id: string; subject_id: string }
+  ): DeliverableEntity {
+    return {
+      title: 'Parcial',
+      due_date: new Date(2026, 7, 15, 12, 0, 0).toISOString(),
+      weight_percentage: 30,
+      type: 'parcial',
+      is_group: false,
+      complexity: 'medio',
+      status: 'pendiente',
+      ...overrides,
+    };
+  }
+
+  function topic(
+    overrides: Partial<SyllabusTopicEntity> & { id: string; subject_id: string; title: string }
+  ): SyllabusTopicEntity {
+    return {
+      mastery_status: 'no_iniciado',
+      order_index: 0,
+      ...overrides,
+    };
+  }
+
+  const universities = [university({ id: 'udea', name: 'UdeA' })];
+
+  it('suma el bonus de urgencia por las entregas pendientes de los próximos 7 días', () => {
+    const subjects = [subject({ id: 'calculo', university_id: 'udea', credits: 3, difficulty: 3 })];
+    const schedules = [
+      schedule({ id: 's1', subject_id: 'calculo', start_time: '08:00', end_time: '11:00' }), // 3h clase
+    ];
+    // 3 créditos -> 9h normativas, menos 3h de clase = 6h independientes de base.
+    const deliverables = [deliverable({ id: 'd1', subject_id: 'calculo', weight_percentage: 30 })];
+
+    const load = computeAcademicLoad(subjects, schedules, universities, {
+      deliverables,
+      referenceDate: REFERENCE,
+    });
+    const item = load.perSubject[0];
+
+    expect(item.upcomingDeliverablesWeight).toBe(30);
+    expect(item.dme.breakdown.urgencyBonus).toBe(1.5); // 30% × 0.05
+    expect(item.dme.normativeWeeklyHours).toBe(6); // la norma no se mueve por la urgencia
+    expect(item.dme.recommendedWeeklyHours).toBe(8.1); // 6 × 1.1 + 1.5
+  });
+
+  it('ignora las entregas fuera de la ventana de 7 días y las que ya no están pendientes', () => {
+    const subjects = [subject({ id: 'calculo', university_id: 'udea', credits: 3 })];
+    const deliverables = [
+      // Dentro de la ventana, pero ya entregada.
+      deliverable({ id: 'd1', subject_id: 'calculo', status: 'entregado', weight_percentage: 40 }),
+      // Pendiente, pero a 20 días vista.
+      deliverable({
+        id: 'd2',
+        subject_id: 'calculo',
+        due_date: new Date(2026, 8, 1, 12, 0, 0).toISOString(),
+        weight_percentage: 25,
+      }),
+    ];
+
+    const load = computeAcademicLoad(subjects, [], universities, {
+      deliverables,
+      referenceDate: REFERENCE,
+    });
+
+    expect(load.perSubject[0].upcomingDeliverablesWeight).toBe(0);
+    expect(load.perSubject[0].dme.breakdown.urgencyBonus).toBe(0);
+  });
+
+  it('descuenta horas cuando dos carreras comparten temario', () => {
+    const subjects = [
+      subject({ id: 'mate-udea', university_id: 'udea', credits: 3, difficulty: 3 }),
+      subject({ id: 'mate-udec', university_id: 'udea', credits: 3, difficulty: 3 }),
+    ];
+    const syllabusTopics = [
+      topic({ id: 't1', subject_id: 'mate-udea', title: 'Álgebra Lineal y Matrices' }),
+      topic({ id: 't2', subject_id: 'mate-udec', title: 'Álgebra Lineal y Matrices' }),
+    ];
+
+    const load = computeAcademicLoad(subjects, [], universities, {
+      syllabusTopics,
+      referenceDate: REFERENCE,
+    });
+    const item = load.perSubject[0];
+
+    // El único tema de la materia coincide con el de la otra carrera.
+    expect(item.percentageSharedTopics).toBe(1);
+    expect(item.dme.breakdown.synergyFactor).toBe(0.7); // 1 - 0.3 × 1
+    // Sin horario, las 9h normativas son todas independientes.
+    expect(item.dme.normativeWeeklyHours).toBe(9);
+    expect(item.dme.recommendedWeeklyHours).toBe(6.93); // 9 × 1.1 × 0.7
+    expect(item.dme.recommendedWeeklyHours).toBeLessThan(item.dme.normativeWeeklyHours);
+  });
+
+  it('no aplica sinergia cuando los temarios no se parecen', () => {
+    const subjects = [
+      subject({ id: 'mate', university_id: 'udea', credits: 3 }),
+      subject({ id: 'historia', university_id: 'udea', credits: 3 }),
+    ];
+    const syllabusTopics = [
+      topic({ id: 't1', subject_id: 'mate', title: 'Derivadas parciales' }),
+      topic({ id: 't2', subject_id: 'historia', title: 'Independencia de Colombia' }),
+    ];
+
+    const load = computeAcademicLoad(subjects, [], universities, {
+      syllabusTopics,
+      referenceDate: REFERENCE,
+    });
+
+    expect(load.perSubject[0].percentageSharedTopics).toBe(0);
+    expect(load.perSubject[0].dme.breakdown.synergyFactor).toBe(1);
+  });
+
+  it('sin entregas ni temario, la recomendación solo depende de dificultad y nota', () => {
+    const subjects = [subject({ id: 'calculo', university_id: 'udea', credits: 3, difficulty: 3 })];
+
+    const load = computeAcademicLoad(subjects, [], universities, { referenceDate: REFERENCE });
+    const item = load.perSubject[0];
+
+    expect(item.percentageSharedTopics).toBe(0);
+    expect(item.upcomingDeliverablesWeight).toBe(0);
+    expect(item.dme.breakdown.synergyFactor).toBe(1);
+    expect(item.dme.breakdown.urgencyBonus).toBe(0);
+    expect(item.dme.recommendedWeeklyHours).toBe(9.9); // 9 × 1.1
   });
 });
