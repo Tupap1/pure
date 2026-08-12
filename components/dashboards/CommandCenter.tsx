@@ -3,24 +3,18 @@ import { usePureData } from '@/lib/hooks/usePureData';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { ProgressRing, MultiProgressRing } from '@/components/ui/ProgressRing';
+import { MultiProgressRing } from '@/components/ui/ProgressRing';
 import { SemesterProgressChart } from '@/components/ui/SemesterProgressChart';
 import { StudyHeatmap } from '@/components/ui/StudyHeatmap';
 import { DailyLoadStackedBar } from '@/components/ui/DailyLoadStackedBar';
 import { SubjectTelemetryTable } from '@/components/ui/SubjectTelemetryTable';
 import {
   Clock,
-  BookOpen,
   CheckCircle2,
   CalendarDays,
   GraduationCap,
-  Sparkles,
-  Zap,
   TrendingUp,
-  ArrowRight,
-  BarChart3,
-  Activity,
-  Layers
+  BarChart3
 } from 'lucide-react';
 import { buildDailyLoad } from '@/lib/algorithms/academic-load';
 import { calculateDME, calculateNetFreeTime, calculateTotalClassHours } from '@/lib/algorithms/study-hours-dme';
@@ -36,6 +30,42 @@ export const CommandCenter: React.FC = () => {
     () => buildDailyLoad(schedules, subjects, universities, academicLoad.normativeIndependentHours),
     [schedules, subjects, universities, academicLoad.normativeIndependentHours]
   );
+
+  // Horas reales de estudio de los últimos 28 días, tomadas de las sesiones completadas.
+  // Debe declararse antes del retorno temprano: un hook detrás de un `return` condicional
+  // se salta mientras los datos cargan y rompe el orden de hooks entre renders.
+  const realHeatmapDays = React.useMemo(() => {
+    const result = [];
+    const now = new Date();
+
+    for (let i = 27; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
+      const sessionsOnDate = studySessions.filter((s) => {
+        const sessionDate = s.scheduled_start?.slice(0, 10);
+        return sessionDate === dateStr && s.is_completed;
+      });
+
+      let hours = 0;
+      sessionsOnDate.forEach((s) => {
+        const start = new Date(s.scheduled_start).getTime();
+        const end = new Date(s.scheduled_end).getTime();
+        if (end > start) {
+          hours += (end - start) / (1000 * 60 * 60);
+        }
+      });
+
+      hours = Math.round(hours * 10) / 10;
+      const intensity = (hours === 0 ? 0 : hours <= 2 ? 1 : hours <= 4 ? 2 : hours <= 6 ? 3 : 4) as 0 | 1 | 2 | 3 | 4;
+      result.push({ date: dateStr, hours, intensity });
+    }
+    return result;
+  }, [studySessions]);
 
   if (!isLoaded) {
     return (
@@ -81,58 +111,8 @@ export const CommandCenter: React.FC = () => {
     { label: 'Horario Clases', progress: Math.min(100, Math.round((classHours / 168) * 100)), color: '#38bdf8' },
   ];
 
-  // Dynamic Heatmap Days calculated from real completed studySessions in IndexedDB
-  const realHeatmapDays = React.useMemo(() => {
-    const result = [];
-    const now = new Date();
-
-    for (let i = 27; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
-      const sessionsOnDate = studySessions.filter((s) => {
-        const sessionDate = s.scheduled_start?.slice(0, 10);
-        return sessionDate === dateStr && s.is_completed;
-      });
-
-      let hours = 0;
-      sessionsOnDate.forEach((s) => {
-        const start = new Date(s.scheduled_start).getTime();
-        const end = new Date(s.scheduled_end).getTime();
-        if (end > start) {
-          hours += (end - start) / (1000 * 60 * 60);
-        }
-      });
-
-      hours = Math.round(hours * 10) / 10;
-      const intensity = (hours === 0 ? 0 : hours <= 2 ? 1 : hours <= 4 ? 2 : hours <= 6 ? 3 : 4) as 0 | 1 | 2 | 3 | 4;
-      result.push({ date: dateStr, hours, intensity });
-    }
-    return result;
-  }, [studySessions]);
-
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Overview Header Banner */}
-      <div className="bg-[#090d18] border border-cyan-500/30 rounded-xl p-5 shadow-sm text-slate-100 glow-aeroespacial">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold text-slate-100 tracking-tight font-heading">
-              Dashboard Académico
-            </h2>
-            <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-              {subjects.length > 0
-                ? `${subjects.length} asignatura(s) activas en ${universities.length} institución(es).`
-                : 'Configura tus instituciones y materias para iniciar la gestión.'}
-            </p>
-          </div>
-        </div>
-      </div>
-
       {subjects.length === 0 ? (
         /* Empty State */
         <Card className="p-8 border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 space-y-6">
@@ -152,7 +132,7 @@ export const CommandCenter: React.FC = () => {
         <>
           {/* 4-Metric Academic Capacity Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800 space-y-1">
+            <Card className="p-3.5 space-y-1">
               <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">Clases en Horario</div>
               <div className="text-lg font-mono font-bold text-cyan-600 dark:text-cyan-400">
                 {classHours.toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
@@ -160,7 +140,7 @@ export const CommandCenter: React.FC = () => {
               <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Horas de asistencia agendadas</div>
             </Card>
 
-            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800 space-y-1">
+            <Card className="p-3.5 space-y-1">
               <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">Estudio por Fuera (DME)</div>
               <div className="text-lg font-mono font-bold text-purple-600 dark:text-purple-400">
                 {totalDMEHours.toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
@@ -168,7 +148,7 @@ export const CommandCenter: React.FC = () => {
               <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Trabajo autónomo sugerido</div>
             </Card>
 
-            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800 space-y-1">
+            <Card className="p-3.5 space-y-1">
               <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">Dedicación Total</div>
               <div className="text-lg font-mono font-bold text-slate-900 dark:text-slate-100">
                 {(classHours + totalDMEHours).toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
@@ -176,7 +156,7 @@ export const CommandCenter: React.FC = () => {
               <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Carga académica global</div>
             </Card>
 
-            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-emerald-500/30 space-y-1 glow-synergy">
+            <Card className="p-3.5 border-emerald-500/30 space-y-1">
               <div className="text-[10px] font-mono uppercase text-emerald-600 dark:text-emerald-400 font-medium">Tiempo Libre Neto</div>
               <div className="text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400">
                 {netFreeTime.toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
@@ -272,7 +252,7 @@ export const CommandCenter: React.FC = () => {
 
                 <div className="space-y-4">
                   {/* Concentric Multi-Ring Display */}
-                  <div className="p-4 rounded-lg bg-slate-50 dark:bg-[#07090e] border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+                  <div className="p-4 rounded-lg bg-slate-50 dark:bg-obsidian-950 border border-surface-border flex items-center justify-between gap-4">
                     <div className="space-y-1 min-w-0">
                       <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">
                         Tiempo Libre Neto

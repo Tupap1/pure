@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { FormErrors } from '@/components/ui/FormErrors';
 import {
   CheckSquare,
   Plus,
@@ -153,7 +154,7 @@ export const DeliverablesDashboard: React.FC = () => {
         <div>
           <h2 className="text-xl font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            Entregas, Evaluaciones & Exámenes (CRUD Completo)
+            Entregas, evaluaciones y exámenes
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Registro y edición de actividades con calculadora de nota mínima requerida.
@@ -340,6 +341,7 @@ export const DeliverablesDashboard: React.FC = () => {
         title={editingDeliv ? `Editar Actividad: ${editingDeliv.title}` : 'Registrar Nueva Actividad / Evaluación'}
       >
         <div className="space-y-4">
+          <FormErrors errors={delivErrors} />
           <div>
             <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Título de la Actividad</label>
             <input
@@ -375,8 +377,8 @@ export const DeliverablesDashboard: React.FC = () => {
                 onChange={(e) => setIsGroup(e.target.value === 'group')}
                 className={inputClass}
               >
-                <option value="individual">👤 Individual</option>
-                <option value="group">👥 Grupal</option>
+                <option value="individual">Individual</option>
+                <option value="group">Grupal</option>
               </select>
             </div>
             <div>

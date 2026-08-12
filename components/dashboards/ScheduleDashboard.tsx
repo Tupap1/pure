@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -12,14 +12,9 @@ import {
   MapPin,
   Pencil,
   Trash2,
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  Grid,
-  List
+  Plus
 } from 'lucide-react';
 import { detectScheduleConflicts, getSabadoTypeForDate, occursOnSabadoVariant } from '@/lib/algorithms/conflict-detector';
-import { filterSchedulesByDay, sortSchedulesByTime } from '@/lib/algorithms/schedule-mobile-transformer';
 import { ScheduleSchema, validateEntity } from '@/lib/validations/schemas';
 import { pureDB, ScheduleEntity } from '@/lib/db/dexie-schema';
 
@@ -32,8 +27,8 @@ export const ScheduleDashboard: React.FC = () => {
   const { isLoaded, universities, subjects, schedules } = usePureData();
   const todayNum = getTodayDayOfWeek();
 
-  const [selectedMobileDay, setSelectedMobileDay] = useState<number>(todayNum);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  /** Día preseleccionado al abrir el formulario de alta. La vista móvil vive en su propio componente. */
+  const selectedMobileDay = todayNum;
 
   const currentHourNum = new Date().getHours();
   const currentMinNum = new Date().getMinutes();
@@ -78,11 +73,10 @@ export const ScheduleDashboard: React.FC = () => {
   });
 
   const mainUni = universities.find((u) => u.has_alternating_saturdays) || universities[0];
-  const currentSabadoType = getSabadoTypeForDate(new Date(), mainUni?.first_sabado_a_date || '2026-08-01');
+  const currentSabadoType = getSabadoTypeForDate(new Date(), mainUni?.first_sabado_a_date);
 
   const conflicts = detectScheduleConflicts(mappedSlots);
   const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-  const shortDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
 
   // El sábado se parte en dos columnas cuando hay clases quincenales: un bloque de
@@ -136,26 +130,6 @@ export const ScheduleDashboard: React.FC = () => {
     return column.sabadoVariant === currentSabadoType;
   };
 
-  const gridHours = [
-    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-    '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-    '18:00', '19:00', '20:00', '21:00', '22:00'
-  ];
-
-  const selectedDaySchedules = sortSchedulesByTime(filterSchedulesByDay(schedules, selectedMobileDay));
-
-  const handlePrevDay = () => {
-    setSelectedMobileDay((prev) => (prev > 1 ? prev - 1 : 7));
-  };
-
-  const handleNextDay = () => {
-    setSelectedMobileDay((prev) => (prev < 7 ? prev + 1 : 1));
-  };
-
-  const handleGoToday = () => {
-    setSelectedMobileDay(todayNum);
-  };
-
   const handleOpenAddSchedule = () => {
     setEditingSchedId(null);
     setSchedSubjectId(subjects[0]?.id || '');
@@ -186,7 +160,7 @@ export const ScheduleDashboard: React.FC = () => {
       day_of_week: Number(schedDay),
       start_time: schedStart,
       end_time: schedEnd,
-      classroom: schedClassroom || 'Aula por definir',
+      classroom: schedClassroom.trim() || undefined,
       periodicity: Number(schedDay) === 6 ? schedPeriodicity : 'semanal',
     };
 
@@ -209,18 +183,11 @@ export const ScheduleDashboard: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const handleDeleteSchedule = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    await pureDB.schedules.delete(id);
+  const handleDeleteSchedule = async () => {
+    if (!editingSchedId) return;
+    await pureDB.schedules.delete(editingSchedId);
+    setIsModalOpen(false);
   };
-
-  const parseTimeToMinutes = (timeStr: string) => {
-    const [h, m] = timeStr.split(':').map(Number);
-    return h * 60 + (m || 0);
-  };
-
-  const gridStartMins = 6 * 60; // 06:00
-  const hourRowHeight = 60; // 60px por hora
 
   const inputClass =
     'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
@@ -505,7 +472,16 @@ export const ScheduleDashboard: React.FC = () => {
             </div>
           )}
 
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
+            {editingSchedId && (
+              <Button
+                variant="danger"
+                className="w-full sm:w-auto sm:mr-auto"
+                onClick={handleDeleteSchedule}
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Eliminar
+              </Button>
+            )}
             <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
