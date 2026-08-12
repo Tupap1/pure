@@ -196,19 +196,17 @@ export const SyllabusDashboard: React.FC = () => {
             role="tablist"
             aria-label="Seleccionar materia"
           >
-            {uniqueSubjects.map((sub) => (
+            {uniqueSubjects.map((s) => (
               <button
-                key={sub.id}
-                role="tab"
-                aria-selected={activeSubject?.id === sub.id}
-                onClick={() => setSelectedSubjectId(sub.id!)}
-                className={`snap-start shrink-0 min-h-[44px] px-4 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
-                  activeSubject?.id === sub.id
-                    ? 'bg-sky-600 text-slate-50 font-medium'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900'
+                key={s.id}
+                onClick={() => setSelectedSubjectId(s.id || '')}
+                className={`snap-start px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all border ${
+                  (s.id === activeSubject?.id) 
+                  ? 'bg-sky-600 text-white border-sky-600 shadow-sm' 
+                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-sky-300 dark:hover:border-sky-700'
                 }`}
               >
-                {sub.name}
+                {s.name}
               </button>
             ))}
           </div>

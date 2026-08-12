@@ -80,33 +80,29 @@ export const MobileScheduleTimeline: React.FC = () => {
         </p>
       </div>
 
-      {/* Titanium Cybernetic Day Selector Strip */}
-      <div className="p-2 rounded-2xl bg-white dark:bg-[#090d18] border border-slate-200 dark:border-cyan-500/30 shadow-md">
-        <div className="flex items-center justify-between gap-1">
-          {shortDays.map((dayName, idx) => {
-            const dayNum = idx + 1;
-            const isSelected = selectedDay === dayNum;
-            const dayDate = dayNumbers[idx];
-
-            return (
-              <button
-                key={dayName}
-                onClick={() => setSelectedDay(dayNum)}
-                className={`flex-1 py-2 px-1 rounded-xl flex flex-col items-center justify-center transition-all ${
-                  isSelected
-                    ? 'bg-cyan-500 text-slate-950 font-bold shadow-md glow-aeroespacial scale-105'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/40'
-                }`}
-              >
-                <span className="text-[10px] uppercase font-mono font-medium leading-none">{dayName}</span>
-                <span className="text-xs font-bold font-mono leading-tight mt-0.5">{dayDate}</span>
-              </button>
-            );
-          })}
-        </div>
+      <div className="flex items-center justify-between gap-1 bg-white dark:bg-[#0d1322] p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        {shortDays.map((day, idx) => {
+          const dayNum = idx + 1;
+          const isSelected = selectedDay === dayNum;
+          return (
+            <button
+              key={day}
+              onClick={() => setSelectedDay(dayNum)}
+              className={`flex-1 flex flex-col items-center justify-center py-2 rounded-xl transition-all ${
+                isSelected
+                  ? 'bg-cyan-500 text-white shadow-md'
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              <span className="text-[9px] font-bold uppercase">{day}</span>
+              <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-900 dark:text-slate-200'}`}>
+                {dayNumbers[idx]}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Sub-Tab View Switcher */}
       <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-mono" role="tablist">
         <button
           role="tab"

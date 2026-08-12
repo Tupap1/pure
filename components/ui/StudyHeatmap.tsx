@@ -15,7 +15,7 @@ const intensityStyles = {
   1: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800',
   2: 'bg-emerald-300 dark:bg-emerald-800/80 text-emerald-950 dark:text-emerald-200 border-emerald-400 dark:border-emerald-700',
   3: 'bg-emerald-500 dark:bg-emerald-600 text-white border-emerald-600 dark:border-emerald-500 shadow-sm shadow-emerald-500/20',
-  4: 'bg-emerald-600 dark:bg-emerald-400 text-white dark:text-slate-950 font-bold border-emerald-500 dark:border-emerald-300 shadow-md shadow-emerald-500/30',
+  4: 'bg-emerald-600 dark:bg-emerald-400 text-white dark:text-white font-bold border-emerald-500 dark:border-emerald-300 shadow-md shadow-emerald-500/30',
 };
 
 export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ days = [] }) => {
