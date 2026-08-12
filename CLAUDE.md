@@ -43,7 +43,7 @@ The five core entities — universities, professors, subjects, schedules, delive
 - `schedule-mobile-transformer.ts` — reshapes the desktop weekly grid into the mobile vertical timeline.
 - `lib/domain/subject.ts` — includes the "minimum required grade" calculator referenced from the Deliverables dashboard.
 
-Net free time is always `168h - (class hours + 49h sleep + DME study hours)`.
+Net free time is always `168h - (class hours + 49h sleep + normative/DME independent hours)`. Note that net free time is unclamped and can now be negative when academic load demands exceed weekly capacity.
 
 ### MCP server (`mcp-server/`) — a separate app from Next.js
 

@@ -19,7 +19,7 @@ $$\text{Nota Actual}(s) = \frac{\sum_{i \in \text{Calificados}} (\text{Grade}_i 
 
 $$\text{Porcentaje Evaluado Tot.}(s) = \sum_{i \in \text{Calificados}} \text{Weight}_i$$
 
-$$\text{Nota Mínima Requerida en Entregas Restantes}(s) = \frac{\text{PassingGrade}(u) - \sum (\text{Grade}_i \times \text{Weight}_i)}{100 - \text{Porcentaje Evaluado Tot.}(s)}$$
+$$\text{Nota Requerida en Entregas Restantes}(s) = \frac{(\text{Nota Meta}(s) \times 100) - \sum_{i \in \text{Calificados}} (\text{Grade}_i \times \text{Weight}_i)}{100 - \text{Porcentaje Evaluado Tot.}(s)}$$
 
 ## 🖥️ Requisitos de UI
 - Tarjetas superiores por Universidad con badge de color personalizado.

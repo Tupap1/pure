@@ -22,12 +22,20 @@ import {
   Activity,
   Layers
 } from 'lucide-react';
+import { buildDailyLoad } from '@/lib/algorithms/academic-load';
 import { calculateDME, calculateNetFreeTime, calculateTotalClassHours } from '@/lib/algorithms/study-hours-dme';
 import { pureDB } from '@/lib/db/dexie-schema';
 import { formatDeliverableDate } from '@/lib/domain/deliverable';
+import { useAcademicLoad } from '@/lib/hooks/useAcademicLoad';
 
 export const CommandCenter: React.FC = () => {
-  const { isLoaded, universities, subjects, deliverables, schedules, professors } = usePureData();
+  const { isLoaded, universities, subjects, deliverables, schedules, professors, studySessions } = usePureData();
+  const academicLoad = useAcademicLoad();
+
+  const dailyLoadData = React.useMemo(
+    () => buildDailyLoad(schedules, subjects, universities, academicLoad.normativeIndependentHours),
+    [schedules, subjects, universities, academicLoad.normativeIndependentHours]
+  );
 
   if (!isLoaded) {
     return (
@@ -73,11 +81,10 @@ export const CommandCenter: React.FC = () => {
     { label: 'Horario Clases', progress: Math.min(100, Math.round((classHours / 168) * 100)), color: '#38bdf8' },
   ];
 
-  // Dynamic Heatmap Days calculated from active subjects and deliverables in IndexedDB
+  // Dynamic Heatmap Days calculated from real completed studySessions in IndexedDB
   const realHeatmapDays = React.useMemo(() => {
     const result = [];
     const now = new Date();
-    const dailyDmeTarget = subjects.length > 0 ? (totalDMEHours / 5) : 0;
 
     for (let i = 27; i >= 0; i--) {
       const d = new Date(now);
@@ -86,25 +93,27 @@ export const CommandCenter: React.FC = () => {
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-      const dayOfWeek = d.getDay();
 
-      const delivsOnDate = deliverables.filter((del) => del.due_date?.slice(0, 10) === dateStr);
-      const completedDelivs = delivsOnDate.filter((del) => del.status === 'entregado');
+      const sessionsOnDate = studySessions.filter((s) => {
+        const sessionDate = s.scheduled_start?.slice(0, 10);
+        return sessionDate === dateStr && s.is_completed;
+      });
 
       let hours = 0;
-      if (completedDelivs.length > 0) {
-        hours += completedDelivs.length * 2.0;
-      } else if (delivsOnDate.length > 0 && dayOfWeek !== 0) {
-        hours += delivsOnDate.length * 1.5;
-      } else if (dailyDmeTarget > 0 && dayOfWeek >= 1 && dayOfWeek <= 5 && i <= 7) {
-        hours = Number(dailyDmeTarget.toFixed(1));
-      }
+      sessionsOnDate.forEach((s) => {
+        const start = new Date(s.scheduled_start).getTime();
+        const end = new Date(s.scheduled_end).getTime();
+        if (end > start) {
+          hours += (end - start) / (1000 * 60 * 60);
+        }
+      });
 
+      hours = Math.round(hours * 10) / 10;
       const intensity = (hours === 0 ? 0 : hours <= 2 ? 1 : hours <= 4 ? 2 : hours <= 6 ? 3 : 4) as 0 | 1 | 2 | 3 | 4;
       result.push({ date: dateStr, hours, intensity });
     }
     return result;
-  }, [deliverables, subjects, totalDMEHours]);
+  }, [studySessions]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -310,8 +319,9 @@ export const CommandCenter: React.FC = () => {
 
               {/* Day-by-Day Stacked Load Distribution Bar */}
               <Card className="p-5">
-                <DailyLoadStackedBar />
+                <DailyLoadStackedBar data={dailyLoadData} />
               </Card>
+
             </div>
           </div>
 

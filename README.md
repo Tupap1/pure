@@ -87,7 +87,7 @@ Calcula la cantidad óptima de horas de estudio semanal por materia:
 
 $$\text{DME Semanal} = \big(\text{Horas Base} \times \text{Dificultad} \times \text{Margen de Nota} \times \text{Sinergia}\big) + \text{Bonus Urgencia}$$
 
-- **Horas Base**: $\text{Créditos} \times 1.2$.
+- **Carga Normativa (Decreto 1075 de 2015)**: 1 crédito = 48h/semestre = $3\text{h/semana}$ en 16 semanas. Las horas totales normativas se dividen entre acompañamiento directo (horas de clase reales en horario, donde clases quincenales Sábado A/B ponderan ×0.5) y trabajo independiente: $\text{Trabajo Independiente Base} = \max(0, \text{Créditos} \times 3 - \text{Horas Clase Reales})$.
 - **Dificultad**: $0.8 + (\text{Dificultad [1..5]} \times 0.1)$.
 - **Margen de Nota**:
   - **Inicio de Semestre (`current_grade === 0`)**: Factor neutral de `1.0x` para evitar recomendaciones infladas de horas cuando aún no hay parciales calificados.
@@ -99,7 +99,9 @@ $$\text{DME Semanal} = \big(\text{Horas Base} \times \text{Dificultad} \times \t
 
 ### 2. Tiempo Libre Neto Semanal
 
-$$\text{Tiempo Libre Neto} = 168\text{h} - (\text{Horas de Clase} + \text{Horas de Sueño [49h]} + \text{Estudio DME})$$
+$$\text{Tiempo Libre Neto} = 168\text{h} - (\text{Horas de Clase} + \text{Horas de Sueño [49h]} + \text{Trabajo Independiente Normativo})$$
+
+*Nota*: Si la carga exigida supera la capacidad semanal de 168h, el tiempo libre neto se reporta en negativo para visibilizar el estado de sobrecarga real sin recortar a cero.
 
 ### 3. Detector de Traslapes de Horario (`lib/algorithms/conflict-detector.ts`)
 
@@ -166,7 +168,7 @@ Pure/
 │   ├── index.ts                # Servidor MCP Principal (Stdio + Express SSE)
 │   ├── tools-handler.ts        # Handlers Ejecutables de Herramientas MCP
 │   └── README.md               # Documentación Técnica Completa para Agentes IA
-├── __tests__/                  # Suite de Pruebas Automatizadas con Vitest (36 tests)
+├── __tests__/                  # Suite de Pruebas Automatizadas con Vitest
 ├── Dockerfile                  # Multi-stage Standalone Docker build
 ├── docker-compose.yml          # Orquestación de Contenedores Docker
 ├── package.json                # Dependencias y Scripts de NPM
@@ -251,4 +253,5 @@ npm run test
 npx tsc --noEmit
 ```
 
-**Estado Actual de Pruebas**: `36 passed (100% OK)`.
+**Estado Actual de Pruebas**: `187 passed (100% OK)`.
+

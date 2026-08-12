@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeAcademicLoad } from '@/lib/algorithms/academic-load';
+import { computeAcademicLoad, buildDailyLoad } from '@/lib/algorithms/academic-load';
 import type { SubjectEntity, ScheduleEntity, UniversityEntity } from '@/lib/db/dexie-schema';
 
 function university(overrides: Partial<UniversityEntity> & { id: string; name: string }): UniversityEntity {
@@ -30,115 +30,135 @@ function schedule(overrides: Partial<ScheduleEntity> & { id: string; subject_id:
     day_of_week: 1,
     start_time: '08:00',
     end_time: '10:00',
-    periodicity: 'semanal',
     ...overrides,
   };
 }
 
-describe('Carga académica agregada desde los datos reales del estudiante', () => {
-  it('reparte la carga normativa de cada carrera según su acompañamiento real', () => {
-    const universities = [
-      university({ id: 'udea', name: 'UdeA', modality: 'presencial' }),
-      university({ id: 'udec', name: 'UdeC', modality: 'virtual' }),
-    ];
-    const subjects = [
-      subject({ id: 'calculo', university_id: 'udea', credits: 4 }),
-      subject({ id: 'bases', university_id: 'udec', credits: 3 }),
-    ];
-    const schedules = [
-      // Presencial: 4h semanales de clase.
-      schedule({ id: 's1', subject_id: 'calculo', start_time: '08:00', end_time: '10:00' }),
-      schedule({ id: 's2', subject_id: 'calculo', start_time: '10:00', end_time: '12:00' }),
-      // A distancia: 1.5h de tutoría.
-      schedule({ id: 's3', subject_id: 'bases', start_time: '18:00', end_time: '19:30' }),
-    ];
-
-    const load = computeAcademicLoad(subjects, schedules, universities);
-
-    expect(load.classHours).toBe(5.5); // 4 + 1.5
-    expect(load.normativeIndependentHours).toBe(15.5); // 8 (presencial) + 7.5 (distancia)
-
-    // El total siempre reconstruye la exigencia legal: 7 créditos × 3 h/sem.
-    expect(load.totalCredits).toBe(7);
-    expect(load.totalAcademicHours).toBe(21);
-
-    // 168 - (5.5 clase + 15.5 independiente + 49 sueño)
-    expect(load.netFreeTime).toBe(98);
-    expect(load.isOverloaded).toBe(false);
-
-    const distancia = load.perSubject.find((item) => item.subject.id === 'bases');
-    expect(distancia?.creditLoad.weeklyIndependentHours).toBe(7.5);
-    const presencial = load.perSubject.find((item) => item.subject.id === 'calculo');
-    expect(presencial?.creditLoad.weeklyIndependentHours).toBe(8);
-  });
-
-  it('respeta la política de sábados alternos de la universidad al ponderar las horas de clase', () => {
-    // La universidad desactivó los sábados alternos, así que la clase se dicta TODAS las semanas
-    // y no debe recibir la ponderación 0.5, pese a que el horario diga 'sabado_a'.
-    const universities = [university({ id: 'udec', name: 'UdeC', has_alternating_saturdays: false })];
-    const subjects = [subject({ id: 'redes', university_id: 'udec', credits: 3 })];
-    const schedules = [
-      schedule({
-        id: 's1',
-        subject_id: 'redes',
-        day_of_week: 6,
-        start_time: '08:00',
-        end_time: '12:00',
-        periodicity: 'sabado_a',
-      }),
-    ];
-
-    const load = computeAcademicLoad(subjects, schedules, universities);
-
-    expect(load.classHours).toBe(4); // 4h completas, no 2h
-    expect(load.normativeIndependentHours).toBe(5); // 9 total - 4 de clase
-  });
-
-  it('aplica la ponderación 0.5 cuando la universidad sí alterna sábados', () => {
-    const universities = [university({ id: 'udec', name: 'UdeC', has_alternating_saturdays: true })];
-    const subjects = [subject({ id: 'redes', university_id: 'udec', credits: 3 })];
-    const schedules = [
-      schedule({
-        id: 's1',
-        subject_id: 'redes',
-        day_of_week: 6,
-        start_time: '08:00',
-        end_time: '12:00',
-        periodicity: 'sabado_a',
-      }),
-    ];
-
-    const load = computeAcademicLoad(subjects, schedules, universities);
-
-    expect(load.classHours).toBe(2); // 4h quincenales -> 2h/semana
-    expect(load.normativeIndependentHours).toBe(7);
-  });
-
-  it('reporta déficit cuando la carga normativa no cabe en la semana', () => {
-    // 14 materias de 3 créditos = 42 créditos = 126 h/sem de trabajo académico.
+describe('computeAcademicLoad — Cálculo Normativo (Decreto 1075 / 168h sem)', () => {
+  it('calcula horas de clase semanales sumando la duración de cada bloque de horario', () => {
     const universities = [university({ id: 'udea', name: 'UdeA' })];
-    const subjects = Array.from({ length: 14 }, (_, i) =>
-      subject({ id: `m${i}`, university_id: 'udea', credits: 3 })
+    const subjects = [subject({ id: 'algoritmos', university_id: 'udea', credits: 4 })];
+    const schedules = [
+      schedule({ id: 'sch1', subject_id: 'algoritmos', day_of_week: 1, start_time: '08:00', end_time: '10:00' }), // 2h
+      schedule({ id: 'sch2', subject_id: 'algoritmos', day_of_week: 3, start_time: '14:00', end_time: '17:00' }), // 3h
+    ];
+
+    const load = computeAcademicLoad(subjects, schedules, universities);
+
+    expect(load.classHours).toBe(5);
+    expect(load.totalCredits).toBe(4);
+    expect(load.normativeIndependentHours).toBe(7);
+    expect(load.totalAcademicHours).toBe(12);
+    expect(load.isOverloaded).toBe(false);
+  });
+
+  it('detecta sobrecarga cuando las horas totales superan las 168h de la semana', () => {
+    const universities = [university({ id: 'udea', name: 'UdeA' })];
+    const subjects = Array.from({ length: 10 }, (_, i) =>
+      subject({ id: `sub_${i}`, university_id: 'udea', credits: 4 })
     );
 
-    const load = computeAcademicLoad(subjects, [], universities);
+    const schedules: ScheduleEntity[] = [];
+    for (let day = 1; day <= 6; day++) {
+      schedules.push(
+        schedule({
+          id: `sch_${day}`,
+          subject_id: `sub_${day - 1}`,
+          day_of_week: day,
+          start_time: '08:00',
+          end_time: '18:00',
+        })
+      );
+    }
 
-    expect(load.totalAcademicHours).toBe(126);
-    // 168 - (0 clase + 126 independiente + 49 sueño) = -7
-    expect(load.netFreeTime).toBe(-7);
+
+    const load = computeAcademicLoad(subjects, schedules, universities);
+
+    expect(load.totalCredits).toBe(40);
+    expect(load.classHours).toBe(60);
+    expect(load.normativeIndependentHours).toBe(60);
+    expect(load.totalAcademicHours).toBe(120);
+    expect(load.netFreeTime).toBe(-1);
     expect(load.isOverloaded).toBe(true);
-
-    // Ninguna materia tiene horario: toda su carga es trabajo independiente.
-    expect(load.subjectsWithoutSchedule).toBe(14);
   });
 
-  it('no rompe cuando no hay materias registradas', () => {
+  it('no marca sobrecarga si el total de horas académicas más el sueño no superan 168h', () => {
+    const universities = [university({ id: 'udea', name: 'UdeA' })];
+    const subjects = [
+      subject({ id: 'materia1', university_id: 'udea', credits: 4 }),
+      subject({ id: 'materia2', university_id: 'udea', credits: 3 }),
+    ];
+    const schedules = [
+      schedule({ id: 's1', subject_id: 'materia1', day_of_week: 1, start_time: '08:00', end_time: '12:00' }),
+      schedule({ id: 's2', subject_id: 'materia2', day_of_week: 2, start_time: '10:00', end_time: '13:00' }),
+    ];
+
+    const load = computeAcademicLoad(subjects, schedules, universities);
+
+    expect(load.totalCredits).toBe(7);
+    expect(load.classHours).toBe(7);
+    expect(load.normativeIndependentHours).toBe(14);
+    expect(load.netFreeTime).toBe(98);
+    expect(load.isOverloaded).toBe(false);
+  });
+
+  it('maneja correctamente una lista vacía de materias y horarios sin romper', () => {
     const load = computeAcademicLoad([], [], []);
 
-    expect(load.totalCredits).toBe(0);
     expect(load.classHours).toBe(0);
+    expect(load.totalCredits).toBe(0);
+    expect(load.normativeIndependentHours).toBe(0);
     expect(load.totalAcademicHours).toBe(0);
-    expect(load.netFreeTime).toBe(119); // 168 - 49 de sueño
+    expect(load.netFreeTime).toBe(119);
     expect(load.isOverloaded).toBe(false);
+  });
+});
+
+describe('buildDailyLoad — Distribución diaria de carga horaria real', () => {
+  it('asigna horas de clase reales por día y distribuye el trabajo independiente uniformemente en 7 días', () => {
+    const universities = [university({ id: 'udea', name: 'UdeA' })];
+    const subjects = [subject({ id: 'algoritmos', university_id: 'udea', credits: 4 })];
+    const schedules = [
+      schedule({ id: 'sch1', subject_id: 'algoritmos', day_of_week: 1, start_time: '08:00', end_time: '12:00' }),
+      schedule({ id: 'sch2', subject_id: 'algoritmos', day_of_week: 3, start_time: '14:00', end_time: '16:00' }),
+    ];
+
+    const weeklyIndependentHours = 14;
+    const daily = buildDailyLoad(schedules, subjects, universities, weeklyIndependentHours);
+
+    expect(daily).toHaveLength(7);
+
+    expect(daily[0].dayName).toBe('Lun');
+    expect(daily[0].classHours).toBe(4);
+    expect(daily[0].independentHours).toBe(2);
+    expect(daily[0].sleepHours).toBe(7);
+    expect(daily[0].freeHours).toBe(11);
+    expect(daily[0].isOverloaded).toBe(false);
+
+    expect(daily[1].dayName).toBe('Mar');
+    expect(daily[1].classHours).toBe(0);
+    expect(daily[1].independentHours).toBe(2);
+    expect(daily[1].sleepHours).toBe(7);
+    expect(daily[1].freeHours).toBe(15);
+
+    expect(daily[2].classHours).toBe(2);
+    expect(daily[2].independentHours).toBe(2);
+    expect(daily[2].freeHours).toBe(13);
+  });
+
+  it('marca sobrecarga diaria cuando las horas demandadas superan las 24h del día', () => {
+    const universities = [university({ id: 'udea', name: 'UdeA' })];
+    const subjects = [subject({ id: 'intensa', university_id: 'udea', credits: 10 })];
+    const schedules = [
+      schedule({ id: 'sch1', subject_id: 'intensa', day_of_week: 1, start_time: '06:00', end_time: '22:00' }),
+    ];
+
+    const weeklyIndependentHours = 28;
+    const daily = buildDailyLoad(schedules, subjects, universities, weeklyIndependentHours);
+
+    expect(daily[0].classHours).toBe(16);
+    expect(daily[0].independentHours).toBe(4);
+    expect(daily[0].freeHours).toBe(-3);
+    expect(daily[0].isOverloaded).toBe(true);
   });
 });

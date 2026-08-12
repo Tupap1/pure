@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
 import { SubjectEntity, ProfessorEntity, UniversityEntity } from '@/lib/db/dexie-schema';
 import { calculateDME } from '@/lib/algorithms/study-hours-dme';
-import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
+import { Badge } from './Badge';
+import { Card } from './Card';
+import { EmptyState } from './EmptyState';
+import { GradeProgressBar } from './GradeProgressBar';
 import {
   BookOpen,
   User,
-  MapPin,
   Clock,
-  Award,
   ShieldAlert,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Building2,
-  Target,
   Mail
 } from 'lucide-react';
 
@@ -34,17 +33,14 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
 
   if (!subjects || subjects.length === 0) {
     return (
-      <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/40 space-y-2">
-        <BookOpen className="w-8 h-8 text-slate-400 mx-auto mb-1" />
-        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 font-heading">Sin asignaturas registradas</h4>
-        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-          Carga tus materias en la pestaña <span className="font-mono text-cyan-600 dark:text-cyan-400">Configuración</span> para activar la telemetría académica.
-        </p>
-      </div>
+      <EmptyState
+        icon={BookOpen}
+        title="Sin asignaturas registradas"
+        description="Carga tus materias en la pestaña Ajustes para activar la telemetría académica."
+      />
     );
   }
 
-  // Filter subjects by university if selected
   const filteredSubjects = selectedUniId === 'all'
     ? subjects
     : subjects.filter((s) => s.university_id === selectedUniId);
@@ -54,16 +50,16 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
   };
 
   return (
-    <div className="w-full space-y-3">
-      {/* University Filter Pills for Quick Touch Filtering */}
+    <div className="w-full space-y-3 font-sans">
+      {/* University Filter Pills */}
       {universities.length > 1 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none font-mono text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
           <button
             onClick={() => setSelectedUniId('all')}
-            className={`px-3 min-h-[44px] rounded-lg border font-bold transition-all shrink-0 ${
+            className={`px-3 py-1.5 rounded-lg border font-medium transition-all shrink-0 ${
               selectedUniId === 'all'
-                ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm'
-                : 'bg-slate-100 dark:bg-[#0d1322] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800'
+                ? 'bg-cyan-600 text-white border-cyan-500 font-bold shadow-sm'
+                : 'bg-surface text-slate-600 dark:text-slate-400 border-surface-border hover:border-surface-hover'
             }`}
           >
             Todas ({subjects.length})
@@ -75,24 +71,22 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
               <button
                 key={uni.id}
                 onClick={() => setSelectedUniId(uni.id!)}
-                className={`px-3 min-h-[44px] rounded-lg border font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-lg border font-medium transition-all shrink-0 flex items-center gap-1.5 ${
                   isSelected
-                    ? 'bg-purple-600 text-white border-purple-500 shadow-sm glow-software'
-                    : 'bg-slate-100 dark:bg-[#0d1322] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800'
+                    ? 'bg-purple-600 text-white border-purple-500 font-bold shadow-sm'
+                    : 'bg-surface text-slate-600 dark:text-slate-400 border-surface-border hover:border-surface-hover'
                 }`}
               >
-                <Building2 className="w-3 h-3" />
+                <Building2 className="w-3.5 h-3.5" />
                 <span>{uni.name}</span>
-                <span className="opacity-75">({count})</span>
+                <span className="opacity-75 font-mono">({count})</span>
               </button>
             );
           })}
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MOBILE-FIRST TOUCH-FRIENDLY ADAPTIVE CARDS (Visible on < 768px screens)   */}
-      {/* ========================================================================= */}
+      {/* MOBILE ADAPTIVE CARDS (< 768px) */}
       <div className="block md:hidden space-y-2.5">
         {filteredSubjects.map((sub) => {
           const dme = calculateDME(sub as any);
@@ -100,16 +94,13 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
           const uni = universities.find((u) => u.id === sub.university_id);
           const hasGrade = sub.current_grade !== undefined && sub.current_grade > 0;
           const isAboveTarget = (sub.current_grade || 0) >= sub.target_grade;
-          const isPassing = (sub.current_grade || 0) >= 3.0;
+          const isPassing = (sub.current_grade || 0) >= (uni?.passing_grade || 3.0);
           const isExpanded = expandedSubjectId === sub.id;
-
-          const currentPct = Math.min(100, Math.max(0, ((sub.current_grade || 0) / 5.0) * 100));
-          const targetPct = Math.min(100, Math.max(0, (sub.target_grade / 5.0) * 100));
 
           return (
             <Card
               key={sub.id}
-              className="p-3.5 space-y-2.5 border-slate-200 dark:border-slate-800/90 hover:border-cyan-500/40 transition-all bg-white dark:bg-[#0d1322]"
+              className="p-3.5 space-y-2.5 border-surface-border hover:border-surface-hover transition-all bg-surface"
             >
               {/* Card Header Row */}
               <div className="flex items-start justify-between gap-2">
@@ -122,12 +113,12 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                       {sub.modality}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                    {sub.code && <span>Cod: {sub.code}</span>}
+                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    {sub.code && <span className="font-mono">Cod: {sub.code}</span>}
                     {uni && (
                       <>
                         <span>•</span>
-                        <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{uni.name}</span>
+                        <span className="text-cyan-600 dark:text-cyan-400 font-medium">{uni.name}</span>
                       </>
                     )}
                   </div>
@@ -136,83 +127,62 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                 {/* Telemetry Status Badge */}
                 <div className="shrink-0">
                   {!hasGrade ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                      Diagnóstico
-                    </span>
+                    <Badge variant="outline">Diagnóstico</Badge>
                   ) : isAboveTarget ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                    <Badge variant="synergy" className="flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> Excelente
-                    </span>
+                    </Badge>
                   ) : isPassing ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30">
-                      En Rango
-                    </span>
+                    <Badge variant="aeroespacial">En Rango</Badge>
                   ) : (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                    <Badge variant="danger" className="flex items-center gap-1">
                       <ShieldAlert className="w-3 h-3" /> Atención
-                    </span>
+                    </Badge>
                   )}
                 </div>
               </div>
 
-              {/* Score Progress Bar vs Target Marker */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-slate-500 dark:text-slate-400 text-[11px]">
-                    Nota: <strong className="text-slate-900 dark:text-slate-100">{hasGrade ? sub.current_grade.toFixed(2) : '0.00'}</strong>
-                  </span>
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Meta: <strong className="text-slate-800 dark:text-slate-200">{sub.target_grade.toFixed(2)}</strong>
-                  </span>
-                </div>
-
-                <div className="relative h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-emerald-400 z-10 opacity-80"
-                    style={{ left: `${targetPct}%` }}
-                  />
-                  <div
-                    className={`h-full transition-all duration-300 ${
-                      isAboveTarget ? 'bg-emerald-500' : hasGrade ? 'bg-cyan-500' : 'bg-slate-400 dark:bg-slate-700'
-                    }`}
-                    style={{ width: `${Math.max(3, currentPct)}%` }}
-                  />
-                </div>
-              </div>
+              {/* Grade Progress Bar Primitive */}
+              <GradeProgressBar
+                currentGrade={sub.current_grade || 0}
+                targetGrade={sub.target_grade}
+                scaleMin={uni?.scale_min ?? 0}
+                scaleMax={uni?.scale_max ?? 5}
+              />
 
               {/* Accordion Expand Trigger */}
-              <div className="pt-1 flex items-center justify-between border-t border-slate-200 dark:border-slate-800/60 text-[10px] font-mono">
+              <div className="pt-1 flex items-center justify-between border-t border-surface-border text-xs">
                 <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                  <span>{sub.credits} Créditos</span>
+                  <span className="font-mono">{sub.credits} Créditos</span>
                   <span>•</span>
-                  <span className="text-purple-600 dark:text-purple-400 font-bold">DME: {dme.recommendedWeeklyHours.toFixed(1)}h/sem</span>
+                  <span className="text-purple-600 dark:text-purple-400 font-bold font-mono">DME: {dme.recommendedWeeklyHours.toFixed(1)}h/sem</span>
                 </div>
                 <button
                   onClick={() => toggleExpand(sub.id!)}
                   aria-expanded={isExpanded}
-                  className="min-h-[44px] px-2 -mr-2 flex items-center gap-1 text-cyan-600 dark:text-cyan-400 font-bold hover:underline"
+                  className="px-2 flex items-center gap-1 text-cyan-600 dark:text-cyan-400 font-medium hover:underline"
                 >
                   <span>{isExpanded ? 'Ocultar' : 'Detalles'}</span>
-                  {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
               </div>
 
               {/* Accordion Details Content */}
               {isExpanded && (
-                <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-1.5 text-xs font-mono">
+                <div className="p-2.5 rounded-lg bg-surface-subtle border border-surface-border space-y-1.5 text-xs">
                   <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
                     <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span>Docente: {prof?.name || 'No asignado'}</span>
                   </div>
                   {prof?.email && (
-                    <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 pl-0.5 truncate">
-                      <Mail className="w-3 h-3 text-slate-400 shrink-0 ml-0.5" />
-                      {prof.email}
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 truncate">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{prof.email}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 pt-0.5">
                     <Clock className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                    <span>Dificultad: {sub.difficulty} / 5</span>
+                    <span>Dificultad: <strong className="font-mono">{sub.difficulty} / 5</strong></span>
                   </div>
                 </div>
               )}
@@ -221,13 +191,11 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
         })}
       </div>
 
-      {/* ========================================================================= */}
-      {/* DESKTOP MATRIX TABLE (Visible on >= 768px screens)                         */}
-      {/* ========================================================================= */}
-      <div className="hidden md:block overflow-x-auto border border-slate-200 dark:border-slate-800/90 rounded-xl bg-white dark:bg-[#0d1322] shadow-sm">
+      {/* DESKTOP MATRIX TABLE (>= 768px) */}
+      <div className="hidden md:block overflow-x-auto border border-surface-border rounded-xl bg-surface shadow-sm">
         <table className="w-full text-left border-collapse min-w-[700px]">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/60 text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <tr className="border-b border-surface-border bg-surface-subtle text-xs font-sans text-slate-500 dark:text-slate-400 font-semibold">
               <th className="p-3 pl-4">Asignatura & Código</th>
               <th className="p-3">Docente</th>
               <th className="p-3 text-center">Carga & DME</th>
@@ -235,20 +203,19 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
               <th className="p-3 text-right pr-4">Estado</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs">
+          <tbody className="divide-y divide-surface-border text-xs">
             {filteredSubjects.map((sub) => {
               const dme = calculateDME(sub as any);
               const prof = professors.find((p) => p.id === sub.professor_id);
+              const uni = universities.find((u) => u.id === sub.university_id);
               const hasGrade = sub.current_grade !== undefined && sub.current_grade > 0;
               const isAboveTarget = (sub.current_grade || 0) >= sub.target_grade;
-              const isPassing = (sub.current_grade || 0) >= 3.0;
-              const currentPct = Math.min(100, Math.max(0, ((sub.current_grade || 0) / 5.0) * 100));
-              const targetPct = Math.min(100, Math.max(0, (sub.target_grade / 5.0) * 100));
+              const isPassing = (sub.current_grade || 0) >= (uni?.passing_grade || 3.0);
 
               return (
                 <tr
                   key={sub.id}
-                  className="hover:bg-slate-50/80 dark:hover:bg-slate-900/40 transition-colors group"
+                  className="hover:bg-surface-subtle/50 transition-colors"
                 >
                   {/* Subject Name & Code & Badge */}
                   <td className="p-3 pl-4">
@@ -262,7 +229,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                         </Badge>
                       </div>
                       {sub.code && (
-                        <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                        <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
                           Cod: {sub.code}
                         </div>
                       )}
@@ -270,7 +237,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                   </td>
 
                   {/* Professor */}
-                  <td className="p-3 font-mono text-slate-600 dark:text-slate-300">
+                  <td className="p-3 text-slate-600 dark:text-slate-300">
                     <div className="flex items-center gap-1.5 truncate max-w-[160px]" title={prof?.name || 'Por asignar'}>
                       <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       <span className="truncate">{prof?.name || 'Por asignar'}</span>
@@ -278,64 +245,39 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                   </td>
 
                   {/* Credits & DME Study Hours */}
-                  <td className="p-3 text-center font-mono">
-                    <div className="text-slate-800 dark:text-slate-200 font-bold text-xs">
+                  <td className="p-3 text-center">
+                    <div className="text-slate-800 dark:text-slate-200 font-bold font-mono text-xs">
                       {sub.credits} crd
                     </div>
-                    <div className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                    <div className="text-xs text-purple-600 dark:text-purple-400 font-mono font-medium">
                       {dme.recommendedWeeklyHours.toFixed(1)}h/sem DME
                     </div>
                   </td>
 
                   {/* Current Grade vs Target Bar */}
                   <td className="p-3 min-w-[180px]">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px] font-mono">
-                        <span className="font-bold text-slate-900 dark:text-slate-100">
-                          {hasGrade ? sub.current_grade?.toFixed(2) : '0.00'}
-                        </span>
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                          Meta: <strong className="text-slate-700 dark:text-slate-300">{sub.target_grade.toFixed(2)}</strong>
-                        </span>
-                      </div>
-
-                      <div className="relative h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className="absolute top-0 bottom-0 w-0.5 bg-emerald-400 z-10 opacity-80"
-                          style={{ left: `${targetPct}%` }}
-                        />
-                        <div
-                          className={`h-full transition-all duration-300 ${
-                            isAboveTarget
-                              ? 'bg-emerald-500'
-                              : hasGrade
-                              ? 'bg-cyan-500'
-                              : 'bg-slate-400 dark:bg-slate-700'
-                          }`}
-                          style={{ width: `${Math.max(3, currentPct)}%` }}
-                        />
-                      </div>
-                    </div>
+                    <GradeProgressBar
+                      currentGrade={sub.current_grade || 0}
+                      targetGrade={sub.target_grade}
+                      scaleMin={uni?.scale_min ?? 0}
+                      scaleMax={uni?.scale_max ?? 5}
+                    />
                   </td>
 
                   {/* Telemetry Status Badge */}
-                  <td className="p-3 text-right pr-4 font-mono">
+                  <td className="p-3 text-right pr-4">
                     {!hasGrade ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                        En Diagnóstico
-                      </span>
+                      <Badge variant="outline">En Diagnóstico</Badge>
                     ) : isAboveTarget ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <Badge variant="synergy" className="inline-flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" /> Excelente
-                      </span>
+                      </Badge>
                     ) : isPassing ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30">
-                        En Rango
-                      </span>
+                      <Badge variant="aeroespacial">En Rango</Badge>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                      <Badge variant="danger" className="inline-flex items-center gap-1">
                         <ShieldAlert className="w-3 h-3" /> Atención
-                      </span>
+                      </Badge>
                     )}
                   </td>
                 </tr>
