@@ -23,6 +23,7 @@ import {
   Layers
 } from 'lucide-react';
 import { buildDailyLoad } from '@/lib/algorithms/academic-load';
+import { computeStudyHeatmap } from '@/lib/domain/study-heatmap';
 import { calculateDME, calculateNetFreeTime, calculateTotalClassHours } from '@/lib/algorithms/study-hours-dme';
 import { pureDB } from '@/lib/db/dexie-schema';
 import { formatDeliverableDate } from '@/lib/domain/deliverable';
@@ -81,39 +82,11 @@ export const CommandCenter: React.FC = () => {
     { label: 'Horario Clases', progress: Math.min(100, Math.round((classHours / 168) * 100)), color: '#38bdf8' },
   ];
 
-  // Dynamic Heatmap Days calculated from real completed studySessions in IndexedDB
-  const realHeatmapDays = React.useMemo(() => {
-    const result = [];
-    const now = new Date();
-
-    for (let i = 27; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
-      const sessionsOnDate = studySessions.filter((s) => {
-        const sessionDate = s.scheduled_start?.slice(0, 10);
-        return sessionDate === dateStr && s.is_completed;
-      });
-
-      let hours = 0;
-      sessionsOnDate.forEach((s) => {
-        const start = new Date(s.scheduled_start).getTime();
-        const end = new Date(s.scheduled_end).getTime();
-        if (end > start) {
-          hours += (end - start) / (1000 * 60 * 60);
-        }
-      });
-
-      hours = Math.round(hours * 10) / 10;
-      const intensity = (hours === 0 ? 0 : hours <= 2 ? 1 : hours <= 4 ? 2 : hours <= 6 ? 3 : 4) as 0 | 1 | 2 | 3 | 4;
-      result.push({ date: dateStr, hours, intensity });
-    }
-    return result;
-  }, [studySessions]);
+  // Heatmap de las sesiones de estudio realmente completadas (ver lib/domain/study-heatmap.ts)
+  const realHeatmapDays = React.useMemo(
+    () => computeStudyHeatmap(studySessions),
+    [studySessions]
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
