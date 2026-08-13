@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
 import { pureDB, UniversityEntity, ProfessorEntity, SubjectEntity, ScheduleEntity } from '@/lib/db/dexie-schema';
+import { saveUniversity, deleteUniversity } from '@/lib/db/repository';
 import { clearAllData } from '@/lib/db/seed';
 import {
   UniversitySchema,
@@ -47,6 +48,8 @@ export const ConfigDashboard: React.FC = () => {
   const [uniMin, setUniMin] = useState(0);
   const [uniMax, setUniMax] = useState(5);
   const [uniPassing, setUniPassing] = useState(3);
+  const [uniHasAlternatingSaturdays, setUniHasAlternatingSaturdays] = useState(false);
+  const [uniFirstSabadoADate, setUniFirstSabadoADate] = useState('');
 
   // Prof form
   const [profName, setProfName] = useState('');
@@ -106,6 +109,8 @@ export const ConfigDashboard: React.FC = () => {
     setUniMin(0);
     setUniMax(5);
     setUniPassing(3);
+    setUniHasAlternatingSaturdays(false);
+    setUniFirstSabadoADate('');
     setUniErrors({});
     setIsAddUniOpen(true);
   };
@@ -117,6 +122,8 @@ export const ConfigDashboard: React.FC = () => {
     setUniMin(uni.scale_min);
     setUniMax(uni.scale_max);
     setUniPassing(uni.passing_grade);
+    setUniHasAlternatingSaturdays(uni.has_alternating_saturdays ?? false);
+    setUniFirstSabadoADate(uni.first_sabado_a_date || '');
     setUniErrors({});
   };
 
@@ -128,6 +135,8 @@ export const ConfigDashboard: React.FC = () => {
       scale_max: Number(uniMax),
       passing_grade: Number(uniPassing),
       color: uniModality === 'presencial' ? '#0ea5e9' : '#6366f1',
+      has_alternating_saturdays: uniHasAlternatingSaturdays,
+      first_sabado_a_date: uniHasAlternatingSaturdays ? uniFirstSabadoADate : undefined,
     };
 
     const validation = validateEntity(UniversitySchema, uniData);
@@ -138,10 +147,13 @@ export const ConfigDashboard: React.FC = () => {
 
     setUniErrors({});
     if (editingUni && editingUni.id) {
-      await pureDB.universities.update(editingUni.id, validation.data);
+      await saveUniversity({
+        ...editingUni,
+        ...validation.data,
+      });
       setEditingUni(null);
     } else {
-      await pureDB.universities.add({
+      await saveUniversity({
         ...validation.data,
         color: validation.data.color || (uniModality === 'presencial' ? '#0ea5e9' : '#6366f1'),
         created_at: new Date().toISOString(),
@@ -151,7 +163,7 @@ export const ConfigDashboard: React.FC = () => {
   };
 
   const handleDeleteUni = async (id: string) => {
-    await pureDB.universities.delete(id);
+    await deleteUniversity(id);
   };
 
   // --- PROFESSOR HANDLERS ---
@@ -718,6 +730,36 @@ export const ConfigDashboard: React.FC = () => {
               />
             </div>
           </div>
+
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={uniHasAlternatingSaturdays}
+                onChange={(e) => setUniHasAlternatingSaturdays(e.target.checked)}
+                className="w-4 h-4 text-sky-600 rounded border-slate-300 dark:border-slate-700 focus:ring-sky-500 dark:bg-slate-900"
+              />
+              <span>¿Maneja sábados alternos (quincenal)?</span>
+            </label>
+
+            {uniHasAlternatingSaturdays && (
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  Fecha del primer Sábado A
+                </label>
+                <input
+                  type="date"
+                  value={uniFirstSabadoADate}
+                  onChange={(e) => setUniFirstSabadoADate(e.target.value)}
+                  className={inputClass}
+                />
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                  Fecha de referencia de un sábado donde se dicta la clase Sábado A. A partir de esta fecha se calcula la alternancia.
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
             <Button variant="ghost" className="w-full sm:w-auto" onClick={() => { setIsAddUniOpen(false); setEditingUni(null); }}>
               Cancelar

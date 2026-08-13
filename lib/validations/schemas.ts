@@ -7,7 +7,9 @@ export const UniversitySchema = z.object({
   scale_min: z.number().min(0, { message: 'La nota mínima no puede ser negativa' }),
   scale_max: z.number().positive({ message: 'La nota máxima debe ser positiva' }),
   passing_grade: z.number(),
-  color: z.string().optional()
+  color: z.string().optional(),
+  has_alternating_saturdays: z.boolean().optional(),
+  first_sabado_a_date: z.string().optional(),
 }).refine(data => data.scale_max > data.scale_min, {
   message: 'La nota máxima debe ser estrictamente mayor a la nota mínima',
   path: ['scale_max']
