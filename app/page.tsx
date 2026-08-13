@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useSyncEngine } from '@/lib/hooks/useSyncEngine';
 import { Shell } from '@/components/layout/Shell';
 import { CommandCenter } from '@/components/dashboards/CommandCenter';
 import { SyllabusDashboard } from '@/components/dashboards/SyllabusDashboard';
@@ -9,6 +10,7 @@ import { DeliverablesDashboard } from '@/components/dashboards/DeliverablesDashb
 import { ConfigDashboard } from '@/components/dashboards/ConfigDashboard';
 
 export default function Home() {
+  useSyncEngine(15000); // Sincroniza cada 15 segundos
   return (
     <Shell>
       {(activeTab) => {
