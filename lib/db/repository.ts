@@ -1,4 +1,4 @@
-import { pureDB, UniversityEntity, ProfessorEntity, SubjectEntity, ScheduleEntity, DeliverableEntity, SyllabusTopicEntity } from './dexie-schema';
+import { pureDB, UniversityEntity, ProfessorEntity, SubjectEntity, ScheduleEntity, DeliverableEntity, SyllabusTopicEntity, ClassSessionEntity } from './dexie-schema';
 
 const nowIso = () => new Date().toISOString();
 
@@ -166,6 +166,36 @@ export async function deleteSyllabusTopic(id: string) {
   await pureDB.syncQueue.add({
     action: 'delete',
     table_name: 'syllabus_topics',
+    data: { id },
+    timestamp: nowIso(),
+  });
+}
+
+// --- CLASS SESSIONS ---
+export async function saveClassSession(session: ClassSessionEntity) {
+  const record = {
+    ...session,
+    id: session.id || `session-${Date.now()}`,
+    topics_covered: session.topics_covered || [],
+    created_at: session.created_at || nowIso(),
+    updated_at: nowIso(),
+  };
+
+  await pureDB.classSessions.put(record);
+  await pureDB.syncQueue.add({
+    action: 'insert',
+    table_name: 'class_sessions',
+    data: record,
+    timestamp: nowIso(),
+  });
+  return record;
+}
+
+export async function deleteClassSession(id: string) {
+  await pureDB.classSessions.delete(id);
+  await pureDB.syncQueue.add({
+    action: 'delete',
+    table_name: 'class_sessions',
     data: { id },
     timestamp: nowIso(),
   });

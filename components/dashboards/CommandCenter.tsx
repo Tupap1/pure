@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { buildDailyLoad } from '@/lib/algorithms/academic-load';
 import { calculateDME, calculateNetFreeTime, calculateTotalClassHours } from '@/lib/algorithms/study-hours-dme';
-import { pureDB } from '@/lib/db/dexie-schema';
+import { saveDeliverable } from '@/lib/db/repository';
 import { formatDeliverableDate } from '@/lib/domain/deliverable';
 import { useAcademicLoad } from '@/lib/hooks/useAcademicLoad';
 
@@ -71,7 +71,13 @@ export const CommandCenter: React.FC = () => {
   );
 
   const handleMarkAsDone = async (id: string) => {
-    await pureDB.deliverables.update(id, { status: 'entregado' });
+    const deliv = deliverables.find((d) => d.id === id);
+    if (deliv) {
+      await saveDeliverable({
+        ...deliv,
+        status: 'entregado',
+      });
+    }
   };
 
   // Concentric multi-rings definition for dashboard

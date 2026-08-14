@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
-import { pureDB, UniversityEntity, ProfessorEntity, SubjectEntity, ScheduleEntity } from '@/lib/db/dexie-schema';
-import { saveUniversity, deleteUniversity } from '@/lib/db/repository';
+import { UniversityEntity, ProfessorEntity, SubjectEntity, ScheduleEntity } from '@/lib/db/dexie-schema';
+import {
+  saveUniversity, deleteUniversity,
+  saveProfessor, deleteProfessor,
+  saveSubject, deleteSubject,
+  saveSchedule, deleteSchedule
+} from '@/lib/db/repository';
 import { clearAllData } from '@/lib/db/seed';
 import {
   UniversitySchema,
@@ -198,19 +203,20 @@ export const ConfigDashboard: React.FC = () => {
 
     setProfErrors({});
     if (editingProf && editingProf.id) {
-      await pureDB.professors.update(editingProf.id, validation.data);
+      await saveProfessor({
+        ...editingProf,
+        ...validation.data,
+        id: editingProf.id,
+      });
       setEditingProf(null);
     } else {
-      await pureDB.professors.add({
-        ...validation.data,
-        created_at: new Date().toISOString(),
-      });
+      await saveProfessor(validation.data);
       setIsAddProfOpen(false);
     }
   };
 
   const handleDeleteProf = async (id: string) => {
-    await pureDB.professors.delete(id);
+    await deleteProfessor(id);
   };
 
   // --- SUBJECT HANDLERS ---
@@ -261,22 +267,25 @@ export const ConfigDashboard: React.FC = () => {
 
     setSubErrors({});
     if (editingSubject && editingSubject.id) {
-      await pureDB.subjects.update(editingSubject.id, validation.data);
+      await saveSubject({
+        ...editingSubject,
+        ...validation.data,
+        id: editingSubject.id,
+      });
       setEditingSubject(null);
     } else {
-      await pureDB.subjects.add({
+      await saveSubject({
         ...validation.data,
         modality: validation.data.modality || subModality || 'presencial',
         target_grade: validation.data.target_grade ?? Number(subTargetGrade) ?? 3.0,
         current_grade: validation.data.current_grade ?? 0,
-        created_at: new Date().toISOString(),
       });
       setIsAddSubjectOpen(false);
     }
   };
 
   const handleDeleteSubject = async (id: string) => {
-    await pureDB.subjects.delete(id);
+    await deleteSubject(id);
   };
 
   // --- SCHEDULE HANDLERS ---
@@ -320,19 +329,20 @@ export const ConfigDashboard: React.FC = () => {
 
     setSchedErrors({});
     if (editingSchedule && editingSchedule.id) {
-      await pureDB.schedules.update(editingSchedule.id, validation.data);
+      await saveSchedule({
+        ...editingSchedule,
+        ...validation.data,
+        id: editingSchedule.id,
+      });
       setEditingSchedule(null);
     } else {
-      await pureDB.schedules.add({
-        ...validation.data,
-        created_at: new Date().toISOString(),
-      });
+      await saveSchedule(validation.data);
       setIsAddScheduleOpen(false);
     }
   };
 
   const handleDeleteSchedule = async (id: string) => {
-    await pureDB.schedules.delete(id);
+    await deleteSchedule(id);
   };
 
   const inputClass =

@@ -7,6 +7,7 @@ import {
   scheduleIdentity,
   deliverableIdentity,
   syllabusTopicIdentity,
+  classSessionIdentity,
 } from '../domain/entity-identity';
 
 let isProcessing = false;
@@ -74,6 +75,7 @@ export async function pullRemoteState() {
       schedules = [],
       deliverables = [],
       syllabusTopics = [],
+      classSessions = [],
     } = body.data;
 
     // Un payload sin universidades es un servidor vacío o a medio arrancar: no se poda
@@ -89,6 +91,7 @@ export async function pullRemoteState() {
         pureDB.schedules,
         pureDB.deliverables,
         pureDB.syllabusTopics,
+        pureDB.classSessions,
       ],
       async () => {
         await pureDB.universities.bulkPut(universities);
@@ -97,6 +100,7 @@ export async function pullRemoteState() {
         if (schedules?.length) await pureDB.schedules.bulkPut(schedules);
         if (deliverables?.length) await pureDB.deliverables.bulkPut(deliverables);
         if (syllabusTopics?.length) await pureDB.syllabusTopics.bulkPut(syllabusTopics);
+        if (classSessions?.length) await pureDB.classSessions.bulkPut(classSessions);
 
         const uniqueIds = (ids: (string | number)[]) =>
           Array.from(new Set(ids.map(String))) as string[];
@@ -143,6 +147,13 @@ export async function pullRemoteState() {
           ...findOrphanIds(localTopics, syllabusTopics, removedSubjectIds, (t) => t.subject_id),
         ]);
         if (staleTopicIds.length) await pureDB.syllabusTopics.bulkDelete(staleTopicIds);
+
+        const localSessions = await pureDB.classSessions.toArray();
+        const staleSessionIds = uniqueIds([
+          ...findShadowedIds(localSessions, classSessions, classSessionIdentity),
+          ...findOrphanIds(localSessions, classSessions, removedSubjectIds, (cs) => cs.subject_id),
+        ]);
+        if (staleSessionIds.length) await pureDB.classSessions.bulkDelete(staleSessionIds);
       }
     );
   } catch (err) {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
-import { pureDB, SyllabusTopicEntity } from '@/lib/db/dexie-schema';
+import { SyllabusTopicEntity } from '@/lib/db/dexie-schema';
+import { saveSyllabusTopic, deleteSyllabusTopic } from '@/lib/db/repository';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -71,7 +72,13 @@ export const SyllabusDashboard: React.FC = () => {
   const ingestLineCount = rawText.split('\n').map((l) => l.trim()).filter(Boolean).length;
 
   const handleUpdateMastery = async (id: string, status: SyllabusTopicEntity['mastery_status']) => {
-    await pureDB.syllabusTopics.update(id, { mastery_status: status });
+    const topic = syllabusTopics.find((t) => t.id === id);
+    if (topic) {
+      await saveSyllabusTopic({
+        ...topic,
+        mastery_status: status,
+      });
+    }
   };
 
   const openEditTopic = (topic: SyllabusTopicEntity) => {
@@ -82,7 +89,8 @@ export const SyllabusDashboard: React.FC = () => {
 
   const handleSaveTopicEdit = async () => {
     if (!editingTopic || !editingTopic.id) return;
-    await pureDB.syllabusTopics.update(editingTopic.id, {
+    await saveSyllabusTopic({
+      ...editingTopic,
       title: editTitle,
       mastery_status: editMastery,
     });
@@ -90,7 +98,7 @@ export const SyllabusDashboard: React.FC = () => {
   };
 
   const handleDeleteTopic = async (id: string) => {
-    await pureDB.syllabusTopics.delete(id);
+    await deleteSyllabusTopic(id);
   };
 
   const handleIngestSyllabus = async () => {
@@ -105,7 +113,9 @@ export const SyllabusDashboard: React.FC = () => {
       created_at: new Date().toISOString(),
     }));
 
-    await pureDB.syllabusTopics.bulkAdd(newTopics);
+    for (const topic of newTopics) {
+      await saveSyllabusTopic(topic);
+    }
     setRawText('');
     setIsIngestModalOpen(false);
   };

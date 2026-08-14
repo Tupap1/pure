@@ -45,6 +45,10 @@ export function syllabusTopicIdentity(t: { subject_id?: string; title?: string }
   return `${norm(t.subject_id)}|${norm(t.title)}`;
 }
 
+export function classSessionIdentity(cs: { subject_id?: string; title?: string; session_date?: string }): string {
+  return `${norm(cs.subject_id)}|${norm(cs.title)}|${norm(cs.session_date)}`;
+}
+
 /**
  * Colapsa una lista dejando una sola entrada por identidad lógica, preservando el orden
  * de aparición. Cuando hay varias candidatas gana la de mayor `preferenceOf` (por defecto,

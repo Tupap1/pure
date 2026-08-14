@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
-import { pureDB, DeliverableEntity } from '@/lib/db/dexie-schema';
+import { DeliverableEntity } from '@/lib/db/dexie-schema';
+import { saveDeliverable, deleteDeliverable } from '@/lib/db/repository';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -119,28 +120,29 @@ export const DeliverablesDashboard: React.FC = () => {
     setDelivErrors({});
 
     if (editingDeliv && editingDeliv.id) {
-      await pureDB.deliverables.update(editingDeliv.id, {
-        ...validation.data as any,
+      await saveDeliverable({
+        ...editingDeliv,
+        ...(validation.data as any),
         complexity,
         status,
         grade: grade !== undefined && grade !== null ? Number(grade) : undefined,
+        id: editingDeliv.id,
       });
       setEditingDeliv(null);
     } else {
-      await pureDB.deliverables.add({
-        ...validation.data as any,
+      await saveDeliverable({
+        ...(validation.data as any),
         type: 'Parcial',
         complexity: complexity,
         status: status,
         grade: grade !== undefined && grade !== null ? Number(grade) : undefined,
-        created_at: new Date().toISOString(),
       });
       setIsAddModalOpen(false);
     }
   };
 
   const handleDeleteDeliverable = async (id: string) => {
-    await pureDB.deliverables.delete(id);
+    await deleteDeliverable(id);
   };
 
   const inputClass =
