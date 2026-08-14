@@ -5,11 +5,12 @@ import {
   Calendar,
   CheckSquare,
   Building2,
-  GraduationCap
+  GraduationCap,
+  Video
 } from 'lucide-react';
 import { usePureData } from '@/lib/hooks/usePureData';
 
-export type DashboardTab = 'command' | 'syllabus' | 'schedule' | 'deliverables' | 'config';
+export type DashboardTab = 'command' | 'syllabus' | 'schedule' | 'deliverables' | 'sessions' | 'config';
 
 interface SidebarProps {
   activeTab: DashboardTab;
@@ -39,6 +40,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
       id: 'deliverables' as DashboardTab,
       label: 'Entregas & Evaluaciones',
       icon: CheckSquare,
+    },
+    {
+      id: 'sessions' as DashboardTab,
+      label: 'Grabaciones & Resúmenes',
+      icon: Video,
     },
     {
       id: 'config' as DashboardTab,

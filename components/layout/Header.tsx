@@ -14,6 +14,7 @@ const TAB_TITLES: Record<DashboardTab, string> = {
   syllabus: 'Sinergias & Syllabus',
   schedule: 'Master Schedule',
   deliverables: 'Entregables & Evaluaciones',
+  sessions: 'Grabaciones & Resúmenes',
   config: 'Configuración',
 };
 

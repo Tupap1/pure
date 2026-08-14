@@ -56,13 +56,14 @@ export async function fetchAcademicLoadInputsFromDb() {
 }
 
 export async function fetchAllDataFromDb() {
-  const [unis, profs, subs, scheds, delivs, topics] = await Promise.all([
+  const [unis, profs, subs, scheds, delivs, topics, sessions] = await Promise.all([
     pgPool.query('SELECT * FROM universities ORDER BY name ASC'),
     pgPool.query('SELECT * FROM professors ORDER BY name ASC'),
     pgPool.query('SELECT * FROM subjects ORDER BY name ASC'),
     pgPool.query('SELECT * FROM schedules ORDER BY day_of_week ASC, start_time ASC'),
     pgPool.query('SELECT * FROM deliverables ORDER BY due_date ASC'),
     pgPool.query('SELECT * FROM syllabus_topics ORDER BY order_index ASC'),
+    pgPool.query('SELECT * FROM class_sessions ORDER BY session_date DESC'),
   ]);
 
   return {
@@ -91,6 +92,7 @@ export async function fetchAllDataFromDb() {
       grade: d.grade !== null && d.grade !== undefined ? Number(d.grade) : undefined,
     })),
     syllabusTopics: topics.rows,
+    classSessions: sessions.rows,
   };
 }
 
@@ -457,4 +459,64 @@ export async function saveSyllabusTopicToDb(topic: any) {
 
 export async function deleteSyllabusTopicFromDb(id: string) {
   await pgPool.query('DELETE FROM syllabus_topics WHERE id = $1', [id]);
+}
+
+// --- CLASS SESSIONS ---
+export async function fetchClassSessionsFromDb(id?: string) {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM class_sessions WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM class_sessions ORDER BY session_date DESC');
+  return res.rows;
+}
+
+export async function saveClassSessionToDb(session: any) {
+  const record = {
+    id: session.id || `session-${Date.now()}`,
+    subject_id: session.subject_id,
+    schedule_id: session.schedule_id || null,
+    session_date: session.session_date || new Date().toISOString(),
+    title: session.title,
+    summary: session.summary || null,
+    notion_link: session.notion_link || null,
+    recording_url: session.recording_url || null,
+    topics_covered: session.topics_covered || [],
+    notes: session.notes || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  await pgPool.query(
+    `INSERT INTO class_sessions (id, subject_id, schedule_id, session_date, title, summary, notion_link, recording_url, topics_covered, notes, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     ON CONFLICT (id) DO UPDATE SET
+       subject_id = EXCLUDED.subject_id,
+       schedule_id = EXCLUDED.schedule_id,
+       session_date = EXCLUDED.session_date,
+       title = EXCLUDED.title,
+       summary = EXCLUDED.summary,
+       notion_link = EXCLUDED.notion_link,
+       recording_url = EXCLUDED.recording_url,
+       topics_covered = EXCLUDED.topics_covered,
+       notes = EXCLUDED.notes,
+       updated_at = EXCLUDED.updated_at`,
+    [
+      record.id,
+      record.subject_id,
+      record.schedule_id,
+      record.session_date,
+      record.title,
+      record.summary,
+      record.notion_link,
+      record.recording_url,
+      record.topics_covered,
+      record.notes,
+      record.updated_at,
+    ]
+  );
+  return record;
+}
+
+export async function deleteClassSessionFromDb(id: string) {
+  await pgPool.query('DELETE FROM class_sessions WHERE id = $1', [id]);
 }

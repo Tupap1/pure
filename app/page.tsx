@@ -7,6 +7,7 @@ import { CommandCenter } from '@/components/dashboards/CommandCenter';
 import { SyllabusDashboard } from '@/components/dashboards/SyllabusDashboard';
 import { ScheduleDashboard } from '@/components/dashboards/ScheduleDashboard';
 import { DeliverablesDashboard } from '@/components/dashboards/DeliverablesDashboard';
+import { ClassSessionsDashboard } from '@/components/dashboards/ClassSessionsDashboard';
 import { ConfigDashboard } from '@/components/dashboards/ConfigDashboard';
 
 export default function Home() {
@@ -23,6 +24,8 @@ export default function Home() {
             return <ScheduleDashboard />;
           case 'deliverables':
             return <DeliverablesDashboard />;
+          case 'sessions':
+            return <ClassSessionsDashboard />;
           case 'config':
             return <ConfigDashboard />;
           default:

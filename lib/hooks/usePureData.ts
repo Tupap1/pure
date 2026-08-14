@@ -17,6 +17,7 @@ export function usePureData() {
   const syllabusTopics = useLiveQuery(() => pureDB.syllabusTopics.toArray(), [], []);
   const deliverables = useLiveQuery(() => pureDB.deliverables.toArray(), [], []);
   const studySessions = useLiveQuery(() => pureDB.studySessions.toArray(), [], []);
+  const classSessions = useLiveQuery(() => pureDB.classSessions.toArray(), [], []);
 
   return {
     isLoaded: universities !== undefined,
@@ -27,5 +28,6 @@ export function usePureData() {
     syllabusTopics: syllabusTopics || [],
     deliverables: deliverables || [],
     studySessions: studySessions || [],
+    classSessions: classSessions || [],
   };
 }

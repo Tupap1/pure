@@ -10,6 +10,7 @@ describe('REQ-08: Capa de Base de Datos Relacional Local-First (Dexie.js Indexed
     expect(pureDB.syllabusTopics).toBeDefined();
     expect(pureDB.deliverables).toBeDefined();
     expect(pureDB.studySessions).toBeDefined();
+    expect(pureDB.classSessions).toBeDefined();
     expect(pureDB.syncQueue).toBeDefined();
   });
 });

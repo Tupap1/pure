@@ -13,6 +13,7 @@ describe('Sistema de Migraciones Versionadas PostgreSQL', () => {
     expect(files).toContain('001_initial_schema.sql');
     expect(files).toContain('002_add_sabado_ab_columns.sql');
     expect(files).toContain('003_oauth_tables.sql');
+    expect(files).toContain('004_class_sessions.sql');
   });
 
   it('la migración 002 debe incluir la alteración idempotente para Sábado A/B y periodicidad', () => {
@@ -32,5 +33,16 @@ describe('Sistema de Migraciones Versionadas PostgreSQL', () => {
     expect(content).toContain('oauth_clients');
     expect(content).toContain('oauth_auth_codes');
     expect(content).toContain('oauth_access_tokens');
+  });
+
+  it('la migración 004 debe definir la tabla class_sessions con campos de grabación y resumen', () => {
+    const mig4Path = path.join(process.cwd(), 'db', 'migrations', '004_class_sessions.sql');
+    expect(fs.existsSync(mig4Path)).toBe(true);
+
+    const content = fs.readFileSync(mig4Path, 'utf-8');
+    expect(content).toContain('CREATE TABLE IF NOT EXISTS class_sessions');
+    expect(content).toContain('notion_link');
+    expect(content).toContain('recording_url');
+    expect(content).toContain('topics_covered');
   });
 });

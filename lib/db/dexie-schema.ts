@@ -89,6 +89,21 @@ export interface StudySessionEntity {
   created_at?: string;
 }
 
+export interface ClassSessionEntity {
+  id?: string;
+  subject_id: string;
+  schedule_id?: string;
+  session_date: string;
+  title: string;
+  summary?: string | null;
+  notion_link?: string | null;
+  recording_url?: string | null;
+  topics_covered?: string[];
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface SyncQueueItem {
   id?: number;
   action: 'insert' | 'update' | 'delete';
@@ -105,6 +120,7 @@ export class PureDatabase extends Dexie {
   syllabusTopics!: Table<SyllabusTopicEntity, string>;
   deliverables!: Table<DeliverableEntity, string>;
   studySessions!: Table<StudySessionEntity, string>;
+  classSessions!: Table<ClassSessionEntity, string>;
   syncQueue!: Table<SyncQueueItem, number>;
 
   constructor() {
@@ -119,6 +135,16 @@ export class PureDatabase extends Dexie {
       deliverables: '++id, subject_id, topic_id, due_date, status, is_group',
       studySessions: '++id, subject_id, topic_id, deliverable_id, is_completed',
       syncQueue: '++id, action, table_name, timestamp'
+    });
+
+    // classSessions llegó después de que la versión 1 ya estuviera instalada en los
+    // navegadores. Declararla dentro de version(1) obligaba a Dexie a parchear el
+    // esquema por su cuenta ("SchemaDiff: Schema was extended without increasing the
+    // number passed to db.version()"), un camino de rescate que él mismo desaconseja y
+    // que deja la migración a merced de una heurística. Pedirla en su propia versión
+    // hace explícito el ascenso y lo vuelve reproducible.
+    this.version(2).stores({
+      classSessions: '++id, subject_id, schedule_id, session_date'
     });
   }
 }

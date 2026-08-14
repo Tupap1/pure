@@ -4,7 +4,8 @@ import {
   GitMerge,
   Calendar,
   CheckSquare,
-  Building2
+  Building2,
+  Video
 } from 'lucide-react';
 import { DashboardTab } from './Sidebar';
 
@@ -19,6 +20,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) 
     { id: 'syllabus' as DashboardTab, label: 'Temario', icon: GitMerge },
     { id: 'schedule' as DashboardTab, label: 'Horarios', icon: Calendar },
     { id: 'deliverables' as DashboardTab, label: 'Entregas', icon: CheckSquare },
+    { id: 'sessions' as DashboardTab, label: 'Clases', icon: Video },
     { id: 'config' as DashboardTab, label: 'Ajustes', icon: Building2 },
   ];
 

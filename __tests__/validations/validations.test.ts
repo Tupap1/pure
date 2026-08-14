@@ -6,6 +6,7 @@ import {
   ScheduleSchema,
   DeliverableSchema,
   SyllabusTopicSchema,
+  ClassSessionSchema,
   validateEntity
 } from '@/lib/validations/schemas';
 
@@ -174,6 +175,39 @@ describe('Validation Schemas (Zod + TDD)', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.errors.weight_percentage).toBeDefined();
+      }
+    });
+  });
+
+  describe('ClassSessionSchema', () => {
+    it('should validate valid class session data', () => {
+      const session = {
+        subject_id: 'sub-1',
+        session_date: '2026-08-13T10:00:00.000Z',
+        title: 'Clase 01 - Introducción a la Dinámica',
+        summary: 'Se presentaron las leyes de Newton aplicadas a fluidos.',
+        notion_link: 'https://notion.so/clase-01',
+        recording_url: 'https://youtube.com/watch?v=123456',
+        topics_covered: ['Leyes de Newton', 'Fluidos'],
+        notes: 'Repasar ejercicio 3.2'
+      };
+      const result = validateEntity(ClassSessionSchema, session);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid URLs for notion or recording', () => {
+      const invalidSession = {
+        subject_id: 'sub-1',
+        session_date: '2026-08-13T10:00:00.000Z',
+        title: 'Clase 02',
+        notion_link: 'invalid-url',
+        recording_url: 'not-a-link'
+      };
+      const result = validateEntity(ClassSessionSchema, invalidSession);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.errors.notion_link).toBeDefined();
+        expect(result.errors.recording_url).toBeDefined();
       }
     });
   });

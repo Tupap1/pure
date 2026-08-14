@@ -101,6 +101,21 @@ export const SyllabusTopicSchema = z.object({
   order_index: z.number().int().min(0).optional()
 });
 
+export const ClassSessionSchema = z.object({
+  id: z.string().optional(),
+  subject_id: z.string().min(1, { message: 'Debe seleccionar una asignatura' }),
+  schedule_id: z.string().optional().nullable(),
+  session_date: z.string().min(1, { message: 'La fecha de la sesión es requerida' }),
+  title: z.string().min(2, { message: 'El título de la sesión es requerido' }),
+  summary: z.string().optional().nullable(),
+  notion_link: z.string().url({ message: 'URL de Notion inválida' }).optional().or(z.literal('')).nullable(),
+  recording_url: z.string().url({ message: 'URL de grabación inválida' }).optional().or(z.literal('')).nullable(),
+  topics_covered: z.array(z.string()).optional().default([]),
+  notes: z.string().optional().nullable(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional()
+});
+
 export type ValidationResult<T> =
   | { success: true; data: T }
   | { success: false; errors: Record<string, string> };
