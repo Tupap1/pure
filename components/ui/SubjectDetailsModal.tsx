@@ -8,12 +8,10 @@ import {
   User,
   Building2,
   Calendar,
-  FileText,
   Link as LinkIcon,
   Video,
   Plus,
   CheckCircle2,
-  XCircle,
   Tag,
   Clock,
   MapPin,
@@ -268,7 +266,7 @@ export const SubjectDetailsModal: React.FC<SubjectDetailsModalProps> = ({
                       {/* Summary Excerpt if present */}
                       {hasSummary && (
                         <p className="text-slate-600 dark:text-slate-400 text-[11px] line-clamp-2 italic bg-white dark:bg-slate-950 p-2 rounded border border-slate-200 dark:border-slate-800/60">
-                          "{session.summary}"
+                          &ldquo;{session.summary}&rdquo;
                         </p>
                       )}
 

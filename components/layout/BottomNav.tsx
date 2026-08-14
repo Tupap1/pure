@@ -1,13 +1,6 @@
 import React from 'react';
-import {
-  LayoutDashboard,
-  GitMerge,
-  Calendar,
-  CheckSquare,
-  Building2,
-  Video
-} from 'lucide-react';
-import { DashboardTab } from './Sidebar';
+import { cn } from '@/lib/utils';
+import { NAV_ITEMS, type DashboardTab } from '@/lib/navigation';
 
 interface BottomNavProps {
   activeTab: DashboardTab;
@@ -15,32 +8,32 @@ interface BottomNavProps {
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) => {
-  const menuItems = [
-    { id: 'command' as DashboardTab, label: 'Inicio', icon: LayoutDashboard },
-    { id: 'syllabus' as DashboardTab, label: 'Temario', icon: GitMerge },
-    { id: 'schedule' as DashboardTab, label: 'Horarios', icon: Calendar },
-    { id: 'deliverables' as DashboardTab, label: 'Entregas', icon: CheckSquare },
-    { id: 'sessions' as DashboardTab, label: 'Clases', icon: Video },
-    { id: 'config' as DashboardTab, label: 'Ajustes', icon: Building2 },
-  ];
-
   return (
-    <nav aria-label="Navegación Móvil Inferior" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#090d18]/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800/80 px-2 py-1.5 flex items-center justify-around shadow-2xl">
-      {menuItems.map((item) => {
+    <nav
+      role="tablist"
+      aria-label="Secciones"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-obsidian-900/95 backdrop-blur-md border-t border-surface-border px-2 py-1.5 flex items-center justify-around"
+    >
+      {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
         return (
           <button
             key={item.id}
+            role="tab"
+            aria-selected={isActive}
             onClick={() => onSelectTab(item.id)}
-            className={`min-h-[44px] min-w-[44px] flex flex-col items-center justify-center flex-1 px-1 py-1 rounded-xl transition-all duration-200 ${
+            className={cn(
+              'min-h-[44px] min-w-[44px] flex flex-col items-center justify-center flex-1 px-1 py-1 rounded-lg border transition-colors duration-200',
               isActive
-                ? 'text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 font-heading font-bold scale-105 glow-aeroespacial'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 active:scale-95'
-            }`}
+                ? 'text-cyan-700 dark:text-cyan-300 bg-cyan-500/10 border-cyan-500/30 font-semibold'
+                : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-slate-200'
+            )}
           >
-            <Icon className={`w-5 h-5 ${isActive ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-400'}`} />
-            <span className="text-[10px] mt-0.5 tracking-tight leading-tight font-heading font-bold">{item.label}</span>
+            <Icon className={cn('w-5 h-5', isActive ? 'text-cyan-700 dark:text-cyan-300' : 'text-slate-400')} />
+            <span className="text-[11px] mt-0.5 tracking-tight leading-tight font-semibold">
+              {item.label}
+            </span>
           </button>
         );
       })}

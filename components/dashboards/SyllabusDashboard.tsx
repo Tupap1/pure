@@ -130,7 +130,7 @@ export const SyllabusDashboard: React.FC = () => {
         <div>
           <h2 className="text-xl font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <GitMerge className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-            Ejes Temáticos & Sinergias (Syllabus Engine)
+            Ejes temáticos y sinergias
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Edición de ejes temáticos y sincronización de equivalencias entre carreras.
@@ -270,7 +270,7 @@ export const SyllabusDashboard: React.FC = () => {
                         <option value="no_iniciado">No Iniciado</option>
                         <option value="en_estudio">En Estudio</option>
                         <option value="repasado">Repasado</option>
-                        <option value="dominado">Dominado ✅</option>
+                        <option value="dominado">Dominado</option>
                       </select>
 
                       <button
@@ -326,7 +326,7 @@ export const SyllabusDashboard: React.FC = () => {
               <option value="no_iniciado">No Iniciado</option>
               <option value="en_estudio">En Estudio</option>
               <option value="repasado">Repasado</option>
-              <option value="dominado">Dominado ✅</option>
+              <option value="dominado">Dominado</option>
             </select>
           </div>
 

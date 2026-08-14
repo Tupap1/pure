@@ -1,20 +1,16 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
 import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import {
-  Calendar as CalendarIcon,
-  Clock,
-  MapPin,
-  CheckCircle2,
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  Info
-} from 'lucide-react';
+import { Calendar as CalendarIcon } from 'lucide-react';
 import { filterSchedulesByDay, sortSchedulesByTime } from '@/lib/algorithms/schedule-mobile-transformer';
 import { getSabadoTypeForDate, getSlotPeriodicity } from '@/lib/algorithms/conflict-detector';
+import {
+  SHORT_DAYS,
+  getWeekDates,
+  getMonthDateKeys,
+  getMonthLabel,
+  getMonthStartOffset,
+} from '@/lib/domain/calendar';
 
 const getTodayDayOfWeek = (): number => {
   const d = new Date().getDay();
@@ -45,9 +41,8 @@ export const MobileScheduleTimeline: React.FC = () => {
     );
   }
 
-  const shortDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-  const fullDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-  const dayNumbers = [18, 19, 20, 21, 22, 23, 24];
+  const today = new Date();
+  const weekDates = getWeekDates(today);
 
   const daySchedules = sortSchedulesByTime(filterSchedulesByDay(schedules, selectedDay));
 
@@ -62,41 +57,29 @@ export const MobileScheduleTimeline: React.FC = () => {
 
   const activeSubject = subjects.find((s) => s.id === (selectedSubjectId || subjects[0]?.id));
 
-  const currentMonthDays = Array.from({ length: 31 }, (_, i) => {
-    const day = i + 1;
-    const dayStr = day < 10 ? `0${day}` : `${day}`;
-    return `2026-08-${dayStr}`;
-  });
+  const currentMonthDays = getMonthDateKeys(today);
 
   return (
     <div className="space-y-4 max-w-md mx-auto">
-      {/* Header — PURE OS Titanium Cybernetic Styling */}
-      <div className="text-center space-y-0.5 py-1">
-        <h3 className="text-base font-extrabold font-heading tracking-wider uppercase text-slate-900 dark:text-slate-100">
-          SCHEDULE
-        </h3>
-        <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-widest">
-          AGOSTO 2026
-        </p>
-      </div>
-
-      <div className="flex items-center justify-between gap-1 bg-white dark:bg-[#0d1322] p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        {shortDays.map((day, idx) => {
+      <div className="flex items-center justify-between gap-1 bg-surface p-1.5 rounded-xl border border-surface-border shadow-sm">
+        {SHORT_DAYS.map((day, idx) => {
           const dayNum = idx + 1;
           const isSelected = selectedDay === dayNum;
+          const date = weekDates[idx];
           return (
             <button
               key={day}
               onClick={() => setSelectedDay(dayNum)}
-              className={`flex-1 flex flex-col items-center justify-center py-2 rounded-xl transition-all ${
+              aria-pressed={isSelected}
+              className={`flex-1 flex flex-col items-center justify-center py-2 rounded-lg transition-colors ${
                 isSelected
-                  ? 'bg-cyan-500 text-white shadow-md'
+                  ? 'bg-cyan-600 text-white shadow-sm'
                   : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
-              <span className="text-[9px] font-bold uppercase">{day}</span>
-              <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-900 dark:text-slate-200'}`}>
-                {dayNumbers[idx]}
+              <span className="text-[10px] font-bold uppercase">{day}</span>
+              <span className={`text-xs font-mono font-bold ${isSelected ? 'text-white' : 'text-slate-900 dark:text-slate-200'}`}>
+                {date.getDate()}
               </span>
             </button>
           );
@@ -153,7 +136,7 @@ export const MobileScheduleTimeline: React.FC = () => {
                 let periodicityBadgeText = '';
 
                 if (selectedDay === 6 && (uni?.has_alternating_saturdays ?? true)) {
-                  const currentSabadoType = getSabadoTypeForDate(new Date(), uni?.first_sabado_a_date || '2026-08-01');
+                  const currentSabadoType = getSabadoTypeForDate(new Date(), uni?.first_sabado_a_date);
                   const schedPeriodicity = getSlotPeriodicity({
                     classroom: sched.classroom,
                     periodicity: sched.periodicity,
@@ -168,7 +151,7 @@ export const MobileScheduleTimeline: React.FC = () => {
                 return (
                   <div
                     key={sched.id}
-                    className={`p-4 rounded-xl bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800/90 flex items-center justify-between gap-3 shadow-sm hover:border-cyan-500/40 transition-all ${
+                    className={`p-4 rounded-xl bg-surface border border-surface-border flex items-center justify-between gap-3 shadow-sm hover:border-cyan-500/40 transition-colors ${
                       isAttenuated ? 'opacity-40 grayscale-[30%]' : ''
                     }`}
                   >
@@ -197,29 +180,29 @@ export const MobileScheduleTimeline: React.FC = () => {
                       <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate font-heading">
                         {sub?.name || 'Materia'}
                       </h4>
-                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                         <span className="text-slate-700 dark:text-slate-300 font-semibold">
-                          {sched.classroom || (isPresencial ? 'AULA 101' : 'VIRTUAL')}
+                          {sched.classroom || '—'}
                         </span>
                         <span>•</span>
-                        <span>{isPresencial ? 'PRESENCIAL' : 'VIRTUAL'}</span>
+                        <span>{isPresencial ? 'Presencial' : 'Virtual'}</span>
                       </div>
                     </div>
 
                     {/* Right: Absences Counter */}
-                    <div className="text-right shrink-0 font-mono space-y-0.5 pl-2">
-                      <div className="text-base font-bold text-cyan-600 dark:text-cyan-400 leading-none">
-                        0{absences.length}
+                    <div className="text-right shrink-0 space-y-0.5 pl-2">
+                      <div className="text-base font-mono font-bold text-cyan-700 dark:text-cyan-400 leading-none">
+                        {String(absences.length).padStart(2, '0')}
                       </div>
-                      <div className="text-[9px] text-slate-500 dark:text-slate-400 leading-tight">Fallas</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Fallas</div>
                       <button
                         onClick={() => {
                           setSelectedSubjectId(sched.subject_id);
                           setActiveTab('attendance');
                         }}
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-end -mr-2 -mb-2 text-[9px] text-purple-600 dark:text-purple-400 font-bold hover:underline"
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-end -mr-2 -mb-2 text-[10px] text-purple-700 dark:text-purple-400 font-bold hover:underline"
                       >
-                        DETALLES
+                        Detalles
                       </button>
                     </div>
                   </div>
@@ -239,10 +222,10 @@ export const MobileScheduleTimeline: React.FC = () => {
                 <button
                   key={sub.id}
                   onClick={() => setSelectedSubjectId(sub.id!)}
-                  className={`px-3 min-h-[44px] rounded-lg text-xs font-heading font-bold transition-all shrink-0 border ${
+                  className={`px-3 min-h-[44px] rounded-lg text-xs font-heading font-bold transition-colors shrink-0 border ${
                     isSelected
-                      ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border-cyan-500/40 glow-aeroespacial'
-                      : 'bg-white dark:bg-[#0d1322] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-400'
+                      ? 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/40'
+                      : 'bg-surface text-slate-600 dark:text-slate-400 border-surface-border hover:border-slate-400'
                   }`}
                 >
                   {sub.name}
@@ -260,35 +243,39 @@ export const MobileScheduleTimeline: React.FC = () => {
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-2">
                   <Card className="p-3 text-center space-y-0.5">
-                    <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">Permitidas</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Permitidas</div>
                     <div className="text-lg font-mono font-bold text-slate-900 dark:text-slate-100">
-                      0{allowedAbsences}
+                      {String(allowedAbsences).padStart(2, '0')}
                     </div>
                   </Card>
                   <Card className="p-3 text-center space-y-0.5 bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40">
-                    <div className="text-[10px] font-mono text-rose-600 dark:text-rose-400">Fallas</div>
-                    <div className="text-lg font-mono font-bold text-rose-600 dark:text-rose-400">
-                      0{absences.length}
+                    <div className="text-xs text-rose-700 dark:text-rose-400">Fallas</div>
+                    <div className="text-lg font-mono font-bold text-rose-700 dark:text-rose-400">
+                      {String(absences.length).padStart(2, '0')}
                     </div>
                   </Card>
                   <Card className="p-3 text-center space-y-0.5 bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40">
-                    <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">Restantes</div>
-                    <div className="text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                      0{remainingAbsences}
+                    <div className="text-xs text-emerald-700 dark:text-emerald-400">Restantes</div>
+                    <div className="text-lg font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                      {String(remainingAbsences).padStart(2, '0')}
                     </div>
                   </Card>
                 </div>
 
                 <Card className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 font-heading">
-                      Registro de Asistencia — Agosto 2026
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-7 gap-1 text-center font-mono text-[10px] text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 pb-1.5">
-                    <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 font-heading capitalize">
+                    Registro de asistencia · {getMonthLabel(today)}
+                  </h4>
+                  <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-slate-400 font-bold border-b border-surface-border pb-1.5">
+                    {SHORT_DAYS.map((day) => (
+                      <span key={day}>{day.charAt(0)}</span>
+                    ))}
                   </div>
                   <div className="grid grid-cols-7 gap-1 text-center">
+                    {/* Celdas vacías para que el día 1 caiga bajo su día de la semana real. */}
+                    {Array.from({ length: getMonthStartOffset(today) }, (_, i) => (
+                      <span key={`offset-${i}`} aria-hidden="true" />
+                    ))}
                     {currentMonthDays.map((dateStr, idx) => {
                       const dayNum = idx + 1;
                       const isAbsent = absences.includes(dateStr);
@@ -298,10 +285,10 @@ export const MobileScheduleTimeline: React.FC = () => {
                           onClick={() => toggleAbsenceDate(activeSubject.id!, dateStr)}
                           aria-label={`Marcar falla el día ${dayNum}`}
                           aria-pressed={isAbsent}
-                          className={`h-11 rounded-lg text-xs font-mono transition-all flex items-center justify-center border ${
+                          className={`h-11 rounded-lg text-xs font-mono transition-colors flex items-center justify-center border ${
                             isAbsent
-                              ? 'bg-rose-500 text-white font-bold border-rose-400 shadow-sm animate-pulse'
-                              : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'
+                              ? 'bg-rose-600 text-white font-bold border-rose-500 shadow-sm'
+                              : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-surface-border'
                           }`}
                         >
                           {dayNum}

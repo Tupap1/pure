@@ -34,6 +34,7 @@ yarn-error.log*
 .gemini/
 .claude/
 .cursor/
+.impeccable/
 *.swp
 *.swo
 *.tsbuildinfo

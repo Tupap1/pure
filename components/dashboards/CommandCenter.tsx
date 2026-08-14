@@ -3,27 +3,21 @@ import { usePureData } from '@/lib/hooks/usePureData';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { ProgressRing, MultiProgressRing } from '@/components/ui/ProgressRing';
+import { MultiProgressRing } from '@/components/ui/ProgressRing';
 import { SemesterProgressChart } from '@/components/ui/SemesterProgressChart';
 import { StudyHeatmap } from '@/components/ui/StudyHeatmap';
 import { DailyLoadStackedBar } from '@/components/ui/DailyLoadStackedBar';
 import { SubjectTelemetryTable } from '@/components/ui/SubjectTelemetryTable';
 import {
   Clock,
-  BookOpen,
   CheckCircle2,
   CalendarDays,
   GraduationCap,
-  Sparkles,
-  Zap,
   TrendingUp,
-  ArrowRight,
-  BarChart3,
-  Activity,
-  Layers
+  BarChart3
 } from 'lucide-react';
 import { buildDailyLoad } from '@/lib/algorithms/academic-load';
-import { calculateDME, calculateNetFreeTime, calculateTotalClassHours } from '@/lib/algorithms/study-hours-dme';
+import { computeStudyHeatmap } from '@/lib/domain/study-heatmap';
 import { saveDeliverable } from '@/lib/db/repository';
 import { formatDeliverableDate } from '@/lib/domain/deliverable';
 import { useAcademicLoad } from '@/lib/hooks/useAcademicLoad';
@@ -35,6 +29,14 @@ export const CommandCenter: React.FC = () => {
   const dailyLoadData = React.useMemo(
     () => buildDailyLoad(schedules, subjects, universities, academicLoad.normativeIndependentHours),
     [schedules, subjects, universities, academicLoad.normativeIndependentHours]
+  );
+
+  // Heatmap de las sesiones de estudio realmente completadas (ver lib/domain/study-heatmap.ts).
+  // Debe declararse antes del retorno temprano: un hook detrás de un `return` condicional
+  // se salta mientras los datos cargan y rompe el orden de hooks entre renders.
+  const realHeatmapDays = React.useMemo(
+    () => computeStudyHeatmap(studySessions),
+    [studySessions]
   );
 
   if (!isLoaded) {
@@ -51,19 +53,16 @@ export const CommandCenter: React.FC = () => {
     );
   }
 
-  const totalDMEHours = subjects.reduce((sum, s) => {
-    return sum + calculateDME(s as any).recommendedWeeklyHours;
-  }, 0);
-
-  const classHours = calculateTotalClassHours(schedules);
-
-  const sleepHoursTotal = 7 * 7; // 49h weekly
-
-  const netFreeTime = calculateNetFreeTime({
+  // Todas las cifras de carga salen del mismo hook que alimenta el encabezado, para que no
+  // puedan discrepar entre sí. Ver lib/algorithms/academic-load.ts.
+  const {
     classHours,
-    dmeHours: totalDMEHours,
-    sleepHoursPerNight: 7,
-  });
+    normativeIndependentHours,
+    totalAcademicHours,
+    sleepHours: sleepHoursTotal,
+    netFreeTime,
+    isOverloaded,
+  } = academicLoad;
 
   const pendingDeliverables = deliverables.filter((d) => d.status === 'pendiente');
   const urgentDeliverables = [...pendingDeliverables].sort(
@@ -83,62 +82,12 @@ export const CommandCenter: React.FC = () => {
   // Concentric multi-rings definition for dashboard
   const multiRings = [
     { label: 'Tiempo Libre', progress: Math.min(100, Math.round((Math.max(0, netFreeTime) / 168) * 100)), color: '#10b981' },
-    { label: 'Carga DME', progress: Math.min(100, Math.round((totalDMEHours / 168) * 100)), color: '#a855f7' },
+    { label: 'Trabajo independiente', progress: Math.min(100, Math.round((normativeIndependentHours / 168) * 100)), color: '#a855f7' },
     { label: 'Horario Clases', progress: Math.min(100, Math.round((classHours / 168) * 100)), color: '#38bdf8' },
   ];
 
-  // Dynamic Heatmap Days calculated from real completed studySessions in IndexedDB
-  const realHeatmapDays = React.useMemo(() => {
-    const result = [];
-    const now = new Date();
-
-    for (let i = 27; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
-      const sessionsOnDate = studySessions.filter((s) => {
-        const sessionDate = s.scheduled_start?.slice(0, 10);
-        return sessionDate === dateStr && s.is_completed;
-      });
-
-      let hours = 0;
-      sessionsOnDate.forEach((s) => {
-        const start = new Date(s.scheduled_start).getTime();
-        const end = new Date(s.scheduled_end).getTime();
-        if (end > start) {
-          hours += (end - start) / (1000 * 60 * 60);
-        }
-      });
-
-      hours = Math.round(hours * 10) / 10;
-      const intensity = (hours === 0 ? 0 : hours <= 2 ? 1 : hours <= 4 ? 2 : hours <= 6 ? 3 : 4) as 0 | 1 | 2 | 3 | 4;
-      result.push({ date: dateStr, hours, intensity });
-    }
-    return result;
-  }, [studySessions]);
-
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Overview Header Banner */}
-      <div className="bg-[#090d18] border border-cyan-500/30 rounded-xl p-5 shadow-sm text-slate-100 glow-aeroespacial">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold text-slate-100 tracking-tight font-heading">
-              Dashboard Académico
-            </h2>
-            <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-              {subjects.length > 0
-                ? `${subjects.length} asignatura(s) activas en ${universities.length} institución(es).`
-                : 'Configura tus instituciones y materias para iniciar la gestión.'}
-            </p>
-          </div>
-        </div>
-      </div>
-
       {subjects.length === 0 ? (
         /* Empty State */
         <Card className="p-8 border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 space-y-6">
@@ -158,36 +107,56 @@ export const CommandCenter: React.FC = () => {
         <>
           {/* 4-Metric Academic Capacity Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800 space-y-1">
-              <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">Clases en Horario</div>
+            <Card className="p-3.5 space-y-1">
+              <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-medium tracking-wide">Acompañamiento directo</div>
               <div className="text-lg font-mono font-bold text-cyan-600 dark:text-cyan-400">
-                {classHours.toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
+                {classHours.toFixed(1)}<span className="text-xs font-normal text-slate-400"> h/sem</span>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Horas de asistencia agendadas</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">Horas de clase de tu horario</div>
             </Card>
 
-            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800 space-y-1">
-              <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">Estudio por Fuera (DME)</div>
+            <Card className="p-3.5 space-y-1">
+              <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-medium tracking-wide">Trabajo independiente</div>
               <div className="text-lg font-mono font-bold text-purple-600 dark:text-purple-400">
-                {totalDMEHours.toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
+                {normativeIndependentHours.toFixed(1)}<span className="text-xs font-normal text-slate-400"> h/sem</span>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Trabajo autónomo sugerido</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">Lo que exige el Decreto 1075, menos tu clase</div>
             </Card>
 
-            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800 space-y-1">
-              <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">Dedicación Total</div>
+            <Card className="p-3.5 space-y-1">
+              <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-medium tracking-wide">Trabajo académico total</div>
               <div className="text-lg font-mono font-bold text-slate-900 dark:text-slate-100">
-                {(classHours + totalDMEHours).toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
+                {totalAcademicHours.toFixed(1)}<span className="text-xs font-normal text-slate-400"> h/sem</span>
               </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Carga académica global</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                {academicLoad.totalCredits} créditos × 3 h/sem
+              </div>
             </Card>
 
-            <Card className="p-3.5 bg-white dark:bg-[#0d1322] border border-emerald-500/30 space-y-1 glow-synergy">
-              <div className="text-[10px] font-mono uppercase text-emerald-600 dark:text-emerald-400 font-medium">Tiempo Libre Neto</div>
-              <div className="text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                {netFreeTime.toFixed(1)}h<span className="text-xs font-normal text-slate-400"> /sem</span>
+            <Card
+              className={`p-3.5 space-y-1 ${
+                isOverloaded ? 'border-red-500/40' : 'border-emerald-500/30'
+              }`}
+            >
+              <div
+                className={`text-[10px] uppercase font-medium tracking-wide ${
+                  isOverloaded ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
+                }`}
+              >
+                {isOverloaded ? 'Sobrecarga semanal' : 'Tiempo libre neto'}
               </div>
-              <div className="text-[10px] text-emerald-600/80 dark:text-emerald-500/80 font-mono">Margen libre (descontando 7h sueño)</div>
+              <div
+                className={`text-lg font-mono font-bold ${
+                  isOverloaded ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
+                }`}
+              >
+                {netFreeTime.toFixed(1)}<span className="text-xs font-normal text-slate-400"> h/sem</span>
+              </div>
+              <div className={`text-[10px] ${isOverloaded ? 'text-red-600/80 dark:text-red-500/80' : 'text-emerald-600/80 dark:text-emerald-500/80'}`}>
+                {isOverloaded
+                  ? 'La carga no cabe en las 168h de la semana'
+                  : `168 − ${classHours.toFixed(1)} clase − ${normativeIndependentHours.toFixed(1)} indep. − ${sleepHoursTotal} sueño`}
+              </div>
             </Card>
           </div>
 
@@ -278,7 +247,7 @@ export const CommandCenter: React.FC = () => {
 
                 <div className="space-y-4">
                   {/* Concentric Multi-Ring Display */}
-                  <div className="p-4 rounded-lg bg-slate-50 dark:bg-[#07090e] border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+                  <div className="p-4 rounded-lg bg-slate-50 dark:bg-obsidian-950 border border-surface-border flex items-center justify-between gap-4">
                     <div className="space-y-1 min-w-0">
                       <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">
                         Tiempo Libre Neto
@@ -305,11 +274,11 @@ export const CommandCenter: React.FC = () => {
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800/80 text-xs font-mono">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-sm bg-sky-500" />
-                      <span className="text-slate-700 dark:text-slate-300">Clases: {classHours}h</span>
+                      <span className="text-slate-700 dark:text-slate-300">Clase: {classHours.toFixed(1)}h</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-sm bg-purple-500" />
-                      <span className="text-slate-700 dark:text-slate-300">DME: {totalDMEHours.toFixed(1)}h</span>
+                      <span className="text-slate-700 dark:text-slate-300">Independiente: {normativeIndependentHours.toFixed(1)}h</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-sm bg-slate-400 dark:bg-slate-700" />
@@ -317,7 +286,9 @@ export const CommandCenter: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
-                      <span className="text-slate-700 dark:text-slate-300 font-bold text-emerald-600 dark:text-emerald-400">Libre: {netFreeTime}h</span>
+                      <span className={`font-bold ${isOverloaded ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                        {isOverloaded ? 'Sobrecarga' : 'Libre'}: {netFreeTime.toFixed(1)}h
+                      </span>
                     </div>
                   </div>
                 </div>

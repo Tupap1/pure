@@ -19,6 +19,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { FormErrors } from '@/components/ui/FormErrors';
 import {
   Building2,
   UserCheck,
@@ -251,7 +252,7 @@ export const ConfigDashboard: React.FC = () => {
       university_id: subUniId,
       professor_id: subProfId || undefined,
       name: subName,
-      code: subCode || 'MAT-101',
+      code: subCode.trim(),
       credits: Number(subCredits),
       difficulty: Number(subDifficulty),
       modality: subModality,
@@ -355,7 +356,7 @@ export const ConfigDashboard: React.FC = () => {
         <div>
           <h2 className="text-xl font-heading font-bold tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
             <Building2 className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0" />
-            Configuración & Directorio Base (CRUD Completo)
+            Configuración y directorio base
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Administra y edita universidades, profesores, asignaturas y clases guardados en tu base de datos local.
@@ -687,6 +688,7 @@ export const ConfigDashboard: React.FC = () => {
         title={editingUni ? `Editar Universidad: ${editingUni.name}` : 'Configurar Nueva Universidad'}
       >
         <div className="space-y-4">
+          <FormErrors errors={uniErrors} />
           <div>
             <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Nombre de la Institución</label>
             <input
@@ -796,6 +798,7 @@ export const ConfigDashboard: React.FC = () => {
         title={editingProf ? `Editar Profesor: ${editingProf.name}` : 'Registrar Nuevo Profesor'}
       >
         <div className="space-y-4">
+          <FormErrors errors={profErrors} />
           <div>
             <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Nombre Completo</label>
             <input
@@ -869,6 +872,9 @@ export const ConfigDashboard: React.FC = () => {
               className={inputClass}
               placeholder="Ej: Cálculo Vectorial y Geometría"
             />
+            {subErrors.name && (
+              <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">{subErrors.name}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -881,6 +887,9 @@ export const ConfigDashboard: React.FC = () => {
                 className={inputClass}
                 placeholder="MAT-201"
               />
+              {subErrors.code && (
+                <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">{subErrors.code}</p>
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Universidad</label>
@@ -970,7 +979,7 @@ export const ConfigDashboard: React.FC = () => {
               variant="aeroespacial"
               className="w-full sm:w-auto"
               onClick={handleSaveSubject}
-              disabled={!subName.trim() || !subUniId}
+              disabled={!subName.trim() || !subCode.trim() || !subUniId}
             >
               {editingSubject ? 'Guardar Cambios' : 'Guardar Materia'}
             </Button>
@@ -988,6 +997,7 @@ export const ConfigDashboard: React.FC = () => {
         title={editingSchedule ? 'Editar Horario' : 'Asignar Horario a Materia'}
       >
         <div className="space-y-4">
+          <FormErrors errors={schedErrors} />
           <div>
             <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Asignatura</label>
             <select

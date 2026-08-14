@@ -10,11 +10,11 @@ import { computeAcademicLoad, type AcademicLoadSummary } from '../algorithms/aca
  * ahora de aquí.
  */
 export function useAcademicLoad(): AcademicLoadSummary & { isLoaded: boolean } {
-  const { isLoaded, subjects, schedules, universities } = usePureData();
+  const { isLoaded, subjects, schedules, universities, deliverables, syllabusTopics } = usePureData();
 
   const summary = useMemo(
-    () => computeAcademicLoad(subjects, schedules, universities),
-    [subjects, schedules, universities]
+    () => computeAcademicLoad(subjects, schedules, universities, { deliverables, syllabusTopics }),
+    [subjects, schedules, universities, deliverables, syllabusTopics]
   );
 
   return { ...summary, isLoaded };

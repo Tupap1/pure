@@ -65,7 +65,7 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({ da
         </div>
       </div>
 
-      <div className="p-4 bg-slate-50/50 dark:bg-[#07090e] border border-slate-200 dark:border-slate-800 rounded-xl space-y-3 max-h-[320px] overflow-y-auto pr-1 scrollbar-none">
+      <div className="p-4 bg-slate-50/50 dark:bg-obsidian-950 border border-surface-border rounded-xl space-y-3 max-h-[320px] overflow-y-auto pr-1 scrollbar-none">
         {data.map((item, idx) => {
           // La posición en la barra se normaliza contra la escala real de la universidad,
           // de modo que una nota sobre 100 y una sobre 5.0 sean visualmente comparables.
@@ -77,7 +77,7 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({ da
           return (
             <div
               key={idx}
-              className="p-3 rounded-lg bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800/80 space-y-2 hover:border-cyan-500/40 transition-colors"
+              className="p-3 rounded-lg bg-surface border border-surface-border space-y-2 hover:border-cyan-500/40 transition-colors"
             >
               <div className="flex items-center justify-between text-xs gap-2">
                 <div className="min-w-0 flex-1 flex items-center gap-2">

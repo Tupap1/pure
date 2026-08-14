@@ -3,29 +3,20 @@ import { Clock, Cpu, Sun, Moon, AlertTriangle } from 'lucide-react';
 import { useTheme } from '@/lib/hooks/useTheme';
 import { useAcademicLoad } from '@/lib/hooks/useAcademicLoad';
 
-import { DashboardTab } from './Sidebar';
+import { getNavLabel, type DashboardTab } from '@/lib/navigation';
 
 interface HeaderProps {
   activeTab?: DashboardTab;
 }
 
-const TAB_TITLES: Record<DashboardTab, string> = {
-  command: 'Dashboard',
-  syllabus: 'Sinergias & Syllabus',
-  schedule: 'Master Schedule',
-  deliverables: 'Entregables & Evaluaciones',
-  sessions: 'Grabaciones & Resúmenes',
-  config: 'Configuración',
-};
-
 export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
   const { normativeIndependentHours, netFreeTime, isOverloaded } = useAcademicLoad();
   const { theme, toggleTheme } = useTheme();
 
-  const title = TAB_TITLES[activeTab] || TAB_TITLES.command;
+  const title = getNavLabel(activeTab);
 
   return (
-    <header className="sticky top-0 z-20 bg-white/90 dark:bg-[#090d18]/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 sm:px-6 py-3.5 flex items-center justify-between transition-colors">
+    <header className="sticky top-0 z-20 bg-white/90 dark:bg-obsidian-900/90 backdrop-blur-md border-b border-surface-border px-4 sm:px-6 py-3.5 flex items-center justify-between transition-colors">
       {/* Title / Context */}
       <div className="min-w-0 pr-2">
         <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 truncate tracking-tight font-heading">
@@ -86,6 +77,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
         {/* Theme Toggle Button */}
         <button
           onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
           title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
           className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 border border-slate-200 dark:border-slate-700/80 transition-colors"
         >

@@ -47,7 +47,7 @@ PURE OS está estructurado en 5 módulos core accesible desde la barra de navega
 ```
 
 ### 1. Dashboard (Centro de Mando & Balance de Tiempo)
-- **MultiProgressRing**: Medidor de anillos concéntricos SVG que visualiza la proporción de **Tiempo Libre Neto**, **Carga de Estudio DME** y **Horario de Clases**.
+- **MultiProgressRing**: Medidor de anillos concéntricos SVG que visualiza la proporción de **Tiempo Libre Neto**, **Trabajo Independiente** y **Horario de Clases**.
 - **DailyLoadStackedBar**: Histograma de distribución de carga horaria por día de la semana (Lunes a Sábado A/B).
 - **StudyHeatmap**: Mapa de calor interactivo tipo GitHub para registrar la consistencia de bloques de estudio.
 - **SemesterProgressChart**: Gráfica SVG interactiva que traza la curva de evolución del Promedio Académico (GPA) acumulado frente a la Nota Meta (4.50).
@@ -94,8 +94,10 @@ $$\text{DME Semanal} = \big(\text{Horas Base} \times \text{Dificultad} \times \t
   - **Nota Actual $\ge$ Meta + 0.5**: Factor de `0.6x` (excelente margen, reducción de horas).
   - **Nota Actual $\ge$ Meta**: Factor de `0.8x`.
   - **Brecha Negativa**: $1.0 + \min(1.0, \text{Meta} - \text{Nota Actual})$.
-- **Factor Sinergia**: $1.0 - (0.3 \times \% \text{Temas Compartidos})$.
-- **Bonus Urgencia**: $\text{Peso \% Parciales en 7 días} \times 0.05$.
+- **Factor Sinergia**: $1.0 - (0.3 \times \% \text{Temas Compartidos})$. El porcentaje se deriva del temario real: la fracción de temas de la materia que `findSynergiesBetweenTopics` empareja con temas de **otra** carrera.
+- **Bonus Urgencia**: $\text{Peso \% Parciales en 7 días} \times 0.05$. Solo cuentan las entregas todavía `pendiente` con fecha límite dentro de la ventana de 7 días.
+
+Ambos factores ajustan únicamente la **recomendación**; la cifra normativa (`normativeWeeklyHours`) nunca se mueve, y la interfaz muestra las dos por separado con su desglose.
 
 ### 2. Tiempo Libre Neto Semanal
 
@@ -253,5 +255,5 @@ npm run test
 npx tsc --noEmit
 ```
 
-**Estado Actual de Pruebas**: `187 passed (100% OK)`.
+**Estado Actual de Pruebas**: `195 passed (100% OK)`.
 

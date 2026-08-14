@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
-import { useCalendarState, CalendarViewMode } from '@/lib/hooks/useCalendarState';
+import { useCalendarState } from '@/lib/hooks/useCalendarState';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { SubjectDetailsModal } from '@/components/ui/SubjectDetailsModal';
 import {
-  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -37,11 +36,6 @@ const DAY_NAMES = [
 ];
 
 const SHORT_DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-
-const getTodayIsoDay = (): number => {
-  const d = new Date().getDay();
-  return d === 0 ? 7 : d;
-};
 
 const timeToMinutes = (t: string): number => {
   const [h, m] = t.split(':').map(Number);

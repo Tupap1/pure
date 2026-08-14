@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
-import { ClassSessionEntity, SubjectEntity } from '@/lib/db/dexie-schema';
+import { ClassSessionEntity } from '@/lib/db/dexie-schema';
 import { saveClassSession, deleteClassSession } from '@/lib/db/repository';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ClassSessionForm } from '@/components/ui/ClassSessionForm';
-import { EmptyState } from '@/components/ui/EmptyState';
 import {
   Video,
   FileText,
@@ -185,7 +184,6 @@ export const ClassSessionsDashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredSessions.map((session) => {
             const sub = subjects.find((sb) => sb.id === session.subject_id);
-            const sched = schedules.find((sc) => sc.id === session.schedule_id);
 
             return (
               <Card

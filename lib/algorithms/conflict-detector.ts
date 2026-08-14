@@ -19,7 +19,19 @@ export interface ScheduleConflict {
 /**
  * Calculates whether a target date is Saturday A or Saturday B based on a customizable anchor date.
  */
-export function getSabadoTypeForDate(targetDate: Date, anchorDateStr: string = '2026-08-01'): 'sabado_a' | 'sabado_b' {
+/**
+ * Sábado de referencia que se considera "Sábado A" cuando la universidad no tiene
+ * configurado `first_sabado_a_date`.
+ *
+ * Es un supuesto, no un dato del estudiante: con la fecha real configurada el cálculo es
+ * exacto, y sin ella la alternancia puede quedar invertida. Configúrala por institución.
+ */
+export const DEFAULT_SABADO_A_ANCHOR = '2026-08-01';
+
+export function getSabadoTypeForDate(
+  targetDate: Date,
+  anchorDateStr: string = DEFAULT_SABADO_A_ANCHOR
+): 'sabado_a' | 'sabado_b' {
   const anchor = new Date(anchorDateStr);
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
   const diffWeeks = Math.floor((targetDate.getTime() - anchor.getTime()) / msPerWeek);
