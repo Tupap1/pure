@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { SubjectDetailsModal } from '@/components/ui/SubjectDetailsModal';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -23,7 +24,8 @@ import {
   ScheduleSlot,
 } from '@/lib/algorithms/conflict-detector';
 import { ScheduleSchema, validateEntity } from '@/lib/validations/schemas';
-import { pureDB, ScheduleEntity } from '@/lib/db/dexie-schema';
+import { ScheduleEntity } from '@/lib/db/dexie-schema';
+import { saveSchedule, deleteSchedule } from '@/lib/db/repository';
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -51,7 +53,7 @@ const formatTimeRange = (start: string, end: string): string => {
 };
 
 export const CalendarView: React.FC = () => {
-  const { isLoaded, universities, subjects, schedules } = usePureData();
+  const { isLoaded, universities, subjects, schedules, professors, classSessions } = usePureData();
   const calendarState = useCalendarState(new Date(), 'week');
   const { viewMode, displayDate, setViewMode, setDisplayDate, goNext, goPrev, goToday } = calendarState;
 
@@ -59,6 +61,8 @@ export const CalendarView: React.FC = () => {
   const [selectedSched, setSelectedSched] = useState<ScheduleEntity | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  // Tocar un bloque abre primero la ficha de la clase; editar es una acción explícita.
+  const [detailsSched, setDetailsSched] = useState<ScheduleEntity | null>(null);
 
   // Form state for add/edit schedule modal
   const [schedSubjectId, setSchedSubjectId] = useState('');
@@ -151,6 +155,11 @@ export const CalendarView: React.FC = () => {
     setIsAddModalOpen(true);
   };
 
+  // Ficha de la clase: qué materia es, con quién, dónde y cuándo. Desde ahí se edita.
+  const handleOpenDetails = (sched: ScheduleEntity) => {
+    setDetailsSched(sched);
+  };
+
   // Helper to open Edit modal
   const handleOpenEdit = (sched: ScheduleEntity) => {
     setSelectedSched(sched);
@@ -183,12 +192,12 @@ export const CalendarView: React.FC = () => {
 
     setSchedErrors({});
     if (selectedSched && selectedSched.id) {
-      await pureDB.schedules.update(selectedSched.id, validation.data);
-    } else {
-      await pureDB.schedules.add({
+      await saveSchedule({
         ...validation.data,
-        created_at: new Date().toISOString(),
+        id: selectedSched.id,
       });
+    } else {
+      await saveSchedule(validation.data);
     }
 
     setIsAddModalOpen(false);
@@ -197,7 +206,7 @@ export const CalendarView: React.FC = () => {
   };
 
   const handleDeleteSchedule = async (id: string) => {
-    await pureDB.schedules.delete(id);
+    await deleteSchedule(id);
     setIsEditModalOpen(false);
     setSelectedSched(null);
   };
@@ -214,6 +223,10 @@ export const CalendarView: React.FC = () => {
   const getUniversityBySubjectId = (subjectId: string) => {
     const sub = getSubject(subjectId);
     return universities.find((u) => u.id === sub?.university_id);
+  };
+  const getProfessorBySubjectId = (subjectId: string) => {
+    const sub = getSubject(subjectId);
+    return professors.find((p) => p.id === sub?.professor_id);
   };
 
   const inputClass =
@@ -374,7 +387,7 @@ export const CalendarView: React.FC = () => {
                     return (
                       <div
                         key={s.id}
-                        onClick={() => handleOpenEdit(s)}
+                        onClick={() => handleOpenDetails(s)}
                         style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                         className={`absolute left-2 right-2 rounded-lg p-2.5 border cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg z-10 flex flex-col justify-between group ${
                           isPresencial
@@ -392,7 +405,7 @@ export const CalendarView: React.FC = () => {
                               {formatTimeRange(s.start_time, s.end_time)}
                             </span>
                           </div>
-                          <Pencil className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-500 shrink-0" />
+                          <Info className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-sky-500 shrink-0" />
                         </div>
                         <div className="text-[10px] opacity-75 flex items-center gap-1 truncate mt-1">
                           <MapPin className="w-3 h-3 shrink-0" />
@@ -502,7 +515,7 @@ export const CalendarView: React.FC = () => {
                             >
                               {hasConflict ? (
                                 <div
-                                  onClick={() => handleOpenEdit(matchingSchedules[0])}
+                                  onClick={() => handleOpenDetails(matchingSchedules[0])}
                                   className="p-1.5 rounded bg-rose-100 dark:bg-rose-500/20 border border-rose-300 dark:border-rose-500/80 text-rose-800 dark:text-rose-200 space-y-0.5 cursor-pointer hover:scale-[1.02] transition-transform"
                                 >
                                   <div className="font-bold text-[10px] flex items-center justify-between">
@@ -522,7 +535,7 @@ export const CalendarView: React.FC = () => {
                                   return (
                                     <div
                                       key={sched.id}
-                                      onClick={() => handleOpenEdit(sched)}
+                                      onClick={() => handleOpenDetails(sched)}
                                       className={`p-1.5 rounded text-xs space-y-0.5 border cursor-pointer hover:scale-[1.02] hover:shadow-md transition-all group ${
                                         isPresencial
                                           ? 'bg-sky-50 dark:bg-sky-950/60 border-sky-200 dark:border-sky-600/50 text-sky-900 dark:text-sky-200'
@@ -531,7 +544,7 @@ export const CalendarView: React.FC = () => {
                                     >
                                       <div className="font-bold text-[11px] flex items-center justify-between">
                                         <span className="truncate">{sub?.name || 'Clase'}</span>
-                                        <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 text-sky-400 transition-opacity shrink-0" />
+                                        <Info className="w-3 h-3 opacity-0 group-hover:opacity-100 text-sky-400 transition-opacity shrink-0" />
                                       </div>
                                       <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
                                         {isPresencial ? <MapPin className="w-2.5 h-2.5 shrink-0" /> : <Clock className="w-2.5 h-2.5 shrink-0" />}
@@ -673,7 +686,7 @@ export const CalendarView: React.FC = () => {
                                 onMouseLeave={() => setHoveredSlot(null)}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleOpenEdit(s);
+                                  handleOpenDetails(s);
                                 }}
                                 className={`text-[10px] px-1.5 py-0.5 rounded truncate font-medium border flex items-center justify-between group/pill ${
                                   isPresencial
@@ -856,6 +869,17 @@ export const CalendarView: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      <SubjectDetailsModal
+        isOpen={detailsSched !== null}
+        onClose={() => setDetailsSched(null)}
+        subject={detailsSched ? getSubject(detailsSched.subject_id) || null : null}
+        university={detailsSched ? getUniversityBySubjectId(detailsSched.subject_id) || null : null}
+        professor={detailsSched ? getProfessorBySubjectId(detailsSched.subject_id) || null : null}
+        classSessions={classSessions}
+        schedule={detailsSched}
+        onEditSchedule={handleOpenEdit}
+      />
     </div>
   );
 };

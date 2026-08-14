@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { SubjectEntity, ProfessorEntity, UniversityEntity } from '@/lib/db/dexie-schema';
+import { usePureData } from '@/lib/hooks/usePureData';
 import { calculateDME } from '@/lib/algorithms/study-hours-dme';
 import { Badge } from './Badge';
 import { Card } from './Card';
 import { EmptyState } from './EmptyState';
 import { GradeProgressBar } from './GradeProgressBar';
+import { SubjectDetailsModal } from './SubjectDetailsModal';
 import {
   BookOpen,
   User,
@@ -14,7 +16,8 @@ import {
   ChevronDown,
   ChevronUp,
   Building2,
-  Mail
+  Mail,
+  Video
 } from 'lucide-react';
 
 interface SubjectTelemetryTableProps {
@@ -28,8 +31,10 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
   professors = [],
   universities = []
 }) => {
+  const { classSessions } = usePureData();
   const [selectedUniId, setSelectedUniId] = useState<string>('all');
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
+  const [modalSubject, setModalSubject] = useState<SubjectEntity | null>(null);
 
   if (!subjects || subjects.length === 0) {
     return (
@@ -264,21 +269,30 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                     />
                   </td>
 
-                  {/* Telemetry Status Badge */}
+                  {/* Telemetry Status Badge & Detail trigger */}
                   <td className="p-3 text-right pr-4">
-                    {!hasGrade ? (
-                      <Badge variant="outline">En Diagnóstico</Badge>
-                    ) : isAboveTarget ? (
-                      <Badge variant="synergy" className="inline-flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Excelente
-                      </Badge>
-                    ) : isPassing ? (
-                      <Badge variant="aeroespacial">En Rango</Badge>
-                    ) : (
-                      <Badge variant="danger" className="inline-flex items-center gap-1">
-                        <ShieldAlert className="w-3 h-3" /> Atención
-                      </Badge>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                      {!hasGrade ? (
+                        <Badge variant="outline">En Diagnóstico</Badge>
+                      ) : isAboveTarget ? (
+                        <Badge variant="synergy" className="inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Excelente
+                        </Badge>
+                      ) : isPassing ? (
+                        <Badge variant="aeroespacial">En Rango</Badge>
+                      ) : (
+                        <Badge variant="danger" className="inline-flex items-center gap-1">
+                          <ShieldAlert className="w-3 h-3" /> Atención
+                        </Badge>
+                      )}
+                      <button
+                        onClick={() => setModalSubject(sub)}
+                        title="Ver detalles de la materia"
+                        className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-sky-500 text-[11px] font-medium transition-colors"
+                      >
+                        Ver Detalle
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -286,6 +300,18 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* Subject Details Modal */}
+      {modalSubject && (
+        <SubjectDetailsModal
+          isOpen={modalSubject !== null}
+          onClose={() => setModalSubject(null)}
+          subject={modalSubject}
+          professor={professors.find((p) => p.id === modalSubject.professor_id)}
+          university={universities.find((u) => u.id === modalSubject.university_id)}
+          classSessions={classSessions}
+        />
+      )}
     </div>
   );
 };
