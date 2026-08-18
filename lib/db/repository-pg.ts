@@ -461,6 +461,10 @@ export async function deleteSyllabusTopicFromDb(id: string) {
   await pgPool.query('DELETE FROM syllabus_topics WHERE id = $1', [id]);
 }
 
+export async function deleteSyllabusTopicsBySubjectFromDb(subjectId: string) {
+  await pgPool.query('DELETE FROM syllabus_topics WHERE subject_id = $1', [subjectId]);
+}
+
 // --- CLASS SESSIONS ---
 export async function fetchClassSessionsFromDb(id?: string) {
   if (id) {

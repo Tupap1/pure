@@ -21,6 +21,7 @@ import {
   fetchSyllabusTopicsFromDb,
   saveSyllabusTopicToDb,
   deleteSyllabusTopicFromDb,
+  deleteSyllabusTopicsBySubjectFromDb,
 } from './db-repository';
 
 export async function handleGetAcademicOverview() {
@@ -88,10 +89,14 @@ export async function handleParseAndIngestSyllabus(subjectId: string, rawText: s
     const topics: SyllabusTopic[] = [];
     let currentParentId: string | undefined = undefined;
 
+    // Reingestar el temario de una materia reemplaza por completo sus nodos previos,
+    // para que una ingesta mas corta no deje nodos huerfanos de una version anterior.
+    await deleteSyllabusTopicsBySubjectFromDb(subjectId);
+
     for (let index = 0; index < lines.length; index++) {
       const line = lines[index];
       if (line.toLowerCase().startsWith('unidad')) {
-        const parentId = `unit-${index}`;
+        const parentId = `${subjectId}-unit-${index}`;
         currentParentId = parentId;
         const topic: SyllabusTopic = {
           id: parentId,
@@ -104,7 +109,7 @@ export async function handleParseAndIngestSyllabus(subjectId: string, rawText: s
         topics.push(topic);
       } else {
         const topic: SyllabusTopic = {
-          id: `topic-${index}`,
+          id: `${subjectId}-topic-${index}`,
           subject_id: subjectId,
           parent_id: currentParentId,
           title: line.replace(/^[-*•]\s*/, ''),

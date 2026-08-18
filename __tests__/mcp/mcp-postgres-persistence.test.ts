@@ -9,6 +9,7 @@ import {
   handleManageSyllabusTopics,
   handleGetAcademicOverview,
   handleIngestAcademicEnrollment,
+  handleParseAndIngestSyllabus,
 } from '../../mcp-server/tools-handler';
 import { globalOAuthStore } from '../../mcp-server/oauth-store';
 
@@ -198,5 +199,68 @@ describe('MCP Server PostgreSQL Real Database Persistence with pg-mem', () => {
     expect(res2.valid).toBe(false);
     expect(res2.error).toBe('invalid_grant');
     expect(res2.errorDescription).toContain('already used');
+  });
+
+  it('6. should not lose or overwrite syllabus topics of another subject when ingesting a new syllabus', async () => {
+    await handleManageUniversities('create', { id: 'uni-syllabus', name: 'Uni Syllabus' });
+    await handleManageSubjects('create', { id: 'sub-quimica', university_id: 'uni-syllabus', name: 'Quimica General' });
+    await handleManageSubjects('create', { id: 'sub-geometria', university_id: 'uni-syllabus', name: 'Geometria Vectorial' });
+
+    const textoQuimica = `
+      Unidad 1: Estequiometria
+      - Tema 1.1: Balanceo de ecuaciones
+      - Tema 1.2: Moles y masa molar
+      Unidad 2: Termoquimica
+      - Tema 2.1: Entalpia
+    `;
+    const textoGeometria = `
+      Unidad 1: Vectores en el plano
+      - Tema 1.1: Producto punto
+    `;
+
+    const ingestaQuimica = await handleParseAndIngestSyllabus('sub-quimica', textoQuimica);
+    expect(ingestaQuimica.status).toBe('success');
+    const ingestaGeometria = await handleParseAndIngestSyllabus('sub-geometria', textoGeometria);
+    expect(ingestaGeometria.status).toBe('success');
+
+    const cantidadQuimica = ingestaQuimica.topics!.length;
+    const cantidadGeometria = ingestaGeometria.topics!.length;
+
+    const allTopics = await handleManageSyllabusTopics('read', {});
+    const topicosQuimica = allTopics.data.filter((t: any) => t.subject_id === 'sub-quimica');
+    const topicosGeometria = allTopics.data.filter((t: any) => t.subject_id === 'sub-geometria');
+
+    expect(topicosQuimica).toHaveLength(cantidadQuimica);
+    expect(topicosGeometria).toHaveLength(cantidadGeometria);
+    expect(allTopics.data.filter((t: any) => t.subject_id === 'sub-quimica' || t.subject_id === 'sub-geometria'))
+      .toHaveLength(cantidadQuimica + cantidadGeometria);
+  });
+
+  it('7. should replace previous syllabus topics of the same subject on re-ingestion instead of leaving orphans', async () => {
+    await handleManageUniversities('create', { id: 'uni-reingest', name: 'Uni Reingest' });
+    await handleManageSubjects('create', { id: 'sub-calculo', university_id: 'uni-reingest', name: 'Calculo Diferencial' });
+
+    const textoLargo = `
+      Unidad 1: Limites
+      - Tema 1.1: Limites laterales
+      - Tema 1.2: Continuidad
+      Unidad 2: Derivadas
+      - Tema 2.1: Regla de la cadena
+    `;
+    const textoCorto = `
+      Unidad 1: Limites
+      - Tema 1.1: Limites laterales
+    `;
+
+    const primeraIngesta = await handleParseAndIngestSyllabus('sub-calculo', textoLargo);
+    expect(primeraIngesta.status).toBe('success');
+
+    const segundaIngesta = await handleParseAndIngestSyllabus('sub-calculo', textoCorto);
+    expect(segundaIngesta.status).toBe('success');
+
+    const allTopics = await handleManageSyllabusTopics('read', {});
+    const topicosCalculo = allTopics.data.filter((t: any) => t.subject_id === 'sub-calculo');
+
+    expect(topicosCalculo).toHaveLength(segundaIngesta.topics!.length);
   });
 });

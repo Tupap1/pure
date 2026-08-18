@@ -20,4 +20,5 @@ export {
   fetchSyllabusTopicsFromDb,
   saveSyllabusTopicToDb,
   deleteSyllabusTopicFromDb,
+  deleteSyllabusTopicsBySubjectFromDb,
 } from '../lib/db/repository-pg';
