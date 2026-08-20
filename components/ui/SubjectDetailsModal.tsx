@@ -156,7 +156,7 @@ export const SubjectDetailsModal: React.FC<SubjectDetailsModalProps> = ({
             onClick={() => setActiveTab('sessions')}
             className={`px-4 py-2 font-medium border-b-2 transition-all ${
               activeTab === 'sessions'
-                ? 'border-sky-500 text-sky-600 dark:text-sky-400 font-bold'
+                ? 'border-sky-500 text-slate-500 dark:text-slate-400 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
@@ -166,7 +166,7 @@ export const SubjectDetailsModal: React.FC<SubjectDetailsModalProps> = ({
             onClick={() => setActiveTab('info')}
             className={`px-4 py-2 font-medium border-b-2 transition-all ${
               activeTab === 'info'
-                ? 'border-sky-500 text-sky-600 dark:text-sky-400 font-bold'
+                ? 'border-sky-500 text-slate-500 dark:text-slate-400 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
@@ -187,7 +187,7 @@ export const SubjectDetailsModal: React.FC<SubjectDetailsModalProps> = ({
                     onClose();
                     onAddSession(subject.id!);
                   }}
-                  className="text-sky-600 dark:text-sky-400"
+                  className="text-slate-500 dark:text-slate-400"
                 >
                   <Plus className="w-3.5 h-3.5" /> Registrar Clase
                 </Button>
@@ -251,7 +251,7 @@ export const SubjectDetailsModal: React.FC<SubjectDetailsModalProps> = ({
                               href={session.notion_link!}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 hover:underline"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-slate-500 dark:text-slate-400 border border-indigo-500/30 hover:underline"
                             >
                               <LinkIcon className="w-2.5 h-2.5" /> Notion
                             </a>
@@ -306,13 +306,13 @@ export const SubjectDetailsModal: React.FC<SubjectDetailsModalProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <span className="text-slate-500 block text-[10px]">Nota Meta</span>
-                <span className="font-mono font-bold text-sm text-cyan-600 dark:text-cyan-400">
+                <span className="font-mono font-bold text-sm text-slate-500 dark:text-slate-400">
                   {subject.target_grade}
                 </span>
               </div>
               <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <span className="text-slate-500 block text-[10px]">Nota Actual</span>
-                <span className="font-mono font-bold text-sm text-purple-600 dark:text-purple-400">
+                <span className="font-mono font-bold text-sm text-slate-500 dark:text-slate-400">
                   {subject.current_grade || 0.0}
                 </span>
               </div>

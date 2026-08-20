@@ -21,11 +21,11 @@ export const Button: React.FC<ButtonProps> = ({
     primary:
       'bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-100 border border-slate-700/60 hover:border-slate-600/80 focus:ring-cyan-500 shadow-sm',
     aeroespacial:
-      'bg-cyan-500/8 hover:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/25 dark:border-cyan-500/30 hover:border-cyan-400/60 focus:ring-cyan-400',
+      'bg-cyan-500/8 hover:bg-cyan-500/15 text-slate-500 dark:text-slate-400 border border-cyan-500/25 dark:border-cyan-500/30 hover:border-cyan-400/60 focus:ring-cyan-400',
     software:
-      'bg-purple-500/8 hover:bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/25 dark:border-purple-500/30 hover:border-purple-400/60 focus:ring-purple-400',
+      'bg-purple-500/8 hover:bg-purple-500/15 text-slate-500 dark:text-slate-400 border border-purple-500/25 dark:border-purple-500/30 hover:border-purple-400/60 focus:ring-purple-400',
     synergy:
-      'bg-emerald-500/8 hover:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 dark:border-emerald-500/30 hover:border-emerald-400/60 focus:ring-emerald-400',
+      'bg-emerald-500/8 hover:bg-emerald-500/15 text-slate-500 dark:text-slate-400 border border-emerald-500/25 dark:border-emerald-500/30 hover:border-emerald-400/60 focus:ring-emerald-400',
     danger:
       'bg-rose-500/8 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25 dark:border-rose-500/30 hover:border-rose-400/60 focus:ring-rose-400',
     ghost:

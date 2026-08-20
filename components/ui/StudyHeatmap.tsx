@@ -37,7 +37,7 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ days = [] }) => {
           </p>
         </div>
         <div className="text-right font-mono">
-          <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+          <div className="text-xs font-bold text-slate-500 dark:text-slate-400">
             {totalHours.toFixed(1)}h acumuladas
           </div>
           <div className="text-[10px] text-slate-500 dark:text-slate-400">

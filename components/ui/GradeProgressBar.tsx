@@ -27,7 +27,7 @@ export const GradeProgressBar: React.FC<GradeProgressBarProps> = ({
           Nota: <strong className="text-slate-900 dark:text-slate-100">{currentGrade > 0 ? currentGrade.toFixed(2) : '—'}</strong>
         </span>
         <span className="text-slate-500 dark:text-slate-400">
-          Meta: <strong className="text-cyan-600 dark:text-cyan-400">{targetGrade.toFixed(2)}</strong>
+          Meta: <strong className="text-slate-500 dark:text-slate-400">{targetGrade.toFixed(2)}</strong>
         </span>
       </div>
 

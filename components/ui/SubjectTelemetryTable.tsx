@@ -225,7 +225,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                     {uni && (
                       <>
                         <span>•</span>
-                        <span className="text-cyan-600 dark:text-cyan-400 font-medium">{uni.name}</span>
+                        <span className="text-slate-500 dark:text-slate-400 font-medium">{uni.name}</span>
                       </>
                     )}
                   </div>
@@ -262,7 +262,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                 <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                   <span className="font-mono">{sub.credits} Créditos</span>
                   <span>•</span>
-                  <span className="text-purple-600 dark:text-purple-400">
+                  <span className="text-slate-500 dark:text-slate-400">
                     Independiente:{' '}
                     <strong className="font-mono">{(load?.creditLoad.weeklyIndependentHours ?? 0).toFixed(1)} h/sem</strong>
                   </span>
@@ -270,7 +270,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                 <button
                   onClick={() => toggleExpand(sub.id!)}
                   aria-expanded={isExpanded}
-                  className="px-2 flex items-center gap-1 text-cyan-600 dark:text-cyan-400 font-medium hover:underline"
+                  className="px-2 flex items-center gap-1 text-slate-500 dark:text-slate-400 font-medium hover:underline"
                 >
                   <span>{isExpanded ? 'Ocultar' : 'Detalles'}</span>
                   {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -360,7 +360,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                       {sub.credits} crd
                     </div>
                     <div
-                      className="text-xs text-purple-600 dark:text-purple-400 font-medium"
+                      className="text-xs text-slate-500 dark:text-slate-400 font-medium"
                       title="Trabajo independiente que exige el Decreto 1075: créditos × 3 h/sem menos tus horas de clase"
                     >
                       <span className="font-mono">
@@ -407,7 +407,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                         onClick={() => toggleExpand(sub.id!)}
                         aria-expanded={isExpanded}
                         aria-label={`${isExpanded ? 'Ocultar' : 'Ver'} el desglose de horas de ${sub.name}`}
-                        className="p-1 rounded text-cyan-600 dark:text-cyan-400 hover:bg-surface-subtle transition-colors shrink-0"
+                        className="p-1 rounded text-slate-500 dark:text-slate-400 hover:bg-surface-subtle transition-colors shrink-0"
                       >
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>

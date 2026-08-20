@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
+import { UpcomingDeliverables } from '@/components/ui/UpcomingDeliverables';
 import { useCalendarState } from '@/lib/hooks/useCalendarState';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -98,7 +99,7 @@ export const CalendarView: React.FC = () => {
     return (
       <div className="space-y-6 animate-pulse pb-4" role="status" aria-label="Cargando calendario">
         <div className="h-14 rounded-lg bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
-        <div className="h-96 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+        <div className="h-96 rounded-xl bg-slate-100 dark:bg-white/[0.03] border border-slate-200 dark:border-slate-800" />
       </div>
     );
   }
@@ -244,19 +245,19 @@ export const CalendarView: React.FC = () => {
   };
 
   const inputClass =
-    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
+    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-slate-400 dark:focus:border-slate-500 transition-colors';
 
   return (
     <div className="space-y-5 animate-fade-in pb-4">
       {/* 1. Control Superior (Top Bar Controls) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
         {/* Left: View Mode Switcher */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 w-fit">
+        <div className="flex items-center gap-1 bg-black/[0.03] dark:bg-white/[0.04] p-1 rounded-lg border border-slate-200 dark:border-slate-800 w-fit">
           <button
             onClick={() => setViewMode('day')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
               viewMode === 'day'
-                ? 'bg-sky-600 text-white shadow-sm'
+                ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -266,7 +267,7 @@ export const CalendarView: React.FC = () => {
             onClick={() => setViewMode('week')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
               viewMode === 'week'
-                ? 'bg-sky-600 text-white shadow-sm'
+                ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -276,7 +277,7 @@ export const CalendarView: React.FC = () => {
             onClick={() => setViewMode('month')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
               viewMode === 'month'
-                ? 'bg-sky-600 text-white shadow-sm'
+                ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -308,6 +309,16 @@ export const CalendarView: React.FC = () => {
         </Button>
       </div>
 
+      {/* Próximas entregas — lo primero: qué hay que entregar antes que qué clase toca */}
+      <UpcomingDeliverables
+        deliverables={deliverables}
+        subjects={subjects}
+        onSelect={(d) => {
+          setDisplayDate(new Date(d.due_date));
+          setViewMode('day');
+        }}
+      />
+
       {/* Conflict Warning Banner */}
       {conflicts.length > 0 && (
         <Card className="p-4 border border-rose-400 dark:border-rose-500/40 bg-rose-50 dark:bg-rose-950/20">
@@ -323,7 +334,7 @@ export const CalendarView: React.FC = () => {
                 </span>
               </div>
               <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                Conflicto entre <span className="text-sky-600 dark:text-sky-300">{conflicts[0].slotA.subjectName}</span> y <span className="text-indigo-600 dark:text-indigo-300">{conflicts[0].slotB.subjectName}</span>
+                Conflicto entre <span className="text-aeroespacial">{conflicts[0].slotA.subjectName}</span> y <span className="text-software">{conflicts[0].slotB.subjectName}</span>
               </h4>
             </div>
           </div>
@@ -332,7 +343,7 @@ export const CalendarView: React.FC = () => {
 
       {/* 2. Vista "Día" (Day View) */}
       {viewMode === 'day' && (
-        <div className="bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 space-y-4">
+        <div className="bg-surface rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 space-y-4">
           {(() => {
             const rawDay = displayDate.getDay();
             const dayNum = rawDay === 0 ? 7 : rawDay;
@@ -503,7 +514,7 @@ export const CalendarView: React.FC = () => {
 
       {/* 3. Vista "Semana" (Week View - Default) */}
       {viewMode === 'week' && (
-        <div className="bg-white dark:bg-slate-950 rounded-xl overflow-x-auto border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="bg-surface rounded-xl overflow-x-auto border border-slate-200 dark:border-slate-800 shadow-sm">
           {(() => {
             const dayOfWeek = displayDate.getDay();
             const isoDay = dayOfWeek === 0 ? 7 : dayOfWeek;
@@ -534,7 +545,7 @@ export const CalendarView: React.FC = () => {
                         <th
                           key={date.toISOString()}
                           className={`p-3 text-center border-r border-slate-200 dark:border-slate-800/80 last:border-r-0 relative ${
-                            isToday ? 'bg-sky-500/15 dark:bg-sky-500/20 font-bold text-sky-600 dark:text-sky-300' : ''
+                            isToday ? 'bg-sky-500/15 dark:bg-sky-500/20 font-bold text-aeroespacial' : ''
                           }`}
                         >
                           <div className="flex flex-col items-center justify-center gap-0.5">
@@ -548,7 +559,7 @@ export const CalendarView: React.FC = () => {
                               </span>
                             )}
                             {isSabado && hasAlternatingSaturdays && (
-                              <span className="px-1.5 py-0.5 text-[9px] font-bold bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 rounded mt-0.5">
+                              <span className="px-1.5 py-0.5 text-[9px] font-bold bg-sky-100 dark:bg-sky-900/60 text-aeroespacial rounded mt-0.5">
                                 {sabadoType === 'sabado_a' ? 'SÁBADO A' : 'SÁBADO B'}
                               </span>
                             )}
@@ -672,7 +683,7 @@ export const CalendarView: React.FC = () => {
                                     >
                                       <div className="font-bold text-[11px] flex items-center justify-between">
                                         <span className="truncate">{sub?.name || 'Clase'}</span>
-                                        <Info className="w-3 h-3 opacity-0 group-hover:opacity-100 text-sky-400 transition-opacity shrink-0" />
+                                        <Info className="w-3 h-3 opacity-0 group-hover:opacity-100 text-slate-400 transition-opacity shrink-0" />
                                       </div>
                                       <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
                                         {isPresencial ? <MapPin className="w-2.5 h-2.5 shrink-0" /> : <Clock className="w-2.5 h-2.5 shrink-0" />}
@@ -697,7 +708,7 @@ export const CalendarView: React.FC = () => {
 
       {/* 4. Vista "Mes" (Month View) */}
       {viewMode === 'month' && (
-        <div className="bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
           {(() => {
             const year = displayDate.getFullYear();
             const month = displayDate.getMonth();
@@ -768,7 +779,7 @@ export const CalendarView: React.FC = () => {
                         }}
                         className={`min-h-[110px] p-1.5 transition-colors cursor-pointer relative group flex flex-col justify-start ${
                           isCurrentMonth
-                            ? 'bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900/40'
+                            ? 'bg-surface hover:bg-slate-50 dark:hover:bg-slate-900/40'
                             : 'bg-slate-50/50 dark:bg-slate-900/20 text-slate-400 dark:text-slate-600'
                         } ${isToday ? 'bg-sky-500/[0.04] dark:bg-sky-500/[0.08]' : ''}`}
                       >
@@ -776,7 +787,7 @@ export const CalendarView: React.FC = () => {
                           <span
                             className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${
                               isToday
-                                ? 'bg-sky-600 text-white shadow-sm font-extrabold'
+                                ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm font-extrabold'
                                 : isCurrentMonth
                                 ? 'text-slate-800 dark:text-slate-200'
                                 : 'text-slate-400 dark:text-slate-600'
@@ -891,7 +902,7 @@ export const CalendarView: React.FC = () => {
           }}
           className="z-50 pointer-events-none bg-slate-900 text-white text-xs p-2.5 rounded-lg shadow-xl border border-slate-700 max-w-xs space-y-1 animate-fade-in"
         >
-          <div className="font-bold text-sky-300 font-heading">{hoveredSlot.slot.subjectName}</div>
+          <div className="font-bold text-slate-100 font-heading">{hoveredSlot.slot.subjectName}</div>
           <div className="text-[11px] text-slate-300 flex items-center gap-1 font-mono">
             <Clock className="w-3 h-3 text-slate-400 shrink-0" />
             {hoveredSlot.slot.start_time} - {hoveredSlot.slot.end_time}

@@ -37,7 +37,7 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({ da
             Sin notas registradas aún
           </p>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
-            Ingresa a <span className="font-mono text-cyan-600 dark:text-cyan-400">Configuración</span> para registrar tus asignaturas y calificaciones.
+            Ingresa a <span className="font-mono text-slate-500 dark:text-slate-400">Configuración</span> para registrar tus asignaturas y calificaciones.
           </p>
         </div>
       </div>
@@ -56,10 +56,10 @@ export const SemesterProgressChart: React.FC<SemesterProgressChartProps> = ({ da
           </p>
         </div>
         <div className="flex items-center gap-3 text-[11px]">
-          <span className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400">
+          <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
             <span className="w-2.5 h-2.5 rounded-sm bg-cyan-500"></span> Nota
           </span>
-          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+          <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
             <span className="w-2.5 h-0.5 bg-emerald-400"></span> Meta
           </span>
         </div>

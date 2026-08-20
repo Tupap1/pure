@@ -40,13 +40,13 @@ export const DailyLoadStackedBar: React.FC<DailyLoadStackedBarProps> = ({ data }
 
         {/* Legend */}
         <div className="flex items-center gap-3 text-[10px] font-sans flex-wrap">
-          <span className="flex items-center gap-1 text-sky-600 dark:text-sky-400">
+          <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
             <span className="w-2.5 h-2.5 rounded-sm bg-sky-500" /> Clases
           </span>
-          <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
+          <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
             <span className="w-2.5 h-2.5 rounded-sm bg-purple-500" /> Independiente
           </span>
-          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+          <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
             <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Libre
           </span>
           <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400">
@@ -73,12 +73,12 @@ export const DailyLoadStackedBar: React.FC<DailyLoadStackedBarProps> = ({ data }
               <div className="flex items-center justify-between text-[11px]">
                 <span className="font-bold text-slate-800 dark:text-slate-200 w-12 font-sans">{item.dayName}</span>
                 <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 text-[10px] font-mono">
-                  {item.classHours > 0 && <span className="text-sky-600 dark:text-sky-400">{item.classHours.toFixed(1)}h clase</span>}
-                  {indepHours > 0 && <span className="text-purple-600 dark:text-purple-400">{indepHours.toFixed(1)}h indep.</span>}
+                  {item.classHours > 0 && <span className="text-slate-500 dark:text-slate-400">{item.classHours.toFixed(1)}h clase</span>}
+                  {indepHours > 0 && <span className="text-slate-500 dark:text-slate-400">{indepHours.toFixed(1)}h indep.</span>}
                   {isOverloaded ? (
                     <span className="font-bold text-rose-600 dark:text-rose-400">{item.freeHours.toFixed(1)}h exceso</span>
                   ) : (
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{item.freeHours.toFixed(1)}h libre</span>
+                    <span className="font-bold text-slate-500 dark:text-slate-400">{item.freeHours.toFixed(1)}h libre</span>
                   )}
                 </div>
               </div>

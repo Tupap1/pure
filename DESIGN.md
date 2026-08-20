@@ -56,10 +56,12 @@ Tonos desaturados de Notion. Se usan con moderación: puntos, bordes tenues, tex
 
 ## Typography Scale
 
-- **Display Headers (`h1`, `h2`):** `font-heading` (`Space Grotesk`), `font-bold` a `font-extrabold`, `tracking-tight` (-0.03em).
-- **Section Headers (`h3`, `h4`):** `font-heading` (`Space Grotesk`), `font-bold`.
-- **Body & Controls (`p`, `button`, `input`):** `font-sans` (`Inter`), `leading-normal`.
-- **Metrics & Telemetry (`span.font-mono`, `code`):** `font-mono` (`JetBrains Mono`), números y códigos exactos.
+Familia única **IBM Plex Sans** para toda la interfaz (cuerpo y títulos); la jerarquía se logra con peso y tamaño, no con una segunda fuente decorativa —enfoque Notion—. **IBM Plex Mono** para cifras. Se evita el trío sobreusado por defaults de IA (Inter / Space Grotesk / Geist).
+
+- **Display Headers (`h1`, `h2`):** `font-heading` (`IBM Plex Sans`), `font-bold`, `tracking-tight` sutil (-0.011em).
+- **Section Headers (`h3`, `h4`):** `font-heading` (`IBM Plex Sans`), `font-semibold`.
+- **Body & Controls (`p`, `button`, `input`):** `font-sans` (`IBM Plex Sans`), `leading-normal`.
+- **Metrics & Telemetry (`span.font-mono`, `code`):** `font-mono` (`IBM Plex Mono`), números y códigos exactos.
 
 ---
 

@@ -34,7 +34,7 @@ export const MobileScheduleTimeline: React.FC = () => {
         <div className="h-10 rounded-xl bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
         <div className="space-y-2.5">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-20 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+            <div key={i} className="h-20 rounded-xl bg-slate-100 dark:bg-white/[0.03] border border-slate-200 dark:border-slate-800" />
           ))}
         </div>
       </div>
@@ -93,7 +93,7 @@ export const MobileScheduleTimeline: React.FC = () => {
           onClick={() => setActiveTab('timeline')}
           className={`flex-1 min-h-[44px] font-bold rounded-lg transition-all ${
             activeTab === 'timeline'
-              ? 'bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm'
+              ? 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 shadow-sm'
               : 'text-slate-500 dark:text-slate-400'
           }`}
         >
@@ -105,7 +105,7 @@ export const MobileScheduleTimeline: React.FC = () => {
           onClick={() => setActiveTab('attendance')}
           className={`flex-1 min-h-[44px] font-bold rounded-lg transition-all ${
             activeTab === 'attendance'
-              ? 'bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 shadow-sm'
+              ? 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 shadow-sm'
               : 'text-slate-500 dark:text-slate-400'
           }`}
         >
@@ -168,7 +168,7 @@ export const MobileScheduleTimeline: React.FC = () => {
                     {/* Center: Course Code & Name & Room Badge */}
                     <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-mono font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">
+                        <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           {sub?.code || 'ASIGNATURA'}
                         </span>
                         {isAttenuated && (
@@ -191,7 +191,7 @@ export const MobileScheduleTimeline: React.FC = () => {
 
                     {/* Right: Absences Counter */}
                     <div className="text-right shrink-0 space-y-0.5 pl-2">
-                      <div className="text-base font-mono font-bold text-cyan-700 dark:text-cyan-400 leading-none">
+                      <div className="text-base font-mono font-bold text-aeroespacial leading-none">
                         {String(absences.length).padStart(2, '0')}
                       </div>
                       <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Fallas</div>
@@ -200,7 +200,7 @@ export const MobileScheduleTimeline: React.FC = () => {
                           setSelectedSubjectId(sched.subject_id);
                           setActiveTab('attendance');
                         }}
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-end -mr-2 -mb-2 text-[10px] text-purple-700 dark:text-purple-400 font-bold hover:underline"
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-end -mr-2 -mb-2 text-[10px] text-software font-bold hover:underline"
                       >
                         Detalles
                       </button>
@@ -255,8 +255,8 @@ export const MobileScheduleTimeline: React.FC = () => {
                     </div>
                   </Card>
                   <Card className="p-3 text-center space-y-0.5 bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40">
-                    <div className="text-xs text-emerald-700 dark:text-emerald-400">Restantes</div>
-                    <div className="text-lg font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                    <div className="text-xs text-synergy">Restantes</div>
+                    <div className="text-lg font-mono font-bold text-synergy">
                       {String(remainingAbsences).padStart(2, '0')}
                     </div>
                   </Card>

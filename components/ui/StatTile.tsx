@@ -22,7 +22,7 @@ export const StatTile: React.FC<StatTileProps> = ({
 }) => {
   const variantStyles = {
     default: 'text-slate-900 dark:text-slate-100',
-    highlight: 'text-cyan-600 dark:text-cyan-400',
+    highlight: 'text-slate-500 dark:text-slate-400',
     warning: 'text-amber-600 dark:text-amber-400',
     danger: 'text-rose-600 dark:text-rose-400',
   };

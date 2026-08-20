@@ -44,7 +44,7 @@ export const DeliverablesDashboard: React.FC = () => {
         <div className="h-14 rounded-lg bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-32 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+            <div key={i} className="h-32 rounded-xl bg-slate-100 dark:bg-white/[0.03] border border-slate-200 dark:border-slate-800" />
           ))}
         </div>
       </div>
@@ -149,7 +149,7 @@ export const DeliverablesDashboard: React.FC = () => {
   };
 
   const inputClass =
-    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
+    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-slate-400 dark:focus:border-slate-500 transition-colors';
 
   // Helper: Check if deliverable is overdue
   const isOverdue = (dueDate: string, status: string): boolean => {
@@ -233,7 +233,7 @@ export const DeliverablesDashboard: React.FC = () => {
                     </p>
                   )}
                   {deliv.grade !== undefined && deliv.grade !== null && (
-                    <p className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                    <p className="text-xs font-mono text-slate-500 dark:text-slate-400 font-bold mt-1">
                       Nota Obtenida: {deliv.grade.toFixed(2)}
                     </p>
                   )}
@@ -277,7 +277,7 @@ export const DeliverablesDashboard: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
           <h2 className="text-xl font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <CheckSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <CheckSquare className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0" />
             Entregas, evaluaciones y exámenes
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -307,12 +307,12 @@ export const DeliverablesDashboard: React.FC = () => {
                 </h4>
                 <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                   Materia: <strong className="text-slate-900 dark:text-slate-100">{activeSubject.name}</strong> • Nota Meta:{' '}
-                  <strong className="text-sky-600 dark:text-sky-300">{activeSubject.target_grade.toFixed(2)}</strong>.
+                  <strong className="text-aeroespacial">{activeSubject.target_grade.toFixed(2)}</strong>.
                   {requiredGrade !== null ? (
                     <span>
                       {' '}
                       Necesitas promediar{' '}
-                      <strong className="text-emerald-600 dark:text-emerald-400 font-mono text-sm font-bold">
+                      <strong className="text-slate-500 dark:text-slate-400 font-mono text-sm font-bold">
                         {requiredGrade.toFixed(2)}
                       </strong>{' '}
                       en los porcentajes restantes.
@@ -369,7 +369,7 @@ export const DeliverablesDashboard: React.FC = () => {
               onClick={() => setFilterGroup('individual')}
               className={`shrink-0 px-3 min-h-[44px] rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 filterGroup === 'individual'
-                  ? 'bg-sky-100 dark:bg-sky-950/80 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-800'
+                  ? 'bg-sky-100 dark:bg-sky-950/80 text-aeroespacial border border-sky-300 dark:border-sky-800'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
@@ -381,7 +381,7 @@ export const DeliverablesDashboard: React.FC = () => {
               onClick={() => setFilterGroup('group')}
               className={`shrink-0 px-3 min-h-[44px] rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 filterGroup === 'group'
-                  ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800'
+                  ? 'bg-indigo-100 dark:bg-indigo-950/80 text-software border border-indigo-300 dark:border-indigo-800'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >

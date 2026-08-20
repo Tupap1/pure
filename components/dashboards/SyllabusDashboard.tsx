@@ -48,7 +48,7 @@ export const SyllabusDashboard: React.FC = () => {
         <div className="h-10 w-2/3 rounded-lg bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
         <div className="space-y-2">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-16 rounded-lg bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+            <div key={i} className="h-16 rounded-lg bg-slate-100 dark:bg-white/[0.03] border border-slate-200 dark:border-slate-800" />
           ))}
         </div>
       </div>
@@ -131,7 +131,7 @@ export const SyllabusDashboard: React.FC = () => {
   };
 
   const inputClass =
-    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
+    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-slate-400 dark:focus:border-slate-500 transition-colors';
 
   // Organize topics into units and orphans
   const units = activeTopics.filter((t) => !t.parent_id).sort((a, b) => a.order_index - b.order_index);
@@ -186,7 +186,7 @@ export const SyllabusDashboard: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
           <h2 className="text-xl font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <GitMerge className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <GitMerge className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0" />
             Ejes temáticos y sinergias
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -224,7 +224,7 @@ export const SyllabusDashboard: React.FC = () => {
                   <div>
                     <div className="flex items-center gap-2">
                       <Badge variant="synergy">Sinergia Temática Detectada</Badge>
-                      <span className="text-xs font-mono text-emerald-700 dark:text-emerald-400 font-bold">
+                      <span className="text-xs font-mono text-synergy font-bold">
                         Similitud: {Math.round(synergies[0].similarityScore * 100)}%
                       </span>
                     </div>
@@ -284,7 +284,7 @@ export const SyllabusDashboard: React.FC = () => {
                   Syllabus: {activeSubject?.name}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {activeTopics.length} temas registrados • Progreso global: <strong className="text-emerald-600 dark:text-emerald-400">{overallProgress}%</strong>
+                  {activeTopics.length} temas registrados • Progreso global: <strong className="text-slate-500 dark:text-slate-400">{overallProgress}%</strong>
                 </p>
               </div>
               <div className="w-full sm:w-32 shrink-0 bg-slate-200 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 h-2 rounded-full overflow-hidden">
@@ -365,7 +365,7 @@ export const SyllabusDashboard: React.FC = () => {
                                   className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-slate-50/40 dark:bg-slate-900/30 border border-slate-200/25 dark:border-slate-800/20 text-xs"
                                 >
                                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <BookOpen className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                                    <BookOpen className="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0" />
                                     <span className="font-medium text-slate-800 dark:text-slate-200 leading-snug">
                                       {topic.title}
                                     </span>
@@ -548,7 +548,7 @@ export const SyllabusDashboard: React.FC = () => {
             placeholder="Unidad 1: Integración Vectorial&#10;- Tema 1.1: Campos Escalares&#10;- Tema 1.2: Teorema de Gauss"
           ></textarea>
           {ingestLineCount > 0 && (
-            <p className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+            <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 font-bold">
               {ingestLineCount} {ingestLineCount === 1 ? 'tema detectado' : 'temas detectados'}
             </p>
           )}

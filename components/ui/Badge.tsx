@@ -26,33 +26,26 @@ export const Badge: React.FC<BadgeProps> = ({
   children,
   className = '',
 }) => {
+  // Chip neutro con hairline; el color de carrera/estado vive solo en el texto,
+  // en los tonos muted definidos por los tokens (nada de neón).
+  const chip = 'bg-black/[0.03] dark:bg-white/[0.05] border-black/[0.06] dark:border-white/[0.08]';
   const variantClasses = {
-    aeroespacial:
-      'bg-cyan-500/5 text-cyan-600 dark:text-cyan-400 border-cyan-500/20 dark:bg-cyan-950/20',
-    software:
-      'bg-purple-500/5 text-purple-600 dark:text-purple-400 border-purple-500/20 dark:bg-purple-950/20',
-    synergy:
-      'bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 dark:bg-emerald-950/20',
-    warning:
-      'bg-amber-500/5 text-amber-600 dark:text-amber-400 border-amber-500/20 dark:bg-amber-950/20',
-    danger:
-      'bg-rose-500/5 text-rose-600 dark:text-rose-400 border-rose-500/20 dark:bg-rose-950/20',
-    no_iniciado:
-      'bg-slate-100/60 dark:bg-slate-900/40 text-slate-600 dark:text-slate-400 border-slate-200/40 dark:border-slate-800/30',
-    en_estudio:
-      'bg-amber-500/5 text-amber-600 dark:text-amber-400 border-amber-500/20',
-    repasado:
-      'bg-cyan-500/5 text-cyan-600 dark:text-cyan-400 border-cyan-500/20',
-    dominado:
-      'bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-    outline:
-      'bg-slate-100/60 dark:bg-slate-900/40 text-slate-600 dark:text-slate-400 border-slate-200/40 dark:border-slate-800/30',
+    aeroespacial: `${chip} text-aeroespacial`,
+    software: `${chip} text-software`,
+    synergy: `${chip} text-synergy`,
+    warning: `${chip} text-amber-700 dark:text-amber-500`,
+    danger: `${chip} text-red-700 dark:text-red-400`,
+    no_iniciado: `${chip} text-slate-500 dark:text-slate-400`,
+    en_estudio: `${chip} text-amber-700 dark:text-amber-500`,
+    repasado: `${chip} text-aeroespacial`,
+    dominado: `${chip} text-synergy`,
+    outline: `${chip} text-slate-500 dark:text-slate-400`,
   };
 
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors',
+        'inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border transition-colors',
         variantClasses[variant],
         className
       )}

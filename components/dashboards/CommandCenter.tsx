@@ -45,10 +45,10 @@ export const CommandCenter: React.FC = () => {
         <div className="h-24 rounded-xl bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-20 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+            <div key={i} className="h-20 rounded-xl bg-slate-100 dark:bg-white/[0.03] border border-slate-200 dark:border-slate-800" />
           ))}
         </div>
-        <div className="h-64 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+        <div className="h-64 rounded-xl bg-slate-100 dark:bg-white/[0.03] border border-slate-200 dark:border-slate-800" />
       </div>
     );
   }
@@ -107,7 +107,7 @@ export const CommandCenter: React.FC = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Card className="p-3.5 space-y-1">
               <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-medium tracking-wide">Acompañamiento directo</div>
-              <div className="text-lg font-mono font-bold text-cyan-600 dark:text-cyan-400">
+              <div className="text-lg font-mono font-bold text-slate-500 dark:text-slate-400">
                 {classHours.toFixed(1)}<span className="text-xs font-normal text-slate-400"> h/sem</span>
               </div>
               <div className="text-[10px] text-slate-500 dark:text-slate-400">Horas de clase de tu horario</div>
@@ -115,7 +115,7 @@ export const CommandCenter: React.FC = () => {
 
             <Card className="p-3.5 space-y-1">
               <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-medium tracking-wide">Trabajo independiente</div>
-              <div className="text-lg font-mono font-bold text-purple-600 dark:text-purple-400">
+              <div className="text-lg font-mono font-bold text-slate-500 dark:text-slate-400">
                 {normativeIndependentHours.toFixed(1)}<span className="text-xs font-normal text-slate-400"> h/sem</span>
               </div>
               <div className="text-[10px] text-slate-500 dark:text-slate-400">Lo que exige el Decreto 1075, menos tu clase</div>
@@ -138,14 +138,14 @@ export const CommandCenter: React.FC = () => {
             >
               <div
                 className={`text-[10px] uppercase font-medium tracking-wide ${
-                  isOverloaded ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
+                  isOverloaded ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'
                 }`}
               >
                 {isOverloaded ? 'Sobrecarga semanal' : 'Tiempo libre neto'}
               </div>
               <div
                 className={`text-lg font-mono font-bold ${
-                  isOverloaded ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
+                  isOverloaded ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'
                 }`}
               >
                 {netFreeTime.toFixed(1)}<span className="text-xs font-normal text-slate-400"> h/sem</span>
@@ -166,14 +166,14 @@ export const CommandCenter: React.FC = () => {
               <Card className="space-y-4 p-5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-heading font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
-                    <CalendarDays className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                    <CalendarDays className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                     Entregas & Parciales Próximos ({urgentDeliverables.length})
                   </h3>
                 </div>
 
                 {urgentDeliverables.length === 0 ? (
                   <div className="p-6 text-center border border-dashed border-slate-200 dark:border-slate-800/80 rounded-lg text-xs text-slate-500 dark:text-slate-400 space-y-1">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mx-auto mb-1" />
+                    <CheckCircle2 className="w-5 h-5 text-slate-500 dark:text-slate-400 mx-auto mb-1" />
                     <p className="font-semibold text-slate-800 dark:text-slate-200">Sin evaluaciones pendientes</p>
                   </div>
                 ) : (
@@ -202,7 +202,7 @@ export const CommandCenter: React.FC = () => {
                             </div>
                             <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{deliv.title}</h4>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                              Límite: <span className="text-slate-800 dark:text-slate-200 font-medium">{formattedDate}</span> • Peso Evaluativo: <span className="text-sky-600 dark:text-sky-400 font-semibold">{deliv.weight_percentage}%</span>
+                              Límite: <span className="text-slate-800 dark:text-slate-200 font-medium">{formattedDate}</span> • Peso Evaluativo: <span className="text-slate-500 dark:text-slate-400 font-semibold">{deliv.weight_percentage}%</span>
                             </p>
                           </div>
                           <Button
@@ -224,7 +224,7 @@ export const CommandCenter: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight font-heading">
-                    <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <TrendingUp className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                     Telemetría Académica & Estado de Asignaturas
                   </h3>
                 </div>
@@ -238,7 +238,7 @@ export const CommandCenter: React.FC = () => {
               <Card className="p-5 space-y-5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-heading font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
-                    <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <Clock className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                     Balance de Tiempo Semanal (168h)
                   </h3>
                 </div>
@@ -250,7 +250,7 @@ export const CommandCenter: React.FC = () => {
                       <div className="text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-medium">
                         Tiempo Libre Neto
                       </div>
-                      <div className="text-3xl font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      <div className="text-3xl font-mono font-bold text-slate-500 dark:text-slate-400">
                         {netFreeTime.toFixed(1)}h
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400">
@@ -284,7 +284,7 @@ export const CommandCenter: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
-                      <span className={`font-bold ${isOverloaded ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      <span className={`font-bold ${isOverloaded ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
                         {isOverloaded ? 'Sobrecarga' : 'Libre'}: {netFreeTime.toFixed(1)}h
                       </span>
                     </div>
@@ -309,7 +309,7 @@ export const CommandCenter: React.FC = () => {
             <Card className="p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                 <h3 className="text-sm font-heading font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
-                  <BarChart3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <BarChart3 className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                   Evolución de Promedio Académico
                 </h3>
               </div>

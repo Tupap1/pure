@@ -92,7 +92,7 @@ export const ConfigDashboard: React.FC = () => {
         <div className="h-16 rounded-lg bg-slate-200 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[0, 1].map((i) => (
-            <div key={i} className="h-28 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800" />
+            <div key={i} className="h-28 rounded-xl bg-slate-100 dark:bg-white/[0.03] border border-slate-200 dark:border-slate-800" />
           ))}
         </div>
       </div>
@@ -347,7 +347,7 @@ export const ConfigDashboard: React.FC = () => {
   };
 
   const inputClass =
-    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
+    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-slate-400 dark:focus:border-slate-500 transition-colors';
 
   return (
     <div className="space-y-8 animate-fade-in pb-16">
@@ -355,7 +355,7 @@ export const ConfigDashboard: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
         <div>
           <h2 className="text-xl font-heading font-bold tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0" />
+            <Building2 className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0" />
             Configuración y directorio base
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -371,7 +371,7 @@ export const ConfigDashboard: React.FC = () => {
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h3 className="text-base font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <GraduationCap className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0" />
+            <GraduationCap className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0" />
             Universidades ({universities.length})
           </h3>
           <Button variant="aeroespacial" size="sm" className="w-full sm:w-auto" onClick={openAddUni}>
@@ -440,7 +440,7 @@ export const ConfigDashboard: React.FC = () => {
                   </div>
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 text-[10px]">Aprobatorio</div>
-                    <div className="text-emerald-600 dark:text-emerald-400 font-bold">{uni.passing_grade.toFixed(1)}</div>
+                    <div className="text-slate-500 dark:text-slate-400 font-bold">{uni.passing_grade.toFixed(1)}</div>
                   </div>
                 </div>
               </Card>
@@ -453,7 +453,7 @@ export const ConfigDashboard: React.FC = () => {
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h3 className="text-base font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <UserCheck className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0" />
             Directorio de Profesores ({professors.length})
           </h3>
           <Button
@@ -484,7 +484,7 @@ export const ConfigDashboard: React.FC = () => {
               return (
                 <Card key={prof.id} className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
+                    <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center font-bold text-xs">
                       {prof.name.substring(0, 2).toUpperCase()}
                     </div>
                     <div>
@@ -492,7 +492,7 @@ export const ConfigDashboard: React.FC = () => {
                       <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
                         <Mail className="w-3 h-3 text-slate-400" /> {prof.email || 'Sin correo registrado'}
                       </p>
-                      <span className="text-[11px] text-sky-600 dark:text-sky-400 mt-0.5 block">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block">
                         {uni?.name || 'Universidad'}
                       </span>
                     </div>
@@ -526,7 +526,7 @@ export const ConfigDashboard: React.FC = () => {
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h3 className="text-base font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <BookOpen className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0" />
             Asignaturas / Materias ({subjects.length})
           </h3>
           <Button
@@ -569,7 +569,7 @@ export const ConfigDashboard: React.FC = () => {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-sky-600 dark:text-sky-400 font-bold">{sub.code}</span>
+                        <span className="text-xs font-mono text-slate-500 dark:text-slate-400 font-bold">{sub.code}</span>
                         <Badge variant={sub.modality === 'presencial' ? 'aeroespacial' : 'software'}>
                           {sub.modality}
                         </Badge>
@@ -648,7 +648,7 @@ export const ConfigDashboard: React.FC = () => {
                 <Card key={sched.id} className="p-3.5 flex items-center justify-between">
                   <div>
                     <div className="text-xs font-bold text-slate-900 dark:text-slate-200">{sub?.name || 'Materia'}</div>
-                    <div className="text-[11px] text-sky-600 dark:text-sky-400 font-mono mt-0.5">
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
                       {days[sched.day_of_week]} • {sched.start_time} - {sched.end_time}
                     </div>
                     <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{sched.classroom}</div>

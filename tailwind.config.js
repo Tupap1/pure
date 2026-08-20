@@ -9,10 +9,10 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-sans)', 'Inter', 'sans-serif'],
-        heading: ['var(--font-heading)', 'Space Grotesk', 'sans-serif'],
-        display: ['Space Grotesk', 'sans-serif'],
-        mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        heading: ['var(--font-heading)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-heading)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
       colors: {
         background: 'var(--bg-main)',
