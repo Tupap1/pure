@@ -834,7 +834,7 @@ export const CalendarView: React.FC = () => {
                           {(() => {
                             const cellDeliverables = getDeliverablesForDate(deliverables, cellDate);
                             return cellDeliverables.map((d) => {
-                              const subject = getSubject(d.subject_id);
+                              const _subject = getSubject(d.subject_id);
                               const isOverdue = isDeliverableOverdue(d);
 
                               let bgClass = '';

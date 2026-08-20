@@ -22,12 +22,6 @@ function timeToMinutes(timeStr: string): number {
   return hours * 60 + minutes;
 }
 
-function minutesToTime(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-}
-
 function extractQuestions(sentences?: FirefliesSentence[]): string[] {
   if (!sentences) return [];
   return sentences
