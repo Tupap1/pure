@@ -10,38 +10,38 @@
   --font-mono: 'JetBrains Mono', monospace;
 }
 
-/* Light Theme Variables — High contrast titanium engineering palette */
+/* Light Theme — warm neutral, editorial (Notion-inspired) */
 html.light {
-  --bg-main: #f1f4f9;
-  --bg-sidebar: #ffffff;
+  --bg-main: #ffffff;
+  --bg-sidebar: #f7f7f5;
   --bg-header: #ffffff;
   --bg-card: #ffffff;
-  --bg-surface-subtle: #e8eef7;
-  --border-color: #cbd5e1;
-  --border-hover: #94a3b8;
-  --text-primary: #090e17;
-  --text-secondary: #334155;
-  --text-muted: #64748b;
-  --accent-aero: #0284c7;
-  --accent-software: #9333ea;
-  --accent-synergy: #059669;
+  --bg-surface-subtle: #f1f1ef;
+  --border-color: rgba(0, 0, 0, 0.09);
+  --border-hover: rgba(0, 0, 0, 0.16);
+  --text-primary: #37352f;
+  --text-secondary: #6f6e69;
+  --text-muted: #9b9a97;
+  --accent-aero: #337ea9;
+  --accent-software: #9065b0;
+  --accent-synergy: #448361;
 }
 
-/* Dark Theme Variables — Titanium Cybernetic OS (#05080e Deep Space Titanium) */
+/* Dark Theme — warm charcoal, low-chroma (Notion-inspired) */
 html.dark, :root {
-  --bg-main: #05080e;
-  --bg-sidebar: #090d18;
-  --bg-header: #090d18;
-  --bg-card: #0d1322;
-  --bg-surface-subtle: #141b2d;
-  --border-color: #1e293b;
-  --border-hover: #334155;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --accent-aero: #00f0ff;
-  --accent-software: #c084fc;
-  --accent-synergy: #00ff9d;
+  --bg-main: #191919;
+  --bg-sidebar: #202020;
+  --bg-header: #191919;
+  --bg-card: #202020;
+  --bg-surface-subtle: #252525;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --text-primary: #e9e9e7;
+  --text-secondary: #9b9b9b;
+  --text-muted: #6f6f6f;
+  --accent-aero: #529cca;
+  --accent-software: #9a6dd7;
+  --accent-synergy: #529e72;
 }
 
 body {
@@ -64,25 +64,25 @@ code, pre, .font-mono {
   letter-spacing: -0.01em;
 }
 
-/* Retícula de puntos. Se aplica una sola vez, en el shell de la aplicación. */
+/* Superficie plana, sin retícula decorativa (estética Notion). */
 .cyber-grid-bg {
-  background-image: radial-gradient(rgba(0, 240, 255, 0.06) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-image: none;
 }
 
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 240, 255, 0.2);
-  border-radius: 2px;
+  background: var(--border-hover);
+  border-radius: 5px;
+  border: 2px solid var(--bg-main);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 240, 255, 0.5);
+  background: var(--text-muted);
 }
 
 /* Respeta la preferencia del sistema de movimiento reducido. */

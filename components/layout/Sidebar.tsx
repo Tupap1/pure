@@ -18,7 +18,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
     <aside className="hidden md:flex w-60 bg-white dark:bg-obsidian-900 border-r border-surface-border flex-col justify-between h-screen sticky top-0 z-30 transition-colors">
       {/* Brand / Logo */}
       <div className="p-4 border-b border-surface-border flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/40 flex items-center justify-center font-bold text-sm shadow-sm">
+        <div className="w-8 h-8 rounded-lg bg-surface-subtle text-slate-700 dark:text-slate-200 border border-surface-border flex items-center justify-center font-bold text-sm">
           P
         </div>
         <h1 className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight font-heading leading-none">
@@ -38,16 +38,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
               aria-selected={isActive}
               onClick={() => onSelectTab(item.id)}
               className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors duration-150 relative cursor-pointer border',
+                'w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors duration-150 cursor-pointer',
                 isActive
-                  ? 'bg-cyan-500/10 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border-cyan-500/30 font-semibold'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/40 border-transparent'
+                  ? 'bg-surface-subtle text-slate-900 dark:text-slate-100 font-medium'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
               )}
             >
-              {isActive && (
-                <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-cyan-500 dark:bg-cyan-400" />
-              )}
-              <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-cyan-700 dark:text-cyan-300' : 'text-slate-500')} />
+              <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500')} />
               <span className="text-xs font-semibold leading-snug truncate">{item.label}</span>
             </button>
           );

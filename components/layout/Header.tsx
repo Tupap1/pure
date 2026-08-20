@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
           className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg border ${
             isOverloaded
               ? 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-900/70'
-              : 'bg-slate-100 dark:bg-slate-900/80 border-slate-200 dark:border-slate-800'
+              : 'bg-surface-subtle border-surface-border'
           }`}
           title={
             isOverloaded
@@ -42,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
           {isOverloaded ? (
             <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-600 dark:text-red-400 shrink-0" />
           ) : (
-            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400 shrink-0" />
           )}
           <div>
             <div className="text-[9px] sm:text-[10px] uppercase text-slate-500 dark:text-slate-400 font-medium leading-none tracking-wide">
@@ -60,10 +60,10 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
 
         {/* Trabajo independiente exigido por la norma de créditos */}
         <div
-          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800"
+          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-subtle border border-surface-border"
           title="Trabajo independiente semanal según el Decreto 1075 de 2015: 48h por crédito por semestre, menos tus horas de clase"
         >
-          <Cpu className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+          <Cpu className="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0" />
           <div>
             <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-medium leading-none tracking-wide">
               Independiente
@@ -79,9 +79,9 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
           onClick={toggleTheme}
           aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
           title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 border border-slate-200 dark:border-slate-700/80 transition-colors"
+          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-surface-subtle text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 border border-surface-border transition-colors"
         >
-          {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
       </div>
     </header>

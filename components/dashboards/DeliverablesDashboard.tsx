@@ -300,9 +300,7 @@ export const DeliverablesDashboard: React.FC = () => {
         <Card className="p-4 border border-sky-300 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-950/20">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-lg bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 shrink-0">
-                <Calculator className="w-5 h-5" />
-              </div>
+              <Calculator className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0 mt-0.5" />
               <div>
                 <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                   Calculadora de Nota Mínima Requerida

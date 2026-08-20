@@ -220,9 +220,7 @@ export const SyllabusDashboard: React.FC = () => {
             <Card className="p-5 border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/20">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-start gap-3">
-                  <div className="p-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 shrink-0">
-                    <Zap className="w-5 h-5" />
-                  </div>
+                  <Zap className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0 mt-0.5" />
                   <div>
                     <div className="flex items-center gap-2">
                       <Badge variant="synergy">Sinergia Temática Detectada</Badge>

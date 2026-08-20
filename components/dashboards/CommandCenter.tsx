@@ -90,11 +90,9 @@ export const CommandCenter: React.FC = () => {
     <div className="space-y-6 animate-fade-in">
       {subjects.length === 0 ? (
         /* Empty State */
-        <Card className="p-8 border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 space-y-6">
+        <Card hoverEffect={false} className="p-10 bg-transparent border-none space-y-6">
           <div className="max-w-xl mx-auto text-center space-y-3">
-            <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto shadow-sm">
-              <GraduationCap className="w-6 h-6" />
-            </div>
+            <GraduationCap className="w-8 h-8 text-slate-400 dark:text-slate-600 mx-auto" strokeWidth={1.5} />
             <h3 className="text-lg font-heading font-bold text-slate-900 dark:text-slate-100 tracking-tight">
               Sin materias registradas
             </h3>

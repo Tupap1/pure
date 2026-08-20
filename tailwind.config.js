@@ -24,23 +24,23 @@ module.exports = {
         },
         aeroespacial: {
           DEFAULT: 'var(--accent-aero)',
-          glow: 'rgba(56, 189, 248, 0.25)',
+          glow: 'rgba(82, 156, 202, 0.12)',
         },
         software: {
           DEFAULT: 'var(--accent-software)',
-          glow: 'rgba(192, 132, 252, 0.25)',
+          glow: 'rgba(154, 109, 215, 0.12)',
         },
         synergy: {
           DEFAULT: 'var(--accent-synergy)',
-          glow: 'rgba(52, 211, 153, 0.25)',
+          glow: 'rgba(82, 158, 114, 0.12)',
         },
         obsidian: {
-          950: '#07090e',
-          900: '#0d121d',
-          850: '#111726',
-          800: '#172033',
-          700: '#1e293d',
-          600: '#33415e',
+          950: '#161616',
+          900: '#191919',
+          850: '#1d1d1d',
+          800: '#202020',
+          700: '#252525',
+          600: '#2f2f2f',
         },
       },
       borderRadius: {
@@ -53,13 +53,13 @@ module.exports = {
         xs: '2px',
       },
       animation: {
-        'pulse-glow': 'pulseGlow 2s infinite ease-in-out',
+        'pulse-glow': 'pulseGlow 2.4s infinite ease-in-out',
         'fade-in': 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
       },
       keyframes: {
         pulseGlow: {
-          '0%, 100%': { boxShadow: '0 0 15px rgba(52, 211, 153, 0.2)' },
-          '50%': { boxShadow: '0 0 30px rgba(52, 211, 153, 0.5)' },
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.55' },
         },
         fadeIn: {
           from: { opacity: '0', transform: 'translateY(6px)' },
