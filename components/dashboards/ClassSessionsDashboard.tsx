@@ -226,7 +226,7 @@ export const ClassSessionsDashboard: React.FC = () => {
 
                 {/* Summary content */}
                 {session.summary && (
-                  <div className="p-3 pl-4 rounded-lg bg-slate-50/50 dark:bg-slate-900/20 border-l-2 border-l-cyan-400 text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                  <div className="p-3 rounded-lg bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200/40 dark:border-slate-800/30 text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
                     <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                       <FileText className="w-3 h-3 text-cyan-500" /> Resumen
                     </div>
