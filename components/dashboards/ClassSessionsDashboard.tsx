@@ -270,7 +270,7 @@ export const ClassSessionsDashboard: React.FC = () => {
                     {session.topics_covered.map((topic) => (
                       <span
                         key={topic}
-                        className="px-2 py-1 rounded text-slate-500 dark:text-slate-400 border border-purple-200/40 dark:border-purple-800/25 text-[10px] font-medium bg-purple-100/30 dark:bg-purple-950/20"
+                        className="px-2 py-1 rounded text-slate-600 dark:text-slate-300 border border-black/[0.06] dark:border-white/[0.08] text-[10px] font-medium bg-black/[0.03] dark:bg-white/[0.05]"
                       >
                         {topic}
                       </span>

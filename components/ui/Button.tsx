@@ -19,15 +19,15 @@ export const Button: React.FC<ButtonProps> = ({
 
   const variantClasses = {
     primary:
-      'bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-100 border border-slate-700/60 hover:border-slate-600/80 focus:ring-cyan-500 shadow-sm',
+      'bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-100 border border-slate-700/60 hover:border-slate-600/80 focus:ring-slate-400 shadow-sm',
     aeroespacial:
-      'bg-cyan-500/8 hover:bg-cyan-500/15 text-slate-500 dark:text-slate-400 border border-cyan-500/25 dark:border-cyan-500/30 hover:border-cyan-400/60 focus:ring-cyan-400',
+      'bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-aeroespacial border border-black/[0.07] dark:border-white/[0.09] focus:ring-aeroespacial',
     software:
-      'bg-purple-500/8 hover:bg-purple-500/15 text-slate-500 dark:text-slate-400 border border-purple-500/25 dark:border-purple-500/30 hover:border-purple-400/60 focus:ring-purple-400',
+      'bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-software border border-black/[0.07] dark:border-white/[0.09] focus:ring-software',
     synergy:
-      'bg-emerald-500/8 hover:bg-emerald-500/15 text-slate-500 dark:text-slate-400 border border-emerald-500/25 dark:border-emerald-500/30 hover:border-emerald-400/60 focus:ring-emerald-400',
+      'bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-synergy border border-black/[0.07] dark:border-white/[0.09] focus:ring-synergy',
     danger:
-      'bg-rose-500/8 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25 dark:border-rose-500/30 hover:border-rose-400/60 focus:ring-rose-400',
+      'bg-red-500/[0.08] hover:bg-red-500/[0.14] text-red-600 dark:text-red-400 border border-red-500/25 hover:border-red-500/50 focus:ring-red-400',
     ghost:
       'bg-transparent hover:bg-slate-100/40 dark:hover:bg-slate-800/30 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent',
   };
