@@ -125,22 +125,26 @@ function mapTranscript(t: any): FirefliesTranscript {
 }
 
 export async function fetchRecentTranscripts(since?: Date): Promise<FirefliesTranscript[]> {
+  // No se filtra por fecha en la query (el argumento/tipo de fecha varía entre
+  // versiones del esquema y rompería toda la consulta). Se traen las 50 recientes
+  // y el dedup por fireflies_transcript_id evita reimportar. `since` queda como
+  // filtro opcional aplicado en memoria.
   const query = `
-    query GetTranscripts($limit: Int, $fromDate: DateTime) {
-      transcripts(mine: true, limit: $limit, fromDate: $fromDate) {
+    query GetTranscripts($limit: Int) {
+      transcripts(mine: true, limit: $limit) {
         ${TRANSCRIPT_FIELDS}
       }
     }
   `;
 
-  const variables = { limit: 50, fromDate: since ? since.toISOString() : null };
-  const data = await makeGraphQLRequest(query, variables);
+  const data = await makeGraphQLRequest(query, { limit: 50 });
 
   if (!data || !data.transcripts) {
     return [];
   }
 
-  return data.transcripts.map(mapTranscript);
+  const list: FirefliesTranscript[] = data.transcripts.map(mapTranscript);
+  return since ? list.filter((t) => new Date(t.date).getTime() >= since.getTime()) : list;
 }
 
 export async function fetchTranscriptById(id: string): Promise<FirefliesTranscript | null> {
