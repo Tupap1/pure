@@ -56,7 +56,9 @@ async function makeGraphQLRequest(query: string, variables?: any): Promise<any> 
     const data = await response.json();
 
     if (data.errors) {
-      console.error('GraphQL errors:', data.errors);
+      // Log completo: los errores de GraphQL (campo/argumento inexistente) son la causa
+      // más común de que el sync reciba una lista vacía sin fallar el HTTP.
+      console.error('Fireflies GraphQL errors:', JSON.stringify(data.errors));
       return null;
     }
 
@@ -67,89 +69,85 @@ async function makeGraphQLRequest(query: string, variables?: any): Promise<any> 
   }
 }
 
+// Campos y argumentos alineados con el esquema real de la API de Fireflies.
+// `dateString` es el ISO datetime del meeting; `topics_discussed` es el nombre
+// correcto del campo (no `topics`). Se piden solo campos estables para no romper
+// toda la query por un nombre inexistente.
+const TRANSCRIPT_FIELDS = `
+  id
+  title
+  dateString
+  duration
+  transcript_url
+  audio_url
+  video_url
+  summary {
+    overview
+    short_summary
+    keywords
+    action_items
+    topics_discussed
+  }
+  sentences {
+    speaker_name
+    text
+    start_time
+    end_time
+  }
+`;
+
+function mapTranscript(t: any): FirefliesTranscript {
+  const rawActionItems = t.summary?.action_items;
+  const actionItems: string[] = Array.isArray(rawActionItems)
+    ? rawActionItems
+    : typeof rawActionItems === 'string' && rawActionItems.trim()
+      ? rawActionItems.split('\n').map((s: string) => s.trim()).filter(Boolean)
+      : [];
+
+  return {
+    id: t.id,
+    title: t.title,
+    date: t.dateString || t.date,
+    duration: t.duration || 0,
+    video_url: t.video_url,
+    audio_url: t.audio_url,
+    summary: t.summary
+      ? {
+          overview: t.summary.overview || t.summary.short_summary || '',
+          short_summary: t.summary.short_summary || '',
+          keywords: t.summary.keywords || [],
+          action_items: actionItems,
+          topics: t.summary.topics_discussed || [],
+        }
+      : undefined,
+    sentences: t.sentences || [],
+  };
+}
+
 export async function fetchRecentTranscripts(since?: Date): Promise<FirefliesTranscript[]> {
   const query = `
-    query GetTranscripts($startDate: String) {
-      transcripts(start_date: $startDate) {
-        id
-        title
-        date
-        duration
-        video_url
-        audio_url
-        summary {
-          overview
-          short_summary
-          keywords
-          action_items
-          topics
-        }
-        sentences {
-          speaker_name
-          text
-          start_time
-          end_time
-          ai_filters {
-            task
-            question
-          }
-        }
+    query GetTranscripts($limit: Int, $fromDate: DateTime) {
+      transcripts(mine: true, limit: $limit, fromDate: $fromDate) {
+        ${TRANSCRIPT_FIELDS}
       }
     }
   `;
 
-  const variables = since ? { startDate: since.toISOString() } : {};
+  const variables = { limit: 50, fromDate: since ? since.toISOString() : null };
   const data = await makeGraphQLRequest(query, variables);
 
   if (!data || !data.transcripts) {
     return [];
   }
 
-  return data.transcripts.map((t: any) => ({
-    id: t.id,
-    title: t.title,
-    date: t.date,
-    duration: t.duration || 0,
-    video_url: t.video_url,
-    audio_url: t.audio_url,
-    summary: t.summary ? {
-      overview: t.summary.overview || '',
-      short_summary: t.summary.short_summary || '',
-      keywords: t.summary.keywords || [],
-      action_items: t.summary.action_items || [],
-      topics: t.summary.topics || [],
-    } : undefined,
-    sentences: t.sentences || [],
-  }));
+  return data.transcripts.map(mapTranscript);
 }
 
 export async function fetchTranscriptById(id: string): Promise<FirefliesTranscript | null> {
   const query = `
     query GetTranscript($id: String!) {
       transcript(id: $id) {
-        id
-        title
-        date
-        duration
-        video_url
-        audio_url
-        summary {
-          overview
-          short_summary
-          keywords
-          action_items
-          topics
-        }
-        sentences {
-          speaker_name
-          text
-          start_time
-          end_time
-          ai_filters {
-            task
-            question
-          }
-        }
+        ${TRANSCRIPT_FIELDS}
       }
     }
   `;
@@ -160,21 +158,5 @@ export async function fetchTranscriptById(id: string): Promise<FirefliesTranscri
     return null;
   }
 
-  const t = data.transcript;
-  return {
-    id: t.id,
-    title: t.title,
-    date: t.date,
-    duration: t.duration || 0,
-    video_url: t.video_url,
-    audio_url: t.audio_url,
-    summary: t.summary ? {
-      overview: t.summary.overview || '',
-      short_summary: t.summary.short_summary || '',
-      keywords: t.summary.keywords || [],
-      action_items: t.summary.action_items || [],
-      topics: t.summary.topics || [],
-    } : undefined,
-    sentences: t.sentences || [],
-  };
+  return mapTranscript(data.transcript);
 }

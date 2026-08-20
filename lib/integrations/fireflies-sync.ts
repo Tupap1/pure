@@ -7,14 +7,28 @@ export interface SyncResult {
   unmatched: number;
 }
 
+// El timestamp de Fireflies viene en UTC. Hay que interpretarlo en la zona horaria
+// del estudiante (Colombia por defecto), NO en la del servidor: en Docker el proceso
+// corre en UTC y una clase de las 09:00 quedaría comparada como si fueran las 14:00,
+// desfase de 5h que rompe el match. Configurable con PURE_TZ.
 function parseISO8601Date(isoString: string): { dayOfWeek: number; hour: number; minute: number } {
+  const timeZone = process.env.PURE_TZ || 'America/Bogota';
   const date = new Date(isoString);
-  // ISO: Monday=1, Sunday=7; JavaScript: Sunday=0, Monday=1
-  const jsDay = date.getDay();
-  const dayOfWeek = jsDay === 0 ? 7 : jsDay;
-  const hour = date.getHours();
-  const minute = date.getMinutes();
-  return { dayOfWeek, hour, minute };
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const wd = parts.find((p) => p.type === 'weekday')?.value || 'Mon';
+  let hour = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
+  if (hour === 24) hour = 0; // algunos entornos devuelven '24' a medianoche
+  const minute = parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10);
+
+  const map: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  return { dayOfWeek: map[wd] ?? 1, hour, minute };
 }
 
 function timeToMinutes(timeStr: string): number {
@@ -44,21 +58,30 @@ function findMatchingSchedule(
   schedules: ScheduleEntity[]
 ): ScheduleEntity | null {
   const { dayOfWeek, hour, minute } = parseISO8601Date(transcript.date);
-  const transcriptTimeMinutes = hour * 60 + minute;
+  const t = hour * 60 + minute;
+
+  // Match por VENTANA de clase: la grabación pega si empieza dentro del bloque
+  // (con 30 min de gracia antes y 15 después), y entre las que califican gana la
+  // de inicio más cercano. Así una grabación que arranca a mitad de clase también entra.
+  let best: ScheduleEntity | null = null;
+  let bestDiff = Infinity;
 
   for (const schedule of schedules) {
     if (schedule.day_of_week !== dayOfWeek) continue;
 
-    const scheduleTimeMinutes = timeToMinutes(schedule.start_time);
-    const timeDiff = Math.abs(transcriptTimeMinutes - scheduleTimeMinutes);
+    const start = timeToMinutes(schedule.start_time);
+    const end = timeToMinutes(schedule.end_time);
+    const withinWindow = t >= start - 30 && t <= end + 15;
+    if (!withinWindow) continue;
 
-    // ±30 minute tolerance
-    if (timeDiff <= 30) {
-      return schedule;
+    const diff = Math.abs(t - start);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = schedule;
     }
   }
 
-  return null;
+  return best;
 }
 
 export async function syncFirefliesTranscripts(
