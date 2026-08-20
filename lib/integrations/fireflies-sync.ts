@@ -111,6 +111,11 @@ export async function syncFirefliesTranscripts(
       continue;
     }
 
+    // Ignorar grabaciones basura: silenciosas o de duración casi nula (< 1 min).
+    if (!transcript.duration || transcript.duration < 1) {
+      continue;
+    }
+
     // Find matching schedule
     const matchedSchedule = findMatchingSchedule(transcript, schedules);
 
