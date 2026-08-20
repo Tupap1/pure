@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 export const ClassSessionsDashboard: React.FC = () => {
-  const { isLoaded, subjects, schedules, classSessions, attendanceRecords } = usePureData();
+  const { isLoaded, subjects, schedules, classSessions, attendanceRecords, universities } = usePureData();
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -120,7 +120,12 @@ export const ClassSessionsDashboard: React.FC = () => {
       </div>
 
       {/* Asistencia por materia */}
-      <AttendancePanel subjects={subjects} attendanceRecords={attendanceRecords} />
+      <AttendancePanel
+        subjects={subjects}
+        schedules={schedules}
+        universities={universities}
+        attendanceRecords={attendanceRecords}
+      />
 
       {/* Filter & Search Bar */}
       <div className="flex flex-col md:flex-row md:items-center gap-3">
