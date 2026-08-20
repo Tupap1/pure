@@ -56,31 +56,30 @@ async function makeGraphQLRequest(query: string, variables?: any): Promise<any> 
     const data = await response.json();
 
     if (data.errors) {
-      // Log completo: los errores de GraphQL (campo/argumento inexistente) son la causa
-      // más común de que el sync reciba una lista vacía sin fallar el HTTP.
-      console.error('Fireflies GraphQL errors:', JSON.stringify(data.errors));
-      return null;
+      // Fireflies devuelve errores PARCIALES: en el plan Free, campos como audio_url
+      // o video_url dan "paid_required" pero el resto de la respuesta (id, título,
+      // fecha, resumen, sentences) sí llega. Se loguea el detalle pero NO se descarta
+      // la respuesta si trae datos utilizables; antes bastaba un error para retornar [].
+      console.error('Fireflies GraphQL errors (parcial, se conserva la data válida):', JSON.stringify(data.errors));
     }
 
-    return data.data;
+    return data.data ?? null;
   } catch (error) {
     console.error('Fireflies API request failed:', error);
     return null;
   }
 }
 
-// Campos y argumentos alineados con el esquema real de la API de Fireflies.
-// `dateString` es el ISO datetime del meeting; `topics_discussed` es el nombre
-// correcto del campo (no `topics`). Se piden solo campos estables para no romper
-// toda la query por un nombre inexistente.
+// Campos alineados con el esquema real de Fireflies y con lo que permite el plan Free.
+// audio_url / video_url / transcript_url son SOLO de plan pago ("paid_required") y
+// hacían fallar la query, así que NO se piden: en Free no hay captura de video de
+// todas formas, y la transcripción se reconstruye desde `sentences`. `dateString` es
+// el ISO del meeting; `topics_discussed` es el nombre correcto del campo (no `topics`).
 const TRANSCRIPT_FIELDS = `
   id
   title
   dateString
   duration
-  transcript_url
-  audio_url
-  video_url
   summary {
     overview
     short_summary

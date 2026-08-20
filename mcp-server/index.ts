@@ -19,6 +19,7 @@ import {
   handleManageSubjects,
   handleManageSchedules,
   handleManageDeliverables,
+  handleManageClassSessions,
   handleManageSyllabusTopics,
   handleGenerateStudyPlan,
   handleGetStudyMaterial,
@@ -129,6 +130,18 @@ export const TOOLS_LIST = [
       properties: {
         action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
         data: { type: 'object', description: 'Datos del entregable (id, subject_id, title, due_date, weight_percentage, grade, type, status)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_class_sessions',
+    description: 'Operaciones CRUD sobre Sesiones de Clase: grabaciones, resúmenes IA y transcripciones (crear, leer, actualizar, eliminar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos de la sesión (id, subject_id, schedule_id, session_date, title, summary, transcript_text, ai_summary, recording_url, fireflies_transcript_id, topics_covered, session_source)' },
       },
       required: ['action'],
     },
@@ -305,6 +318,11 @@ export function createMcpServerInstance() {
 
   mcpServer.tool('manage_deliverables', 'Operaciones CRUD sobre Entregables / Parciales.', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
     const res = await handleManageDeliverables(action, data);
+    return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+  });
+
+  mcpServer.tool('manage_class_sessions', 'Operaciones CRUD sobre Sesiones de Clase (grabaciones, resúmenes y transcripciones).', { action: z.enum(['create', 'read', 'update', 'delete']), data: z.any().optional() }, async ({ action, data }) => {
+    const res = await handleManageClassSessions(action, data);
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
 

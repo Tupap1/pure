@@ -31,6 +31,7 @@ import {
   fetchDueFlashcardsFromDb,
   fetchClassSessionsFromDb,
   saveClassSessionToDb,
+  deleteClassSessionFromDb,
 } from './db-repository';
 
 export async function handleGetAcademicOverview() {
@@ -447,6 +448,36 @@ export async function handleManageSchedules(action: 'create' | 'read' | 'update'
     }
   } catch (error: any) {
     return { status: 'error', message: error.message || 'Error en operación de Horario' };
+  }
+}
+
+export async function handleManageClassSessions(action: 'create' | 'read' | 'update' | 'delete', data?: any) {
+  try {
+    switch (action) {
+      case 'create': {
+        const saved = await saveClassSessionToDb(data || {});
+        return { status: 'success', message: 'Sesión de clase creada', data: saved };
+      }
+      case 'read': {
+        const found = await fetchClassSessionsFromDb(data?.id);
+        return { status: 'success', data: found };
+      }
+      case 'update': {
+        if (!data?.id) return { status: 'error', message: 'ID es requerido para actualizar' };
+        const existing = await fetchClassSessionsFromDb(data.id);
+        const merged = Array.isArray(existing) ? existing[0] : existing;
+        if (!merged) return { status: 'error', message: 'Sesión de clase no encontrada' };
+        const updated = await saveClassSessionToDb({ ...merged, ...data });
+        return { status: 'success', message: 'Sesión de clase actualizada', data: updated };
+      }
+      case 'delete': {
+        if (!data?.id) return { status: 'error', message: 'ID es requerido para eliminar' };
+        await deleteClassSessionFromDb(data.id);
+        return { status: 'success', message: 'Sesión de clase eliminada' };
+      }
+    }
+  } catch (error: any) {
+    return { status: 'error', message: error.message || 'Error en operación de Sesión de clase' };
   }
 }
 

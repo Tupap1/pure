@@ -31,4 +31,5 @@ export {
   fetchClassSessionsFromDb,
   fetchClassSessionByFirefliesIdFromDb,
   saveClassSessionToDb,
+  deleteClassSessionFromDb,
 } from '../lib/db/repository-pg';
