@@ -23,6 +23,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-pure_user}:${POSTGRES_PASSWORD:-pure_secure_password_2026}@pure-db:5432/${POSTGRES_DB:-pure_academic}?sslmode=disable
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-demo_key}
+      - FIREFLIES_API_KEY=${FIREFLIES_API_KEY:-}
     depends_on:
       - pure-db
     restart: unless-stopped
@@ -40,6 +41,7 @@ services:
       - MCP_API_KEY=${MCP_API_KEY:?MCP_API_KEY es obligatorio}
       - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-${MCP_API_KEY:?MCP_API_KEY es obligatorio}}
       - PUBLIC_MCP_URL=${PUBLIC_MCP_URL:-https://mcp.btw-one.com}
+      - FIREFLIES_API_KEY=${FIREFLIES_API_KEY:-}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-pure_user}:${POSTGRES_PASSWORD:-pure_secure_password_2026}@pure-db:5432/${POSTGRES_DB:-pure_academic}?sslmode=disable
     stdin_open: true
     tty: true
