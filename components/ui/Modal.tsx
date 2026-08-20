@@ -85,10 +85,10 @@ export const Modal: React.FC<ModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-md sm:max-w-lg lg:max-w-xl max-h-[90vh] sm:max-h-[85vh] flex flex-col overflow-hidden text-slate-900 dark:text-slate-100 my-auto pointer-events-auto overscroll-contain"
+        className="bg-white dark:bg-slate-950 rounded-xl sm:rounded-2xl border border-slate-200/40 dark:border-slate-800/30 shadow-2xl w-full max-w-md sm:max-w-lg lg:max-w-xl max-h-[90vh] sm:max-h-[85vh] flex flex-col overflow-hidden text-slate-900 dark:text-slate-100 my-auto pointer-events-auto overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-200/25 dark:border-slate-800/15 shrink-0 bg-white/50 dark:bg-slate-950/50">
           <h3 id={titleId} className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 truncate pr-2">
             {title}
           </h3>
@@ -101,7 +101,7 @@ export const Modal: React.FC<ModalProps> = ({
           </button>
         </div>
 
-        <div className="px-4 sm:px-6 py-4 sm:py-5 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
+        <div className="px-4 sm:px-6 py-5 sm:py-6 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
           {children}
         </div>
       </div>

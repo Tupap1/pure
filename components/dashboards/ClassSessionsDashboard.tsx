@@ -188,7 +188,7 @@ export const ClassSessionsDashboard: React.FC = () => {
             return (
               <Card
                 key={session.id}
-                className="p-4 space-y-3 border border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 transition-all bg-white dark:bg-slate-950 shadow-sm"
+                className="p-5 space-y-4 border border-slate-200/40 dark:border-slate-800/30 hover:border-slate-200/60 dark:hover:border-slate-700/50 transition-all bg-white dark:bg-slate-950 shadow-sm"
               >
                 {/* Header Row */}
                 <div className="flex items-start justify-between gap-2">
@@ -200,7 +200,7 @@ export const ClassSessionsDashboard: React.FC = () => {
                         {formatDate(session.session_date)}
                       </span>
                     </div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 font-heading leading-snug">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 font-heading leading-snug">
                       {session.title}
                     </h3>
                   </div>
@@ -226,8 +226,8 @@ export const ClassSessionsDashboard: React.FC = () => {
 
                 {/* Summary content */}
                 {session.summary && (
-                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/60 text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
-                    <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 mb-1">
+                  <div className="p-3 pl-4 rounded-lg bg-slate-50/50 dark:bg-slate-900/20 border-l-2 border-l-cyan-400 text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                    <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                       <FileText className="w-3 h-3 text-cyan-500" /> Resumen
                     </div>
                     {session.summary}
@@ -265,12 +265,12 @@ export const ClassSessionsDashboard: React.FC = () => {
 
                 {/* Topics Covered */}
                 {session.topics_covered && session.topics_covered.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-100 dark:border-slate-900">
+                  <div className="flex items-center gap-1.5 flex-wrap pt-3 border-t border-slate-200/25 dark:border-slate-800/15">
                     <Tag className="w-3 h-3 text-purple-400 shrink-0" />
                     {session.topics_covered.map((topic) => (
                       <span
                         key={topic}
-                        className="px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 text-[10px] font-medium"
+                        className="px-2 py-1 rounded text-purple-600 dark:text-purple-400 border border-purple-200/40 dark:border-purple-800/25 text-[10px] font-medium bg-purple-100/30 dark:bg-purple-950/20"
                       >
                         {topic}
                       </span>

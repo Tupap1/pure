@@ -20,6 +20,14 @@ import {
   handleManageSchedules,
   handleManageDeliverables,
   handleManageSyllabusTopics,
+  handleGenerateStudyPlan,
+  handleGetStudyMaterial,
+  handleGeneratePracticeExam,
+  handleRecordStudyProgress,
+  handleGetSyllabusProgress,
+  handleSyncFireflies,
+  handleManageStudyBlocks,
+  handleManageFlashcards,
 } from './tools-handler';
 
 export const TOOLS_LIST = [
@@ -137,6 +145,103 @@ export const TOOLS_LIST = [
       required: ['action'],
     },
   },
+  {
+    name: 'generate_study_plan',
+    description: 'Genera bloques de estudio concretos en el calendario basado en horas DME y entregas pendientes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        available_hours_per_day: { type: 'number', description: 'Horas disponibles diarias para estudio (ej. 2.5)' },
+        target_subject_ids: { type: 'array', items: { type: 'string' }, description: 'IDs de materias a priorizar (opcional)' },
+        date_start: { type: 'string', description: 'Fecha inicio en ISO format (YYYY-MM-DD)' },
+        date_end: { type: 'string', description: 'Fecha fin en ISO format (YYYY-MM-DD)' },
+      },
+      required: ['available_hours_per_day', 'date_start', 'date_end'],
+    },
+  },
+  {
+    name: 'get_study_material',
+    description: 'Obtiene material de estudio para una materia/tema: contenido del temario, transcripciones de clases, flashcards pendientes y entregas relacionadas.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        subject_id: { type: 'string', description: 'ID de la materia (opcional)' },
+        topic_id: { type: 'string', description: 'ID del tema (opcional)' },
+        session_date: { type: 'string', description: 'Fecha de la sesión en ISO format (opcional)' },
+      },
+    },
+  },
+  {
+    name: 'generate_practice_exam',
+    description: 'Devuelve contexto estructurado de los temas para que el agente formule preguntas de práctica.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        subject_id: { type: 'string', description: 'ID de la materia' },
+        topic_ids: { type: 'array', items: { type: 'string' }, description: 'IDs de temas a incluir' },
+        question_count: { type: 'number', description: 'Número de preguntas deseadas (defecto 10)' },
+        question_types: { type: 'array', items: { type: 'string' }, description: 'Tipos: open, mcq, cloze, true_false (defecto [open, mcq])' },
+        difficulty: { type: 'string', enum: ['easy', 'medium', 'hard'], description: 'Nivel de dificultad' },
+      },
+      required: ['subject_id', 'topic_ids', 'difficulty'],
+    },
+  },
+  {
+    name: 'record_study_progress',
+    description: 'Registra el resultado de una revisión de flashcard usando FSRS.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flashcard_id: { type: 'string', description: 'ID de la flashcard' },
+        rating: { type: 'string', enum: ['again', 'hard', 'good', 'easy'], description: 'Rating FSRS' },
+      },
+      required: ['flashcard_id', 'rating'],
+    },
+  },
+  {
+    name: 'get_syllabus_progress',
+    description: 'Obtiene progreso del temario por materia agrupado por unidades.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        subject_id: { type: 'string', description: 'ID de la materia (opcional; si omite, retorna todas)' },
+      },
+    },
+  },
+  {
+    name: 'sync_fireflies',
+    description: 'Sincroniza transcripciones de Fireflies.ai y crea sesiones de clase automáticamente.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        force: { type: 'boolean', description: 'Forzar resincronización (opcional, defecto false)' },
+      },
+    },
+  },
+  {
+    name: 'manage_study_blocks',
+    description: 'CRUD de bloques de estudio en el calendario.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete'] },
+        data: { type: 'object', description: 'Datos del bloque (id, subject_id, date, start_time, end_time, type, is_completed, source)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_flashcards',
+    description: 'CRUD de flashcards con opción de obtener las que vencen hoy.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete', 'due_today'] },
+        data: { type: 'object', description: 'Datos de flashcard (id, subject_id, topic_id, question, answer, question_type, options, due, source)' },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -207,6 +312,114 @@ export function createMcpServerInstance() {
     const res = await handleManageSyllabusTopics(action, data);
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
   });
+
+  mcpServer.tool(
+    'generate_study_plan',
+    'Genera bloques de estudio concretos en el calendario basado en horas DME y entregas pendientes.',
+    {
+      available_hours_per_day: z.number(),
+      target_subject_ids: z.array(z.string()).optional(),
+      date_start: z.string(),
+      date_end: z.string(),
+    },
+    async ({ available_hours_per_day, target_subject_ids, date_start, date_end }) => {
+      const res = await handleGenerateStudyPlan(available_hours_per_day, target_subject_ids, date_start, date_end);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'get_study_material',
+    'Obtiene material de estudio para una materia/tema: temario, clases, flashcards y entregas.',
+    {
+      subject_id: z.string().optional(),
+      topic_id: z.string().optional(),
+      session_date: z.string().optional(),
+    },
+    async ({ subject_id, topic_id, session_date }) => {
+      const res = await handleGetStudyMaterial(subject_id, topic_id, session_date);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'generate_practice_exam',
+    'Devuelve contexto estructurado de los temas para que el agente formule preguntas de práctica.',
+    {
+      subject_id: z.string(),
+      topic_ids: z.array(z.string()),
+      question_count: z.number().optional(),
+      question_types: z.array(z.string()).optional(),
+      difficulty: z.enum(['easy', 'medium', 'hard']),
+    },
+    async ({ subject_id, topic_ids, question_count, question_types, difficulty }) => {
+      const res = await handleGeneratePracticeExam(subject_id, topic_ids, question_count, question_types, difficulty);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'record_study_progress',
+    'Registra el resultado de una revisión de flashcard usando FSRS.',
+    {
+      flashcard_id: z.string(),
+      rating: z.enum(['again', 'hard', 'good', 'easy']),
+    },
+    async ({ flashcard_id, rating }) => {
+      const res = await handleRecordStudyProgress(flashcard_id, rating);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'get_syllabus_progress',
+    'Obtiene progreso del temario por materia agrupado por unidades.',
+    {
+      subject_id: z.string().optional(),
+    },
+    async ({ subject_id }) => {
+      const res = await handleGetSyllabusProgress(subject_id);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'sync_fireflies',
+    'Sincroniza transcripciones de Fireflies.ai y crea sesiones de clase automáticamente.',
+    {
+      force: z.boolean().optional(),
+    },
+    async ({ force }) => {
+      const res = await handleSyncFireflies(force);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_study_blocks',
+    'CRUD de bloques de estudio en el calendario.',
+    {
+      action: z.enum(['create', 'read', 'update', 'delete']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageStudyBlocks(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_flashcards',
+    'CRUD de flashcards con opción de obtener las que vencen hoy.',
+    {
+      action: z.enum(['create', 'read', 'update', 'delete', 'due_today']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageFlashcards(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
 
   return mcpServer;
 }

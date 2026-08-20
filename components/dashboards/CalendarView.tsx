@@ -15,6 +15,8 @@ import {
   Pencil,
   Plus,
   Info,
+  FileCheck,
+  AlertCircle,
 } from 'lucide-react';
 import {
   detectScheduleConflicts,
@@ -23,7 +25,7 @@ import {
   ScheduleSlot,
 } from '@/lib/algorithms/conflict-detector';
 import { ScheduleSchema, validateEntity } from '@/lib/validations/schemas';
-import { ScheduleEntity } from '@/lib/db/dexie-schema';
+import { ScheduleEntity, DeliverableEntity } from '@/lib/db/dexie-schema';
 import { saveSchedule, deleteSchedule } from '@/lib/db/repository';
 
 const MONTH_NAMES = [
@@ -46,8 +48,26 @@ const formatTimeRange = (start: string, end: string): string => {
   return `${start} - ${end}`;
 };
 
+const getDeliverablesForDate = (deliverables: DeliverableEntity[], date: Date): DeliverableEntity[] => {
+  return deliverables.filter(d => {
+    const dDate = new Date(d.due_date);
+    return dDate.getFullYear() === date.getFullYear() &&
+           dDate.getMonth() === date.getMonth() &&
+           dDate.getDate() === date.getDate();
+  });
+};
+
+const isDeliverableOverdue = (deliverable: DeliverableEntity): boolean => {
+  if (deliverable.status !== 'pendiente') return false;
+  const dDate = new Date(deliverable.due_date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  dDate.setHours(0, 0, 0, 0);
+  return dDate < today;
+};
+
 export const CalendarView: React.FC = () => {
-  const { isLoaded, universities, subjects, schedules, professors, classSessions } = usePureData();
+  const { isLoaded, universities, subjects, schedules, professors, classSessions, deliverables } = usePureData();
   const calendarState = useCalendarState(new Date(), 'week');
   const { viewMode, displayDate, setViewMode, setDisplayDate, goNext, goPrev, goToday } = calendarState;
 
@@ -355,6 +375,72 @@ export const CalendarView: React.FC = () => {
                   )}
                 </div>
 
+                {/* Deliverables Section */}
+                {(() => {
+                  const dayDeliverables = getDeliverablesForDate(deliverables, displayDate);
+                  if (dayDeliverables.length === 0) return null;
+
+                  return (
+                    <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-800">
+                      <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                        Entregas Pendientes ({dayDeliverables.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {dayDeliverables.map((d) => {
+                          const subject = getSubject(d.subject_id);
+                          const isOverdue = isDeliverableOverdue(d);
+
+                          let statusBg = '';
+                          let statusText = '';
+
+                          if (isOverdue) {
+                            statusBg = 'bg-red-100 dark:bg-red-900/30';
+                            statusText = 'text-red-700 dark:text-red-300';
+                          } else if (d.status === 'pendiente') {
+                            statusBg = 'bg-amber-100 dark:bg-amber-900/30';
+                            statusText = 'text-amber-700 dark:text-amber-300';
+                          } else if (d.status === 'entregado') {
+                            statusBg = 'bg-cyan-100 dark:bg-cyan-900/30';
+                            statusText = 'text-cyan-700 dark:text-cyan-300';
+                          } else if (d.status === 'calificado') {
+                            statusBg = 'bg-emerald-100 dark:bg-emerald-900/30';
+                            statusText = 'text-emerald-700 dark:text-emerald-300';
+                          }
+
+                          return (
+                            <div
+                              key={d.id}
+                              className={`p-2 rounded border ${statusBg} border-current/20`}
+                            >
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <div className="flex-1">
+                                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                    {d.title}
+                                  </div>
+                                  <div className="text-[10px] text-slate-600 dark:text-slate-400">
+                                    {subject?.name || 'Materia'}
+                                  </div>
+                                </div>
+                                <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${statusText}`}>
+                                  {d.status}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 text-[10px] text-slate-600 dark:text-slate-400">
+                                {d.type && (
+                                  <span className="capitalize">{d.type}</span>
+                                )}
+                                {d.weight_percentage && (
+                                  <span>{d.weight_percentage}%</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Timeline Container */}
                 <div className="relative border-l border-slate-200 dark:border-slate-800 ml-16 min-h-[850px]">
                   {gridHours.map((h, i) => (
@@ -471,12 +557,60 @@ export const CalendarView: React.FC = () => {
                       );
                     })}
                   </tr>
+
+                  {/* Deliverables Banner Row */}
+                  <tr className="border-b border-slate-200/30 dark:border-slate-800/20 bg-slate-50/30 dark:bg-slate-900/15">
+                    <td className="p-2.5 border-r border-slate-200/30 dark:border-slate-800/20" />
+                    {weekDays.map((date) => {
+                      const dayDeliverables = getDeliverablesForDate(deliverables, date);
+                      const visibleCount = Math.min(dayDeliverables.length, 2);
+                      const moreCount = dayDeliverables.length - visibleCount;
+
+                      return (
+                        <td
+                          key={`deliverables-${date.toISOString()}`}
+                          className="p-2 border-r border-slate-200/30 dark:border-slate-800/20 last:border-r-0"
+                        >
+                          {dayDeliverables.length > 0 ? (
+                            <div className="space-y-0.5">
+                              {dayDeliverables.slice(0, visibleCount).map((d) => {
+                                const isOverdue = isDeliverableOverdue(d);
+                                let dotColor = 'bg-amber-400';
+
+                                if (isOverdue) {
+                                  dotColor = 'bg-red-500';
+                                } else if (d.status === 'entregado') {
+                                  dotColor = 'bg-cyan-400';
+                                } else if (d.status === 'calificado') {
+                                  dotColor = 'bg-emerald-500';
+                                }
+
+                                return (
+                                  <div key={d.id} className="flex items-center gap-1 text-[9px]">
+                                    <div className={`w-1 h-1 rounded-full ${dotColor} shrink-0`} />
+                                    <span className="text-slate-600 dark:text-slate-400 truncate flex-1">
+                                      {d.title}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                              {moreCount > 0 && (
+                                <div className="text-[8px] text-slate-500 dark:text-slate-500 px-0.5">
+                                  +{moreCount}
+                                </div>
+                              )}
+                            </div>
+                          ) : null}
+                        </td>
+                      );
+                    })}
+                  </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs">
+                <tbody className="divide-y divide-slate-200/30 dark:divide-slate-800/20 text-xs">
                   {gridHours.map((hour) => {
                     return (
-                      <tr key={hour} className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
-                        <td className="p-2.5 font-mono text-center text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+                      <tr key={hour} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20">
+                        <td className="p-2.5 font-mono text-center text-slate-500 dark:text-slate-400 border-r border-slate-200/30 dark:border-slate-800/20 bg-slate-50/30 dark:bg-slate-900/20">
                           {hour}
                         </td>
                         {weekDays.map((date, index) => {
@@ -503,7 +637,7 @@ export const CalendarView: React.FC = () => {
                           return (
                             <td
                               key={date.toISOString()}
-                              className={`p-1 border-r border-slate-200 dark:border-slate-800/40 last:border-r-0 align-top h-16 relative ${
+                              className={`p-1 border-r border-slate-200/30 dark:border-slate-800/20 last:border-r-0 align-top h-16 relative ${
                                 isToday ? 'bg-sky-500/[0.03] dark:bg-sky-500/[0.05]' : ''
                               }`}
                             >
@@ -532,8 +666,8 @@ export const CalendarView: React.FC = () => {
                                       onClick={() => handleOpenDetails(sched)}
                                       className={`p-1.5 rounded text-xs space-y-0.5 border cursor-pointer hover:scale-[1.02] hover:shadow-md transition-all group ${
                                         isPresencial
-                                          ? 'bg-sky-50 dark:bg-sky-950/60 border-sky-200 dark:border-sky-600/50 text-sky-900 dark:text-sky-200'
-                                          : 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200 dark:border-indigo-600/50 text-indigo-900 dark:text-indigo-200'
+                                          ? 'bg-sky-50/80 dark:bg-sky-950/40 border-sky-200/50 dark:border-sky-600/30 text-sky-900 dark:text-sky-200'
+                                          : 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-200/50 dark:border-indigo-600/30 text-indigo-900 dark:text-indigo-200'
                                       }`}
                                     >
                                       <div className="font-bold text-[11px] flex items-center justify-between">
@@ -695,6 +829,46 @@ export const CalendarView: React.FC = () => {
                               </div>
                             );
                           })}
+
+                          {/* Deliverables Pills */}
+                          {(() => {
+                            const cellDeliverables = getDeliverablesForDate(deliverables, cellDate);
+                            return cellDeliverables.map((d) => {
+                              const subject = getSubject(d.subject_id);
+                              const isOverdue = isDeliverableOverdue(d);
+
+                              let bgClass = '';
+                              let textClass = '';
+
+                              if (isOverdue) {
+                                bgClass = 'bg-red-100 dark:bg-red-900/30';
+                                textClass = 'text-red-700 dark:text-red-300';
+                              } else if (d.status === 'pendiente') {
+                                bgClass = 'bg-amber-100 dark:bg-amber-900/30';
+                                textClass = 'text-amber-700 dark:text-amber-300';
+                              } else if (d.status === 'entregado') {
+                                bgClass = 'bg-cyan-100 dark:bg-cyan-900/30';
+                                textClass = 'text-cyan-700 dark:text-cyan-300';
+                              } else if (d.status === 'calificado') {
+                                bgClass = 'bg-emerald-100 dark:bg-emerald-900/30';
+                                textClass = 'text-emerald-700 dark:text-emerald-300';
+                              }
+
+                              return (
+                                <div
+                                  key={d.id}
+                                  className={`text-[10px] px-1.5 py-0.5 rounded-md truncate font-medium border ${bgClass} ${textClass} flex items-center gap-1 border-current/20`}
+                                >
+                                  {isOverdue ? (
+                                    <AlertCircle className="w-3 h-3 shrink-0" />
+                                  ) : (
+                                    <FileCheck className="w-3 h-3 shrink-0" />
+                                  )}
+                                  <span className="truncate flex-1">{d.title}</span>
+                                </div>
+                              );
+                            });
+                          })()}
                         </div>
                       </div>
                     );

@@ -51,11 +51,13 @@ export const DeliverablesDashboard: React.FC = () => {
     );
   }
 
-  const filteredDeliverables = deliverables.filter((item) => {
-    if (filterGroup === 'group') return item.is_group;
-    if (filterGroup === 'individual') return !item.is_group;
-    return true;
-  });
+  const filteredDeliverables = deliverables
+    .filter((item) => {
+      if (filterGroup === 'group') return item.is_group;
+      if (filterGroup === 'individual') return !item.is_group;
+      return true;
+    })
+    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
   const activeSubject = subjects[0];
   const requiredGrade = activeSubject
@@ -148,6 +150,126 @@ export const DeliverablesDashboard: React.FC = () => {
 
   const inputClass =
     'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-sky-500 transition-colors';
+
+  // Helper: Check if deliverable is overdue
+  const isOverdue = (dueDate: string, status: string): boolean => {
+    if (status !== 'pendiente') return false;
+    return new Date(dueDate).getTime() < new Date().getTime();
+  };
+
+  // Helper: Group deliverables by time proximity
+  const groupDeliverablesByTime = (delivs: typeof deliverables) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekFromNow = new Date(today);
+    weekFromNow.setDate(weekFromNow.getDate() + 7);
+    const twoWeeksFromNow = new Date(weekFromNow);
+    twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 7);
+
+    const groups: {
+      vencidas: DeliverableEntity[];
+      estaSemana: DeliverableEntity[];
+      proximaSemana: DeliverableEntity[];
+      masAdelante: DeliverableEntity[];
+    } = {
+      vencidas: [],
+      estaSemana: [],
+      proximaSemana: [],
+      masAdelante: [],
+    };
+
+    delivs.forEach((deliv) => {
+      const dueDate = new Date(deliv.due_date);
+      const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+
+      if (isOverdue(deliv.due_date, deliv.status)) {
+        groups.vencidas.push(deliv);
+      } else if (dueDateOnly <= weekFromNow) {
+        groups.estaSemana.push(deliv);
+      } else if (dueDateOnly <= twoWeeksFromNow) {
+        groups.proximaSemana.push(deliv);
+      } else {
+        groups.masAdelante.push(deliv);
+      }
+    });
+
+    return groups;
+  };
+
+  // Helper: Render a time-grouped section
+  const renderTimeGroup = (groupTitle: string, groupDelivs: typeof deliverables, titleColor: string) => {
+    if (groupDelivs.length === 0) return null;
+
+    return (
+      <div key={groupTitle} className="space-y-3">
+        <h3 className={`text-xs font-medium ${titleColor} uppercase tracking-wide`}>
+          {groupTitle}
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {groupDelivs.map((deliv) => {
+            const sub = subjects.find((s) => s.id === deliv.subject_id);
+            const isDone = deliv.status === 'calificado' || deliv.status === 'entregado';
+            const overdue = isOverdue(deliv.due_date, deliv.status);
+
+            return (
+              <Card
+                key={deliv.id}
+                className={`space-y-4 p-5 ${overdue ? 'border-red-400/60 dark:border-red-500/30' : ''}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                    {sub?.name || 'Asignatura'} • <span className="capitalize">{deliv.complexity}</span>
+                  </span>
+                </div>
+                <div>
+                  <h4 className={`text-base font-bold text-slate-900 dark:text-slate-100 ${isDone ? 'line-through text-slate-400' : ''}`}>
+                    {deliv.title}
+                  </h4>
+                  {deliv.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{deliv.description}</p>}
+                  {deliv.due_date && (
+                    <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+                      Límite: <span className="font-semibold text-slate-700 dark:text-slate-200">{formatDeliverableDate(deliv.due_date)}</span>
+                      {overdue && <Badge className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-[10px]">Vencida</Badge>}
+                    </p>
+                  )}
+                  {deliv.grade !== undefined && deliv.grade !== null && (
+                    <p className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                      Nota Obtenida: {deliv.grade.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+                <div className="pt-3 border-t border-slate-200/25 dark:border-slate-800/15 flex flex-wrap items-center justify-between gap-y-1 text-xs">
+                  <span className="text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
+                    {deliv.is_group ? <Users className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" /> : <User className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />}
+                    {deliv.is_group ? 'Grupal' : 'Individual'}
+                  </span>
+                  <div className="flex items-center gap-0.5">
+                    <span className="text-slate-600 dark:text-slate-400 font-mono text-[11px] mr-1">Peso: {deliv.weight_percentage}%</span>
+                    <button
+                      onClick={() => openEditModal(deliv)}
+                      aria-label={`Editar ${deliv.title}`}
+                      title="Editar Actividad"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-sky-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDeliverable(deliv.id!)}
+                      aria-label={`Eliminar ${deliv.title}`}
+                      title="Eliminar Actividad"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 animate-fade-in pb-16">
@@ -269,67 +391,18 @@ export const DeliverablesDashboard: React.FC = () => {
             </button>
           </div>
 
-          {/* Deliverable Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredDeliverables.map((deliv) => {
-              const sub = subjects.find((s) => s.id === deliv.subject_id);
-              const isDone = deliv.status === 'calificado' || deliv.status === 'entregado';
-
-              return (
-                <Card key={deliv.id} className="space-y-3 p-4">
-                  <div className="flex items-center justify-between">
-                    <Badge variant={sub?.modality === 'presencial' ? 'aeroespacial' : 'software'}>
-                      {sub?.name || 'Asignatura'}
-                    </Badge>
-                    <Badge variant={deliv.complexity === 'dificil' ? 'danger' : 'warning'}>
-                      {deliv.complexity}
-                    </Badge>
-                  </div>
-                  <div>
-                    <h4 className={`text-sm font-bold text-slate-900 dark:text-slate-100 ${isDone ? 'line-through text-slate-400' : ''}`}>
-                      {deliv.title}
-                    </h4>
-                    {deliv.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{deliv.description}</p>}
-                    {deliv.due_date && (
-                      <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-1">
-                        Límite: <span className="font-semibold text-slate-700 dark:text-slate-200">{formatDeliverableDate(deliv.due_date)}</span>
-                      </p>
-                    )}
-                    {deliv.grade !== undefined && deliv.grade !== null && (
-                      <p className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold mt-1">
-                        Nota Obtenida: {deliv.grade.toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-y-1 text-xs">
-                    <span className="text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
-                      {deliv.is_group ? <Users className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> : <User className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />}
-                      {deliv.is_group ? 'Grupal' : 'Individual'}
-                    </span>
-                    <div className="flex items-center gap-0.5">
-                      <span className="text-slate-700 dark:text-slate-300 font-mono text-[11px] mr-1">Peso: {deliv.weight_percentage}%</span>
-                      <button
-                        onClick={() => openEditModal(deliv)}
-                        aria-label={`Editar ${deliv.title}`}
-                        title="Editar Actividad"
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-sky-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteDeliverable(deliv.id!)}
-                        aria-label={`Eliminar ${deliv.title}`}
-                        title="Eliminar Actividad"
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+          {/* Deliverable Cards Grid - Grouped by Time */}
+          {(() => {
+            const groups = groupDeliverablesByTime(filteredDeliverables);
+            return (
+              <div className="space-y-8">
+                {renderTimeGroup('Vencidas', groups.vencidas, 'text-red-600 dark:text-red-400')}
+                {renderTimeGroup('Esta semana', groups.estaSemana, 'text-slate-500 dark:text-slate-400')}
+                {renderTimeGroup('Próxima semana', groups.proximaSemana, 'text-slate-500 dark:text-slate-400')}
+                {renderTimeGroup('Más adelante', groups.masAdelante, 'text-slate-500 dark:text-slate-400')}
+              </div>
+            );
+          })()}
         </>
       )}
 

@@ -19,17 +19,17 @@ export const Button: React.FC<ButtonProps> = ({
 
   const variantClasses = {
     primary:
-      'bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-100 border border-slate-700/80 hover:border-slate-600 focus:ring-cyan-500 shadow-sm',
+      'bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-100 border border-slate-700/60 hover:border-slate-600/80 focus:ring-cyan-500 shadow-sm',
     aeroespacial:
-      'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 dark:border-cyan-500/40 hover:border-cyan-400 focus:ring-cyan-400',
+      'bg-cyan-500/8 hover:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/25 dark:border-cyan-500/30 hover:border-cyan-400/60 focus:ring-cyan-400',
     software:
-      'bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 dark:border-purple-500/40 hover:border-purple-400 focus:ring-purple-400',
+      'bg-purple-500/8 hover:bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/25 dark:border-purple-500/30 hover:border-purple-400/60 focus:ring-purple-400',
     synergy:
-      'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 dark:border-emerald-500/40 hover:border-emerald-400 focus:ring-emerald-400',
+      'bg-emerald-500/8 hover:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 dark:border-emerald-500/30 hover:border-emerald-400/60 focus:ring-emerald-400',
     danger:
-      'bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30 dark:border-rose-500/40 hover:border-rose-400 focus:ring-rose-400',
+      'bg-rose-500/8 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25 dark:border-rose-500/30 hover:border-rose-400/60 focus:ring-rose-400',
     ghost:
-      'bg-transparent hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 border border-transparent',
+      'bg-transparent hover:bg-slate-100/40 dark:hover:bg-slate-800/30 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent',
   };
 
   const sizeClasses = {

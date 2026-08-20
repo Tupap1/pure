@@ -112,8 +112,52 @@ export const ClassSessionSchema = z.object({
   recording_url: z.string().url({ message: 'URL de grabación inválida' }).optional().or(z.literal('')).nullable(),
   topics_covered: z.array(z.string()).optional().default([]),
   notes: z.string().optional().nullable(),
+  fireflies_transcript_id: z.string().optional().nullable(),
+  transcript_text: z.string().optional().nullable(),
+  ai_summary: z.string().optional().nullable(),
+  ai_action_items: z.array(z.string()).optional().default([]),
+  ai_questions: z.array(z.string()).optional().default([]),
+  duration_minutes: z.number().int().min(0).optional().nullable(),
+  session_source: z.enum(['manual', 'fireflies']).optional().default('manual'),
   created_at: z.string().optional(),
   updated_at: z.string().optional()
+});
+
+export const StudyBlockSchema = z.object({
+  id: z.string().optional(),
+  subject_id: z.string().min(1),
+  topic_id: z.string().optional().nullable(),
+  deliverable_id: z.string().optional().nullable(),
+  date: z.string().min(1),
+  start_time: z.string().regex(/^\d{2}:\d{2}$/),
+  end_time: z.string().regex(/^\d{2}:\d{2}$/),
+  type: z.enum(['study', 'review', 'exam_prep', 'project']).optional().default('study'),
+  is_completed: z.boolean().optional().default(false),
+  actual_minutes: z.number().int().min(0).optional().nullable(),
+  source: z.enum(['algorithm', 'ai_mcp', 'manual']).optional().default('manual'),
+  plan_id: z.string().optional().nullable(),
+  created_at: z.string().optional()
+});
+
+export const FlashcardSchema = z.object({
+  id: z.string().optional(),
+  subject_id: z.string().min(1),
+  topic_id: z.string().min(1),
+  question: z.string().min(1),
+  answer: z.string().min(1),
+  question_type: z.enum(['open', 'mcq', 'cloze', 'true_false']).optional().default('open'),
+  options: z.array(z.string()).optional(),
+  due: z.string().min(1),
+  stability: z.number().default(0),
+  difficulty: z.number().default(0),
+  elapsed_days: z.number().int().default(0),
+  scheduled_days: z.number().int().default(0),
+  reps: z.number().int().default(0),
+  lapses: z.number().int().default(0),
+  state: z.number().int().min(0).max(3).default(0),
+  last_review: z.string().optional().nullable(),
+  source: z.enum(['ai_generated', 'manual', 'from_transcript']).optional().default('manual'),
+  created_at: z.string().optional()
 });
 
 export type ValidationResult<T> =

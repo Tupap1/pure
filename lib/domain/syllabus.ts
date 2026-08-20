@@ -121,3 +121,46 @@ export function findSynergiesBetweenTopics(
 
   return matches.sort((a, b) => b.similarityScore - a.similarityScore);
 }
+
+/**
+ * Parses raw syllabus text and creates a hierarchical topic structure.
+ * Lines starting with "unidad" (case-insensitive) become parent topics.
+ * Subsequent lines become children of the most recent unit.
+ * Orphan lines (no preceding unit) get parent_id = undefined.
+ *
+ * Returns array sorted by order_index, ready to persist.
+ */
+export function parseSyllabusText(rawText: string, subjectId: string): SyllabusTopic[] {
+  const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean);
+  const topics: SyllabusTopic[] = [];
+  let currentParentId: string | undefined = undefined;
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+
+    if (line.toLowerCase().startsWith('unidad')) {
+      // Detect "Unidad X" as a parent topic
+      const parentId = `${subjectId}-unit-${index}`;
+      currentParentId = parentId;
+      topics.push({
+        id: parentId,
+        subject_id: subjectId,
+        title: line,
+        mastery_status: 'no_iniciado',
+        order_index: index,
+      });
+    } else {
+      // Regular topic: child of currentParentId (if any)
+      topics.push({
+        id: `${subjectId}-topic-${index}`,
+        subject_id: subjectId,
+        parent_id: currentParentId,
+        title: line.replace(/^[-*•]\s*/, ''),
+        mastery_status: 'no_iniciado',
+        order_index: index,
+      });
+    }
+  }
+
+  return topics;
+}

@@ -524,3 +524,144 @@ export async function saveClassSessionToDb(session: any) {
 export async function deleteClassSessionFromDb(id: string) {
   await pgPool.query('DELETE FROM class_sessions WHERE id = $1', [id]);
 }
+
+// --- STUDY BLOCKS ---
+export async function fetchStudyBlocksFromDb(subjectId?: string) {
+  let query = 'SELECT * FROM study_blocks';
+  const params: any[] = [];
+
+  if (subjectId) {
+    query += ' WHERE subject_id = $1';
+    params.push(subjectId);
+  }
+
+  query += ' ORDER BY date ASC, start_time ASC';
+  const res = await pgPool.query(query, params);
+  return res.rows;
+}
+
+export async function saveStudyBlockToDb(block: any) {
+  const record = {
+    id: block.id,
+    subject_id: block.subject_id,
+    topic_id: block.topic_id || null,
+    deliverable_id: block.deliverable_id || null,
+    date: block.date,
+    start_time: block.start_time,
+    end_time: block.end_time,
+    type: block.type || 'study',
+    is_completed: block.is_completed ?? false,
+    actual_minutes: block.actual_minutes || null,
+    source: block.source || 'manual',
+    plan_id: block.plan_id || null,
+  };
+
+  await pgPool.query(
+    `INSERT INTO study_blocks (id, subject_id, topic_id, deliverable_id, date, start_time, end_time, type, is_completed, actual_minutes, source, plan_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+     ON CONFLICT (id) DO UPDATE SET
+       subject_id = EXCLUDED.subject_id,
+       topic_id = EXCLUDED.topic_id,
+       deliverable_id = EXCLUDED.deliverable_id,
+       date = EXCLUDED.date,
+       start_time = EXCLUDED.start_time,
+       end_time = EXCLUDED.end_time,
+       type = EXCLUDED.type,
+       is_completed = EXCLUDED.is_completed,
+       actual_minutes = EXCLUDED.actual_minutes,
+       source = EXCLUDED.source,
+       plan_id = EXCLUDED.plan_id`,
+    [record.id, record.subject_id, record.topic_id, record.deliverable_id, record.date, record.start_time, record.end_time, record.type, record.is_completed, record.actual_minutes, record.source, record.plan_id]
+  );
+}
+
+export async function deleteStudyBlockFromDb(id: string) {
+  await pgPool.query('DELETE FROM study_blocks WHERE id = $1', [id]);
+}
+
+// --- FLASHCARDS ---
+export async function fetchFlashcardsFromDb(subjectId?: string) {
+  let query = 'SELECT * FROM flashcards';
+  const params: any[] = [];
+
+  if (subjectId) {
+    query += ' WHERE subject_id = $1';
+    params.push(subjectId);
+  }
+
+  query += ' ORDER BY due ASC';
+  const res = await pgPool.query(query, params);
+  return res.rows.map((row: any) => ({
+    ...row,
+    stability: Number(row.stability),
+    difficulty: Number(row.difficulty),
+  }));
+}
+
+export async function saveFlashcardToDb(card: any) {
+  const record = {
+    id: card.id,
+    subject_id: card.subject_id,
+    topic_id: card.topic_id,
+    question: card.question,
+    answer: card.answer,
+    question_type: card.question_type || 'open',
+    options: card.options || null,
+    due: card.due,
+    stability: card.stability || 0,
+    difficulty: card.difficulty || 0,
+    elapsed_days: card.elapsed_days || 0,
+    scheduled_days: card.scheduled_days || 0,
+    reps: card.reps || 0,
+    lapses: card.lapses || 0,
+    state: card.state || 0,
+    last_review: card.last_review || null,
+    source: card.source || 'manual',
+  };
+
+  await pgPool.query(
+    `INSERT INTO flashcards (id, subject_id, topic_id, question, answer, question_type, options, due, stability, difficulty, elapsed_days, scheduled_days, reps, lapses, state, last_review, source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+     ON CONFLICT (id) DO UPDATE SET
+       question = EXCLUDED.question,
+       answer = EXCLUDED.answer,
+       question_type = EXCLUDED.question_type,
+       options = EXCLUDED.options,
+       due = EXCLUDED.due,
+       stability = EXCLUDED.stability,
+       difficulty = EXCLUDED.difficulty,
+       elapsed_days = EXCLUDED.elapsed_days,
+       scheduled_days = EXCLUDED.scheduled_days,
+       reps = EXCLUDED.reps,
+       lapses = EXCLUDED.lapses,
+       state = EXCLUDED.state,
+       last_review = EXCLUDED.last_review,
+       source = EXCLUDED.source`,
+    [record.id, record.subject_id, record.topic_id, record.question, record.answer, record.question_type, record.options, record.due, record.stability, record.difficulty, record.elapsed_days, record.scheduled_days, record.reps, record.lapses, record.state, record.last_review, record.source]
+  );
+}
+
+export async function deleteFlashcardFromDb(id: string) {
+  await pgPool.query('DELETE FROM flashcards WHERE id = $1', [id]);
+}
+
+export async function fetchDueFlashcardsFromDb(dateStr: string) {
+  const res = await pgPool.query(
+    'SELECT * FROM flashcards WHERE due <= $1 ORDER BY due ASC',
+    [dateStr]
+  );
+  return res.rows.map((row: any) => ({
+    ...row,
+    stability: Number(row.stability),
+    difficulty: Number(row.difficulty),
+  }));
+}
+
+// --- CLASS SESSIONS HELPER ---
+export async function fetchClassSessionByFirefliesIdFromDb(firefliesId: string) {
+  const res = await pgPool.query(
+    'SELECT * FROM class_sessions WHERE fireflies_transcript_id = $1',
+    [firefliesId]
+  );
+  return res.rows[0] || null;
+}

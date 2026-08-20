@@ -100,8 +100,52 @@ export interface ClassSessionEntity {
   recording_url?: string | null;
   topics_covered?: string[];
   notes?: string | null;
+  fireflies_transcript_id?: string | null;
+  transcript_text?: string | null;
+  ai_summary?: string | null;
+  ai_action_items?: string[];
+  ai_questions?: string[];
+  duration_minutes?: number;
+  session_source?: 'manual' | 'fireflies';
   created_at?: string;
   updated_at?: string;
+}
+
+export interface StudyBlockEntity {
+  id?: string;
+  subject_id: string;
+  topic_id?: string;
+  deliverable_id?: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  type: 'study' | 'review' | 'exam_prep' | 'project';
+  is_completed: boolean;
+  actual_minutes?: number;
+  source: 'algorithm' | 'ai_mcp' | 'manual';
+  plan_id?: string;
+  created_at?: string;
+}
+
+export interface FlashcardEntity {
+  id?: string;
+  subject_id: string;
+  topic_id: string;
+  question: string;
+  answer: string;
+  question_type: 'open' | 'mcq' | 'cloze' | 'true_false';
+  options?: string[];
+  due: string;
+  stability: number;
+  difficulty: number;
+  elapsed_days: number;
+  scheduled_days: number;
+  reps: number;
+  lapses: number;
+  state: number;
+  last_review?: string;
+  source: 'ai_generated' | 'manual' | 'from_transcript';
+  created_at?: string;
 }
 
 export interface SyncQueueItem {
@@ -121,6 +165,8 @@ export class PureDatabase extends Dexie {
   deliverables!: Table<DeliverableEntity, string>;
   studySessions!: Table<StudySessionEntity, string>;
   classSessions!: Table<ClassSessionEntity, string>;
+  studyBlocks!: Table<StudyBlockEntity, string>;
+  flashcards!: Table<FlashcardEntity, string>;
   syncQueue!: Table<SyncQueueItem, number>;
 
   constructor() {
@@ -145,6 +191,11 @@ export class PureDatabase extends Dexie {
     // hace explícito el ascenso y lo vuelve reproducible.
     this.version(2).stores({
       classSessions: '++id, subject_id, schedule_id, session_date'
+    });
+
+    this.version(3).stores({
+      studyBlocks: '++id, subject_id, topic_id, deliverable_id, date, is_completed, source',
+      flashcards: '++id, subject_id, topic_id, due, state, source'
     });
   }
 }

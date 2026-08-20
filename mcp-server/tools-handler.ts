@@ -22,6 +22,15 @@ import {
   saveSyllabusTopicToDb,
   deleteSyllabusTopicFromDb,
   deleteSyllabusTopicsBySubjectFromDb,
+  fetchStudyBlocksFromDb,
+  saveStudyBlockToDb,
+  deleteStudyBlockFromDb,
+  fetchFlashcardsFromDb,
+  saveFlashcardToDb,
+  deleteFlashcardFromDb,
+  fetchDueFlashcardsFromDb,
+  fetchClassSessionsFromDb,
+  saveClassSessionToDb,
 } from './db-repository';
 
 export async function handleGetAcademicOverview() {
@@ -500,5 +509,378 @@ export async function handleManageSyllabusTopics(action: 'create' | 'read' | 'up
     }
   } catch (error: any) {
     return { status: 'error', message: error.message || 'Error en operación de Tema' };
+  }
+}
+
+export async function handleGenerateStudyPlan(
+  availableHoursPerDay: number,
+  targetSubjectIds?: string[],
+  dateStart?: string,
+  dateEnd?: string
+) {
+  try {
+    if (!availableHoursPerDay || !dateStart || !dateEnd) {
+      return { status: 'error', message: 'available_hours_per_day, date_start, date_end son requeridos' };
+    }
+
+    const [subjects, schedules, deliverables] = await Promise.all([
+      fetchSubjectsFromDb(),
+      fetchSchedulesFromDb(),
+      fetchDeliverablesFromDb(),
+    ]);
+
+    const filteredSubjects = targetSubjectIds
+      ? (Array.isArray(subjects) ? subjects : [subjects]).filter((s: any) => targetSubjectIds.includes(s.id))
+      : (Array.isArray(subjects) ? subjects : [subjects]);
+
+    const dmeHoursBySubject = new Map<string, number>();
+    filteredSubjects.forEach((s: any) => {
+      dmeHoursBySubject.set(s.id, s.difficulty * 0.5);
+    });
+
+    const { generateStudyPlan } = await import('../lib/algorithms/study-planner');
+    const weekStart = new Date(dateStart);
+    const blocks = generateStudyPlan({
+      dmeHoursBySubject,
+      schedules: (Array.isArray(schedules) ? schedules : [schedules]) as any,
+      deliverables: (Array.isArray(deliverables) ? deliverables : [deliverables]) as any,
+      weekStartDate: weekStart,
+    });
+
+    const filteredBlocks = blocks.filter(b => b.date >= dateStart && b.date <= dateEnd);
+
+    return {
+      status: 'success',
+      blocksGenerated: filteredBlocks.length,
+      blocks: filteredBlocks,
+      dateRange: { start: dateStart, end: dateEnd },
+    };
+  } catch (error: any) {
+    return { status: 'error', message: error.message || 'Error generando plan de estudio' };
+  }
+}
+
+export async function handleGetStudyMaterial(
+  subjectId?: string,
+  topicId?: string,
+  sessionDate?: string
+) {
+  try {
+    const [topics, sessions, flashcards, deliverables] = await Promise.all([
+      fetchSyllabusTopicsFromDb(),
+      fetchClassSessionsFromDb(),
+      fetchFlashcardsFromDb(),
+      fetchDeliverablesFromDb(),
+    ]);
+
+    let filteredTopics = Array.isArray(topics) ? topics : [topics];
+    let filteredSessions = Array.isArray(sessions) ? sessions : [sessions];
+    let filteredFlashcards = Array.isArray(flashcards) ? flashcards : [flashcards];
+    let filteredDeliverables = Array.isArray(deliverables) ? deliverables : [deliverables];
+
+    if (subjectId) {
+      filteredTopics = filteredTopics.filter((t: any) => t.subject_id === subjectId);
+      filteredSessions = filteredSessions.filter((s: any) => s.subject_id === subjectId);
+      filteredFlashcards = filteredFlashcards.filter((f: any) => f.subject_id === subjectId);
+      filteredDeliverables = filteredDeliverables.filter((d: any) => d.subject_id === subjectId);
+    }
+
+    if (topicId) {
+      filteredTopics = filteredTopics.filter((t: any) => t.id === topicId || t.parent_id === topicId);
+      filteredFlashcards = filteredFlashcards.filter((f: any) => f.topic_id === topicId);
+    }
+
+    if (sessionDate) {
+      filteredSessions = filteredSessions.filter((s: any) => s.session_date.split('T')[0] === sessionDate);
+    }
+
+    return {
+      status: 'success',
+      material: {
+        syllabusTopics: filteredTopics,
+        classSessions: filteredSessions,
+        flashcards: filteredFlashcards,
+        deliverables: filteredDeliverables,
+      },
+      counts: {
+        topics: filteredTopics.length,
+        sessions: filteredSessions.length,
+        flashcards: filteredFlashcards.length,
+        deliverables: filteredDeliverables.length,
+      },
+    };
+  } catch (error: any) {
+    return { status: 'error', message: error.message || 'Error obteniendo material de estudio' };
+  }
+}
+
+export async function handleGeneratePracticeExam(
+  subjectId: string,
+  topicIds: string[],
+  questionCount?: number,
+  questionTypes?: string[],
+  difficulty?: string
+) {
+  try {
+    if (!subjectId || !topicIds || topicIds.length === 0) {
+      return { status: 'error', message: 'subject_id y topic_ids son requeridos' };
+    }
+
+    const count = questionCount || 10;
+    const types = questionTypes || ['open', 'mcq'];
+    const diff = difficulty || 'medium';
+
+    const [topics, sessions, flashcards] = await Promise.all([
+      fetchSyllabusTopicsFromDb(),
+      fetchClassSessionsFromDb(),
+      fetchFlashcardsFromDb(),
+    ]);
+
+    const relevantTopics = (Array.isArray(topics) ? topics : [topics]).filter((t: any) => topicIds.includes(t.id));
+    const relevantSessions = (Array.isArray(sessions) ? sessions : [sessions]).filter((s: any) => s.subject_id === subjectId);
+    const relevantFlashcards = (Array.isArray(flashcards) ? flashcards : [flashcards]).filter((f: any) => topicIds.includes(f.topic_id));
+
+    return {
+      status: 'success',
+      examContext: {
+        subject_id: subjectId,
+        topic_ids: topicIds,
+        difficulty: diff,
+        question_count: count,
+        question_types: types,
+        topics: relevantTopics,
+        referenceMaterial: {
+          classSessions: relevantSessions,
+          existingFlashcards: relevantFlashcards,
+        },
+      },
+      instruction: `Usa este contexto para formular ${count} preguntas de tipo ${types.join(', ')} con dificultad ${diff}.`,
+    };
+  } catch (error: any) {
+    return { status: 'error', message: error.message || 'Error generando examen de práctica' };
+  }
+}
+
+export async function handleRecordStudyProgress(flashcardId: string, rating: string) {
+  try {
+    if (!flashcardId || !['again', 'hard', 'good', 'easy'].includes(rating)) {
+      return { status: 'error', message: 'flashcard_id y rating (again|hard|good|easy) son requeridos' };
+    }
+
+    const flashcard = await fetchFlashcardsFromDb(flashcardId);
+    if (!flashcard) {
+      return { status: 'error', message: `Flashcard ${flashcardId} no encontrada` };
+    }
+
+    const { reviewFlashcard: review } = await import('../lib/algorithms/flashcard-scheduler');
+    const updatedCard = review(Array.isArray(flashcard) ? flashcard[0] : flashcard, rating as any);
+    await saveFlashcardToDb(updatedCard);
+
+    return {
+      status: 'success',
+      flashcard: updatedCard,
+      message: `Flashcard actualizada. Próxima revisión: ${updatedCard.due}`,
+    };
+  } catch (error: any) {
+    return { status: 'error', message: error.message || 'Error registrando progreso de flashcard' };
+  }
+}
+
+export async function handleGetSyllabusProgress(subjectId?: string) {
+  try {
+    const topics = await fetchSyllabusTopicsFromDb();
+    let filtered = Array.isArray(topics) ? topics : [topics];
+
+    if (subjectId) {
+      filtered = filtered.filter((t: any) => t.subject_id === subjectId);
+    }
+
+    const units = new Map<string | undefined, any[]>();
+    filtered.forEach((topic: any) => {
+      const parentId = topic.parent_id;
+      if (!units.has(parentId)) units.set(parentId, []);
+      units.get(parentId)!.push(topic);
+    });
+
+    const progress = Array.from(units.entries()).map(([unitId, unitTopics]) => {
+      const statuses = unitTopics.map((t: any) => t.mastery_status);
+      const counts = {
+        total: unitTopics.length,
+        no_iniciado: statuses.filter((s: string) => s === 'no_iniciado').length,
+        en_estudio: statuses.filter((s: string) => s === 'en_estudio').length,
+        repasado: statuses.filter((s: string) => s === 'repasado').length,
+        dominado: statuses.filter((s: string) => s === 'dominado').length,
+      };
+      const completionPercent = counts.total > 0 ? Math.round((counts.dominado / counts.total) * 100) : 0;
+
+      return {
+        unit_id: unitId,
+        topics: unitTopics,
+        progress: {
+          completionPercent,
+          ...counts,
+        },
+      };
+    });
+
+    return {
+      status: 'success',
+      progress,
+      subjectId: subjectId || 'all',
+      totalTopics: filtered.length,
+    };
+  } catch (error: any) {
+    return { status: 'error', message: error.message || 'Error obteniendo progreso del temario' };
+  }
+}
+
+export async function handleSyncFireflies(force?: boolean) {
+  try {
+    const apiKey = process.env.FIREFLIES_API_KEY;
+    if (!apiKey) {
+      return { status: 'error', message: 'FIREFLIES_API_KEY no está configurado' };
+    }
+
+    const [schedules, subjects, existingSessions] = await Promise.all([
+      fetchSchedulesFromDb(),
+      fetchSubjectsFromDb(),
+      fetchClassSessionsFromDb(),
+    ]);
+
+    const { syncFirefliesTranscripts } = await import('../lib/integrations/fireflies-sync');
+    const syncResult = await syncFirefliesTranscripts(
+      apiKey,
+      (Array.isArray(schedules) ? schedules : [schedules]) as any,
+      (Array.isArray(subjects) ? subjects : [subjects]) as any,
+      (Array.isArray(existingSessions) ? existingSessions : [existingSessions]) as any
+    );
+
+    const { saveClassSessionToDb } = await import('./db-repository');
+    for (const session of syncResult.newSessions) {
+      await saveClassSessionToDb(session);
+    }
+
+    return {
+      status: 'success',
+      message: `Sincronización completada: ${syncResult.matched} coincidencias, ${syncResult.unmatched} no coincididas`,
+      newSessionsCreated: syncResult.newSessions.length,
+      matched: syncResult.matched,
+      unmatched: syncResult.unmatched,
+      sessions: syncResult.newSessions,
+    };
+  } catch (error: any) {
+    return { status: 'error', message: error.message || 'Error sincronizando Fireflies' };
+  }
+}
+
+export async function handleManageStudyBlocks(action: string, data?: any) {
+  try {
+    const { fetchStudyBlocksFromDb, saveStudyBlockToDb, deleteStudyBlockFromDb } = await import('./db-repository');
+
+    switch (action) {
+      case 'create': {
+        if (!data || !data.subject_id || !data.date || !data.start_time || !data.end_time) {
+          return { status: 'error', message: 'subject_id, date, start_time, end_time son requeridos para crear' };
+        }
+        const block = {
+          id: data.id || `block-${Date.now()}`,
+          ...data,
+          created_at: new Date().toISOString(),
+        };
+        await saveStudyBlockToDb(block);
+        return { status: 'success', block };
+      }
+
+      case 'read': {
+        const blocks = await fetchStudyBlocksFromDb(data?.subject_id);
+        return { status: 'success', blocks };
+      }
+
+      case 'update': {
+        if (!data || !data.id) {
+          return { status: 'error', message: 'id es requerido para actualizar' };
+        }
+        const existing = await fetchStudyBlocksFromDb();
+        const toUpdate = (Array.isArray(existing) ? existing : [existing]).find((b: any) => b.id === data.id);
+        if (!toUpdate) {
+          return { status: 'error', message: `Bloque ${data.id} no encontrado` };
+        }
+        const updated = { ...toUpdate, ...data };
+        await saveStudyBlockToDb(updated);
+        return { status: 'success', block: updated };
+      }
+
+      case 'delete': {
+        if (!data || !data.id) {
+          return { status: 'error', message: 'id es requerido para eliminar' };
+        }
+        await deleteStudyBlockFromDb(data.id);
+        return { status: 'success', message: `Bloque ${data.id} eliminado` };
+      }
+
+      default:
+        return { status: 'error', message: `Acción no válida: ${action}` };
+    }
+  } catch (error: any) {
+    return { status: 'error', message: error.message || 'Error en operación de bloques de estudio' };
+  }
+}
+
+export async function handleManageFlashcards(action: string, data?: any) {
+  try {
+    const { fetchFlashcardsFromDb, saveFlashcardToDb, deleteFlashcardFromDb, fetchDueFlashcardsFromDb } = await import('./db-repository');
+
+    switch (action) {
+      case 'create': {
+        if (!data || !data.subject_id || !data.topic_id || !data.question || !data.answer) {
+          return { status: 'error', message: 'subject_id, topic_id, question, answer son requeridos para crear' };
+        }
+        const card = {
+          id: data.id || `card-${Date.now()}`,
+          ...data,
+          created_at: new Date().toISOString(),
+        };
+        await saveFlashcardToDb(card);
+        return { status: 'success', flashcard: card };
+      }
+
+      case 'read': {
+        const cards = await fetchFlashcardsFromDb(data?.subject_id);
+        return { status: 'success', flashcards: cards };
+      }
+
+      case 'update': {
+        if (!data || !data.id) {
+          return { status: 'error', message: 'id es requerido para actualizar' };
+        }
+        const existing = await fetchFlashcardsFromDb();
+        const toUpdate = (Array.isArray(existing) ? existing : [existing]).find((c: any) => c.id === data.id);
+        if (!toUpdate) {
+          return { status: 'error', message: `Flashcard ${data.id} no encontrada` };
+        }
+        const updated = { ...toUpdate, ...data };
+        await saveFlashcardToDb(updated);
+        return { status: 'success', flashcard: updated };
+      }
+
+      case 'delete': {
+        if (!data || !data.id) {
+          return { status: 'error', message: 'id es requerido para eliminar' };
+        }
+        await deleteFlashcardFromDb(data.id);
+        return { status: 'success', message: `Flashcard ${data.id} eliminada` };
+      }
+
+      case 'due_today': {
+        const today = new Date().toISOString().split('T')[0];
+        const dueCards = await fetchDueFlashcardsFromDb(today);
+        return { status: 'success', flashcards: dueCards, count: dueCards.length, date: today };
+      }
+
+      default:
+        return { status: 'error', message: `Acción no válida: ${action}` };
+    }
+  } catch (error: any) {
+    return { status: 'error', message: error.message || 'Error en operación de flashcards' };
   }
 }
