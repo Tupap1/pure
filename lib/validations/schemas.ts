@@ -160,6 +160,15 @@ export const FlashcardSchema = z.object({
   created_at: z.string().optional()
 });
 
+export const AttendanceRecordSchema = z.object({
+  id: z.string().optional(),
+  subject_id: z.string().min(1, { message: 'Debe seleccionar una asignatura' }),
+  date: z.string().min(1, { message: 'La fecha es requerida' }),
+  status: z.enum(['presente', 'ausente', 'tarde', 'justificada']),
+  note: z.string().optional().nullable(),
+  created_at: z.string().optional()
+});
+
 export type ValidationResult<T> =
   | { success: true; data: T }
   | { success: false; errors: Record<string, string> };

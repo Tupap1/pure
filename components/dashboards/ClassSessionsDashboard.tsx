@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ClassSessionForm } from '@/components/ui/ClassSessionForm';
+import { AttendancePanel } from '@/components/ui/AttendancePanel';
 import {
   Video,
   FileText,
@@ -22,7 +23,7 @@ import {
 } from 'lucide-react';
 
 export const ClassSessionsDashboard: React.FC = () => {
-  const { isLoaded, subjects, schedules, classSessions } = usePureData();
+  const { isLoaded, subjects, schedules, classSessions, attendanceRecords } = usePureData();
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -118,6 +119,9 @@ export const ClassSessionsDashboard: React.FC = () => {
         </Button>
       </div>
 
+      {/* Asistencia por materia */}
+      <AttendancePanel subjects={subjects} attendanceRecords={attendanceRecords} />
+
       {/* Filter & Search Bar */}
       <div className="flex flex-col md:flex-row md:items-center gap-3">
         {/* Search */}
@@ -138,7 +142,7 @@ export const ClassSessionsDashboard: React.FC = () => {
             onClick={() => setSelectedSubjectId('all')}
             className={`px-3 py-2 rounded-lg border font-medium transition-all shrink-0 ${
               selectedSubjectId === 'all'
-                ? 'bg-sky-600 text-white border-sky-500 font-bold shadow-sm'
+                ? 'bg-slate-900 dark:bg-white/10 text-white border-transparent font-semibold shadow-sm'
                 : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-300'
             }`}
           >

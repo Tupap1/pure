@@ -15,6 +15,8 @@ import {
   deleteSyllabusTopicFromDb,
   saveClassSessionToDb,
   deleteClassSessionFromDb,
+  saveAttendanceRecordToDb,
+  deleteAttendanceRecordFromDb,
 } from '@/lib/db/repository-pg';
 
 const ALLOWED_TABLES = new Set([
@@ -25,6 +27,7 @@ const ALLOWED_TABLES = new Set([
   'deliverables',
   'syllabus_topics',
   'class_sessions',
+  'attendance_records',
 ]);
 
 export async function GET() {
@@ -76,6 +79,9 @@ export async function POST(request: Request) {
         case 'class_sessions':
           await deleteClassSessionFromDb(data.id);
           break;
+        case 'attendance_records':
+          await deleteAttendanceRecordFromDb(data.id);
+          break;
       }
       return NextResponse.json({ status: 'success', message: 'Record deleted from PostgreSQL' });
     }
@@ -102,6 +108,9 @@ export async function POST(request: Request) {
         break;
       case 'class_sessions':
         await saveClassSessionToDb(data);
+        break;
+      case 'attendance_records':
+        await saveAttendanceRecordToDb(data);
         break;
     }
 

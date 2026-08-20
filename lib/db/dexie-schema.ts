@@ -148,6 +148,15 @@ export interface FlashcardEntity {
   created_at?: string;
 }
 
+export interface AttendanceRecordEntity {
+  id?: string;
+  subject_id: string;
+  date: string;
+  status: 'presente' | 'ausente' | 'tarde' | 'justificada';
+  note?: string | null;
+  created_at?: string;
+}
+
 export interface SyncQueueItem {
   id?: number;
   action: 'insert' | 'update' | 'delete';
@@ -167,6 +176,7 @@ export class PureDatabase extends Dexie {
   classSessions!: Table<ClassSessionEntity, string>;
   studyBlocks!: Table<StudyBlockEntity, string>;
   flashcards!: Table<FlashcardEntity, string>;
+  attendanceRecords!: Table<AttendanceRecordEntity, string>;
   syncQueue!: Table<SyncQueueItem, number>;
 
   constructor() {
@@ -196,6 +206,10 @@ export class PureDatabase extends Dexie {
     this.version(3).stores({
       studyBlocks: '++id, subject_id, topic_id, deliverable_id, date, is_completed, source',
       flashcards: '++id, subject_id, topic_id, due, state, source'
+    });
+
+    this.version(4).stores({
+      attendanceRecords: '++id, subject_id, date, status'
     });
   }
 }

@@ -30,6 +30,15 @@ function extractQuestions(sentences?: FirefliesSentence[]): string[] {
     .filter(Boolean);
 }
 
+// La transcripción completa se persiste en PURE (no solo el resumen) para que
+// sobreviva cuando Fireflies purgue la grabación al llegar a su tope de almacenamiento.
+function buildTranscriptText(sentences?: FirefliesSentence[]): string | null {
+  if (!sentences || sentences.length === 0) return null;
+  return sentences
+    .map(s => `${s.speaker_name ? s.speaker_name + ': ' : ''}${s.text}`)
+    .join('\n');
+}
+
 function findMatchingSchedule(
   transcript: FirefliesTranscript,
   schedules: ScheduleEntity[]
@@ -100,7 +109,7 @@ export async function syncFirefliesTranscripts(
       topics_covered: transcript.summary?.keywords || [],
       notes: null,
       fireflies_transcript_id: transcript.id,
-      transcript_text: null,
+      transcript_text: buildTranscriptText(transcript.sentences),
       ai_summary: transcript.summary?.overview || null,
       ai_action_items: transcript.summary?.action_items || [],
       ai_questions: extractQuestions(transcript.sentences),

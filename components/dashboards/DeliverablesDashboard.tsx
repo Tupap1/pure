@@ -12,7 +12,6 @@ import {
   Plus,
   Users,
   User,
-  Calculator,
   Trash2,
   Edit3
 } from 'lucide-react';
@@ -21,7 +20,7 @@ import { formatDeliverableDate } from '@/lib/domain/deliverable';
 import { DeliverableSchema, validateEntity } from '@/lib/validations/schemas';
 
 export const DeliverablesDashboard: React.FC = () => {
-  const { isLoaded, subjects, deliverables } = usePureData();
+  const { isLoaded, subjects, deliverables, universities } = usePureData();
   const [filterGroup, setFilterGroup] = useState<'all' | 'individual' | 'group'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingDeliv, setEditingDeliv] = useState<DeliverableEntity | null>(null);
@@ -59,10 +58,21 @@ export const DeliverablesDashboard: React.FC = () => {
     })
     .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
-  const activeSubject = subjects[0];
-  const requiredGrade = activeSubject
-    ? calculateRequiredGradeForRemaining(deliverables as any, activeSubject.target_grade)
-    : null;
+  // Nota requerida POR materia: cada una usa solo sus propias entregas y su meta.
+  // Antes se calculaba con todas las entregas contra la meta de una sola materia (bug).
+  const gradeRows = subjects
+    .map((subject) => {
+      const subjectDelivs = deliverables.filter((d) => d.subject_id === subject.id);
+      if (subjectDelivs.length === 0) return null;
+      const uni = universities.find((u) => u.id === subject.university_id);
+      const scaleMax = uni?.scale_max ?? 5;
+      const required = calculateRequiredGradeForRemaining(subjectDelivs as any, subject.target_grade);
+      const evaluatedWeight = subjectDelivs
+        .filter((d) => d.status === 'calificado' && d.grade != null)
+        .reduce((sum, d) => sum + d.weight_percentage, 0);
+      return { subject, required, scaleMax, remainingWeight: Math.max(0, 100 - evaluatedWeight) };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
 
   const openAddModal = () => {
     setTitle('');
@@ -295,35 +305,61 @@ export const DeliverablesDashboard: React.FC = () => {
         </Button>
       </div>
 
-      {/* Required Grade Calculator Card */}
-      {activeSubject && deliverables.length > 0 && (
-        <Card className="p-4 border border-sky-300 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-950/20">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <Calculator className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  Calculadora de Nota Mínima Requerida
-                </h4>
-                <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                  Materia: <strong className="text-slate-900 dark:text-slate-100">{activeSubject.name}</strong> • Nota Meta:{' '}
-                  <strong className="text-aeroespacial">{activeSubject.target_grade.toFixed(2)}</strong>.
-                  {requiredGrade !== null ? (
-                    <span>
-                      {' '}
-                      Necesitas promediar{' '}
-                      <strong className="text-slate-500 dark:text-slate-400 font-mono text-sm font-bold">
-                        {requiredGrade.toFixed(2)}
-                      </strong>{' '}
-                      en los porcentajes restantes.
-                    </span>
-                  ) : (
-                    <span> Ya se evaluó el 100% de la materia.</span>
-                  )}
-                </p>
-              </div>
-            </div>
-            <Badge variant="synergy">Cálculo Automático</Badge>
+      {/* Nota requerida por materia — dato, no prosa */}
+      {gradeRows.length > 0 && (
+        <Card className="p-0 overflow-hidden">
+          <div className="px-4 pt-4 pb-3">
+            <h4 className="text-sm font-heading font-semibold text-slate-900 dark:text-slate-100">
+              Nota requerida por materia
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Promedio mínimo necesario en lo que falta para alcanzar tu meta.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-y border-surface-border text-slate-500 dark:text-slate-400">
+                  <th className="text-left font-medium px-4 py-2">Materia</th>
+                  <th className="text-right font-medium px-3 py-2 tabular-nums">Meta</th>
+                  <th className="text-right font-medium px-3 py-2 tabular-nums">Falta</th>
+                  <th className="text-right font-medium px-4 py-2 tabular-nums">Requerida</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border">
+                {gradeRows.map(({ subject, required, scaleMax, remainingWeight }) => {
+                  const impossible = required != null && required > scaleMax;
+                  const demanding = required != null && !impossible && required > subject.target_grade;
+                  const reqClass = impossible
+                    ? 'text-red-600 dark:text-red-400'
+                    : demanding
+                      ? 'text-amber-600 dark:text-amber-500'
+                      : 'text-slate-900 dark:text-slate-100';
+                  return (
+                    <tr key={subject.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors">
+                      <td className="px-4 py-2.5">
+                        <span className="font-medium text-slate-800 dark:text-slate-200">{subject.name}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                        {subject.target_grade.toFixed(1)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                        {remainingWeight}%
+                      </td>
+                      <td className={`px-4 py-2.5 text-right font-mono tabular-nums font-semibold ${reqClass}`}>
+                        {required == null ? (
+                          <span className="text-slate-400 font-normal">Completa</span>
+                        ) : impossible ? (
+                          <span title="Supera la escala máxima">{required.toFixed(2)} ✕</span>
+                        ) : (
+                          required.toFixed(2)
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </Card>
       )}

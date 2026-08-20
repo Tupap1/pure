@@ -131,6 +131,15 @@ export async function initPostgresSchema() {
           updated_at TIMESTAMPTZ DEFAULT NOW()
         );
 
+        CREATE TABLE IF NOT EXISTS attendance_records (
+          id TEXT PRIMARY KEY,
+          subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+          date TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'presente',
+          note TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
         CREATE TABLE IF NOT EXISTS oauth_clients (
           client_id VARCHAR(255) PRIMARY KEY,
           client_name VARCHAR(255),

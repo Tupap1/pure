@@ -525,6 +525,42 @@ export async function deleteClassSessionFromDb(id: string) {
   await pgPool.query('DELETE FROM class_sessions WHERE id = $1', [id]);
 }
 
+// --- ATTENDANCE ---
+export async function fetchAttendanceRecordsFromDb(subjectId?: string) {
+  if (subjectId) {
+    const res = await pgPool.query('SELECT * FROM attendance_records WHERE subject_id = $1 ORDER BY date DESC', [subjectId]);
+    return res.rows;
+  }
+  const res = await pgPool.query('SELECT * FROM attendance_records ORDER BY date DESC');
+  return res.rows;
+}
+
+export async function saveAttendanceRecordToDb(rec: any) {
+  const record = {
+    id: rec.id || `att-${Date.now()}`,
+    subject_id: rec.subject_id,
+    date: rec.date,
+    status: rec.status || 'presente',
+    note: rec.note || null,
+  };
+
+  await pgPool.query(
+    `INSERT INTO attendance_records (id, subject_id, date, status, note)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (id) DO UPDATE SET
+       subject_id = EXCLUDED.subject_id,
+       date = EXCLUDED.date,
+       status = EXCLUDED.status,
+       note = EXCLUDED.note`,
+    [record.id, record.subject_id, record.date, record.status, record.note]
+  );
+  return record;
+}
+
+export async function deleteAttendanceRecordFromDb(id: string) {
+  await pgPool.query('DELETE FROM attendance_records WHERE id = $1', [id]);
+}
+
 // --- STUDY BLOCKS ---
 export async function fetchStudyBlocksFromDb(subjectId?: string) {
   let query = 'SELECT * FROM study_blocks';
