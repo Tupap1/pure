@@ -29,6 +29,7 @@ import {
   handleSyncFireflies,
   handleManageStudyBlocks,
   handleManageFlashcards,
+  handleGetClassContext,
 } from './tools-handler';
 
 export const TOOLS_LIST = [
@@ -255,6 +256,18 @@ export const TOOLS_LIST = [
       required: ['action'],
     },
   },
+  {
+    name: 'get_class_context',
+    description: 'Devuelve el contexto completo de una clase (resumen, temas, transcripción y temario relacionado) para que un agente responda o genere material.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session_id: { type: 'string', description: 'ID de la sesión de clase (opcional si se proporciona subject_id)' },
+        subject_id: { type: 'string', description: 'ID de la materia para obtener la sesión más reciente (opcional si se proporciona session_id)' },
+        date: { type: 'string', description: 'Fecha en formato ISO (optional, futuro uso)' },
+      },
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -369,9 +382,10 @@ export function createMcpServerInstance() {
       question_count: z.number().optional(),
       question_types: z.array(z.string()).optional(),
       difficulty: z.enum(['easy', 'medium', 'hard']),
+      session_id: z.string().optional(),
     },
-    async ({ subject_id, topic_ids, question_count, question_types, difficulty }) => {
-      const res = await handleGeneratePracticeExam(subject_id, topic_ids, question_count, question_types, difficulty);
+    async ({ subject_id, topic_ids, question_count, question_types, difficulty, session_id }) => {
+      const res = await handleGeneratePracticeExam(subject_id, topic_ids, question_count, question_types, difficulty, session_id);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );
@@ -435,6 +449,20 @@ export function createMcpServerInstance() {
     },
     async ({ action, data }) => {
       const res = await handleManageFlashcards(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'get_class_context',
+    'Devuelve el contexto completo de una clase (resumen, temas, transcripción y temario relacionado) para que un agente responda o genere material.',
+    {
+      session_id: z.string().optional(),
+      subject_id: z.string().optional(),
+      date: z.string().optional(),
+    },
+    async ({ session_id, subject_id, date }) => {
+      const res = await handleGetClassContext({ session_id, subject_id, date });
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );

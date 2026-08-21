@@ -650,7 +650,8 @@ export async function handleGeneratePracticeExam(
   topicIds: string[],
   questionCount?: number,
   questionTypes?: string[],
-  difficulty?: string
+  difficulty?: string,
+  sessionId?: string
 ) {
   try {
     if (!subjectId || !topicIds || topicIds.length === 0) {
@@ -671,6 +672,27 @@ export async function handleGeneratePracticeExam(
     const relevantSessions = (Array.isArray(sessions) ? sessions : [sessions]).filter((s: any) => s.subject_id === subjectId);
     const relevantFlashcards = (Array.isArray(flashcards) ? flashcards : [flashcards]).filter((f: any) => topicIds.includes(f.topic_id));
 
+    // If sessionId is provided, incorporate its content into the context
+    let additionalContext = '';
+    if (sessionId) {
+      const sessionResult = await fetchClassSessionsFromDb(sessionId);
+      const session = Array.isArray(sessionResult) ? sessionResult[0] : sessionResult;
+      if (session) {
+        additionalContext += `Materiales de sesión ${sessionId}:\n`;
+        if (session.topics_covered) {
+          const covered = typeof session.topics_covered === 'string'
+            ? JSON.parse(session.topics_covered)
+            : session.topics_covered;
+          if (Array.isArray(covered)) {
+            additionalContext += `Temas cubiertos: ${covered.join(', ')}\n`;
+          }
+        }
+        if (session.transcript_text) {
+          additionalContext += `Transcripción:\n${session.transcript_text}\n`;
+        }
+      }
+    }
+
     return {
       status: 'success',
       examContext: {
@@ -685,7 +707,7 @@ export async function handleGeneratePracticeExam(
           existingFlashcards: relevantFlashcards,
         },
       },
-      instruction: `Usa este contexto para formular ${count} preguntas de tipo ${types.join(', ')} con dificultad ${diff}.`,
+      instruction: `Usa este contexto para formular ${count} preguntas de tipo ${types.join(', ')} con dificultad ${diff}.${additionalContext ? '\n' + additionalContext : ''}`,
     };
   } catch (error: any) {
     return { status: 'error', message: error.message || 'Error generando examen de práctica' };
@@ -762,6 +784,123 @@ export async function handleGetSyllabusProgress(subjectId?: string) {
     };
   } catch (error: any) {
     return { status: 'error', message: error.message || 'Error obteniendo progreso del temario' };
+  }
+}
+
+export async function handleGetClassContext(input: { session_id?: string; subject_id?: string; date?: string }) {
+  try {
+    let session: any = null;
+
+    // Resolve the session
+    if (input.session_id) {
+      const result = await fetchClassSessionsFromDb(input.session_id);
+      session = Array.isArray(result) ? result[0] : result;
+    } else if (input.subject_id) {
+      // Fetch all sessions for this subject, sort by session_date DESC, take the first
+      const allSessions = await fetchClassSessionsFromDb();
+      const sessionsArray = Array.isArray(allSessions) ? allSessions : [allSessions];
+      const filtered = sessionsArray.filter((s: any) => s && s.subject_id === input.subject_id);
+      if (filtered.length > 0) {
+        filtered.sort((a: any, b: any) => {
+          const dateA = new Date(a.session_date || 0).getTime();
+          const dateB = new Date(b.session_date || 0).getTime();
+          return dateB - dateA; // DESC
+        });
+        session = filtered[0];
+      }
+    } else {
+      return { status: 'error', message: 'Debe indicar session_id o subject_id' };
+    }
+
+    if (!session) {
+      return { status: 'error', message: 'Sesión de clase no encontrada' };
+    }
+
+    // Load subject
+    const subjectResult = await fetchSubjectsFromDb(session.subject_id);
+    const subj = Array.isArray(subjectResult) ? subjectResult[0] : subjectResult;
+
+    // Load all syllabus topics and filter by subject_id
+    const allTopics = await fetchSyllabusTopicsFromDb();
+    const topicsArray = Array.isArray(allTopics) ? allTopics : [allTopics];
+    const relatedTopics = topicsArray
+      .filter((t: any) => t && t.subject_id === session.subject_id)
+      .map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        mastery_status: t.mastery_status,
+      }));
+
+    // Parse topics_covered if it's a string (JSON array)
+    let topicsCovered: string[] = [];
+    if (session.topics_covered) {
+      if (typeof session.topics_covered === 'string') {
+        try {
+          topicsCovered = JSON.parse(session.topics_covered);
+        } catch {
+          topicsCovered = [];
+        }
+      } else if (Array.isArray(session.topics_covered)) {
+        topicsCovered = session.topics_covered;
+      }
+    }
+
+    // Parse ai_action_items if it's a string
+    let actionItems: string[] = [];
+    if (session.ai_action_items) {
+      if (typeof session.ai_action_items === 'string') {
+        try {
+          actionItems = JSON.parse(session.ai_action_items);
+        } catch {
+          actionItems = [];
+        }
+      } else if (Array.isArray(session.ai_action_items)) {
+        actionItems = session.ai_action_items;
+      }
+    }
+
+    // Parse ai_questions if it's a string
+    let questions: string[] = [];
+    if (session.ai_questions) {
+      if (typeof session.ai_questions === 'string') {
+        try {
+          questions = JSON.parse(session.ai_questions);
+        } catch {
+          questions = [];
+        }
+      } else if (Array.isArray(session.ai_questions)) {
+        questions = session.ai_questions;
+      }
+    }
+
+    // Ensure session_date is a string (it may be a Date object from the database)
+    const sessionDateStr = typeof session.session_date === 'string'
+      ? session.session_date
+      : session.session_date instanceof Date
+      ? session.session_date.toISOString()
+      : String(session.session_date);
+
+    return {
+      status: 'success',
+      data: {
+        id: session.id,
+        title: session.title,
+        session_date: sessionDateStr,
+        subject: {
+          id: session.subject_id,
+          name: subj?.name ?? null,
+        },
+        summary: session.ai_summary ?? session.summary ?? null,
+        topics: topicsCovered,
+        action_items: actionItems,
+        questions: questions,
+        transcript_text: session.transcript_text ?? null,
+        transcript_available: !!session.transcript_text,
+        related_syllabus_topics: relatedTopics,
+      },
+    };
+  } catch (error: any) {
+    return { status: 'error', message: error.message };
   }
 }
 
