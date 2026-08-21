@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { Badge } from './Badge';
 import { Button } from './Button';
-import { SubjectEntity, ProfessorEntity, UniversityEntity, ClassSessionEntity, ScheduleEntity } from '@/lib/db/dexie-schema';
+import { SubjectEntity, ProfessorEntity, UniversityEntity, ClassSessionEntity, ScheduleEntity, DeliverableEntity } from '@/lib/db/dexie-schema';
+import { SubjectEvaluation } from './SubjectEvaluation';
 import {
   BookOpen,
   User,
@@ -33,6 +34,8 @@ interface SubjectDetailsModalProps {
   professor?: ProfessorEntity | null;
   university?: UniversityEntity | null;
   classSessions?: ClassSessionEntity[];
+  /** Entregas de todas las materias; la pestaña Evaluación filtra las de esta materia. */
+  deliverables?: DeliverableEntity[];
   onAddSession?: (subjectId: string) => void;
   /** Cuando el modal se abre desde un bloque del calendario, la clase concreta que se tocó. */
   schedule?: ScheduleEntity | null;
@@ -47,11 +50,12 @@ export const SubjectDetailsModal: React.FC<SubjectDetailsModalProps> = ({
   professor,
   university,
   classSessions = [],
+  deliverables = [],
   onAddSession,
   schedule = null,
   onEditSchedule,
 }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'sessions'>('sessions');
+  const [activeTab, setActiveTab] = useState<'info' | 'sessions' | 'evaluation'>('sessions');
 
   if (!subject) return null;
 
@@ -161,6 +165,16 @@ export const SubjectDetailsModal: React.FC<SubjectDetailsModalProps> = ({
             }`}
           >
             Últimas Sesiones ({subjectSessions.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('evaluation')}
+            className={`px-4 py-2 font-medium border-b-2 transition-all ${
+              activeTab === 'evaluation'
+                ? 'border-sky-500 text-slate-500 dark:text-slate-400 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            Evaluación
           </button>
           <button
             onClick={() => setActiveTab('info')}
@@ -298,6 +312,11 @@ export const SubjectDetailsModal: React.FC<SubjectDetailsModalProps> = ({
               </div>
             )}
           </div>
+        )}
+
+        {/* Tab: Evaluación — esquema ponderado y nota calculada de la materia */}
+        {activeTab === 'evaluation' && (
+          <SubjectEvaluation subject={subject} deliverables={deliverables} />
         )}
 
         {/* Tab 2: General Info & Telemetry */}

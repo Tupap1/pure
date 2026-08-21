@@ -129,7 +129,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
   professors = [],
   universities = []
 }) => {
-  const { classSessions } = usePureData();
+  const { classSessions, deliverables } = usePureData();
   const [selectedUniId, setSelectedUniId] = useState<string>('all');
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
   const [modalSubject, setModalSubject] = useState<SubjectEntity | null>(null);
@@ -440,6 +440,7 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
           professor={professors.find((p) => p.id === modalSubject.professor_id)}
           university={universities.find((u) => u.id === modalSubject.university_id)}
           classSessions={classSessions}
+          deliverables={deliverables}
         />
       )}
     </div>

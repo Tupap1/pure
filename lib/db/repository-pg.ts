@@ -370,7 +370,10 @@ export async function saveDeliverableToDb(deliv: any) {
     due_date: deliv.due_date || new Date().toISOString(),
     weight_percentage: Number(deliv.weight_percentage ?? 20),
     grade: deliv.grade !== undefined && deliv.grade !== null ? Number(deliv.grade) : null,
-    type: deliv.type || 'Parcial',
+    // Normalizamos el `type` a minúscula canónica (igual que el Zod DeliverableSchema) para
+    // que el camino MCP/Postgres no reintroduzca valores capitalizados que el planificador
+    // de estudio ignora. Default 'parcial' en minúscula.
+    type: deliv.type ? String(deliv.type).trim().toLowerCase().replace(/\s+/g, '_') : 'parcial',
     location_modality: deliv.location_modality || 'presencial',
     is_group: deliv.is_group ?? false,
     complexity: deliv.complexity || 'medio',

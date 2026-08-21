@@ -1,6 +1,37 @@
 import { pureDB, UniversityEntity, ProfessorEntity, SubjectEntity, ScheduleEntity, DeliverableEntity, SyllabusTopicEntity, ClassSessionEntity, AttendanceRecordEntity } from './dexie-schema';
+import { calculateWeightedGrade } from '../domain/subject';
 
 const nowIso = () => new Date().toISOString();
+
+/**
+ * Fuente única de `subject.current_grade` (arregla B3).
+ *
+ * Recalcula la nota actual de una materia a partir de SUS entregas calificadas usando el
+ * mismo ponderado que el resto de la app (`calculateWeightedGrade`) y la persiste en el
+ * registro de la materia. Antes `current_grade` se escribía a mano (0 o heredado) y nunca
+ * se refrescaba, así que telemetría, DME y GPA leían un valor stale.
+ *
+ * Se invoca tras cada alta/baja de entrega para mantener el valor derivado al día. Si la
+ * materia no existe localmente no hace nada (evita crear un registro incompleto).
+ */
+export async function recomputeSubjectCurrentGrade(subjectId: string): Promise<number | null> {
+  if (!subjectId) return null;
+  const subject = await pureDB.subjects.get(subjectId);
+  if (!subject) return null;
+
+  const subjectDeliverables = await pureDB.deliverables
+    .where('subject_id')
+    .equals(subjectId)
+    .toArray();
+
+  const { currentGrade } = calculateWeightedGrade(subjectDeliverables);
+
+  // Evita una escritura (y un item en la cola de sync) si el valor no cambió.
+  if (subject.current_grade === currentGrade) return currentGrade;
+
+  await saveSubject({ ...subject, current_grade: currentGrade });
+  return currentGrade;
+}
 
 // --- UNIVERSITIES ---
 export async function saveUniversity(uni: UniversityEntity) {
@@ -130,10 +161,14 @@ export async function saveDeliverable(deliv: DeliverableEntity) {
     data: record,
     timestamp: nowIso(),
   });
+  // Mantiene `subject.current_grade` como valor derivado de las entregas (B3).
+  await recomputeSubjectCurrentGrade(record.subject_id);
   return record;
 }
 
 export async function deleteDeliverable(id: string) {
+  // Necesitamos el subject_id ANTES de borrar para poder recalcular su nota después.
+  const existing = await pureDB.deliverables.get(id);
   await pureDB.deliverables.delete(id);
   await pureDB.syncQueue.add({
     action: 'delete',
@@ -141,6 +176,9 @@ export async function deleteDeliverable(id: string) {
     data: { id },
     timestamp: nowIso(),
   });
+  if (existing?.subject_id) {
+    await recomputeSubjectCurrentGrade(existing.subject_id);
+  }
 }
 
 // --- SYLLABUS TOPICS ---

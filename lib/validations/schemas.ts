@@ -84,7 +84,18 @@ export const DeliverableSchema = z.object({
   due_date: z.string().optional(),
   weight_percentage: z.number().gt(0, { message: 'El peso debe ser mayor al 0%' }).lte(100, { message: 'El peso no puede superar el 100%' }),
   grade: z.number().optional(),
-  type: z.enum(['Taller', 'Proyecto', 'Parcial', 'Quiz', 'Laboratorio', 'Examen Final', 'taller', 'proyecto', 'parcial', 'quiz', 'laboratorio', 'examen_final']),
+  // El `type` se normaliza a minúscula canónica antes de validarse: acepta entrada
+  // case-insensitive (y "Examen Final" con espacio) y la reduce a
+  // taller|proyecto|parcial|quiz|laboratorio|examen_final. Así el planificador de
+  // estudio —que lee el `type` en minúscula (lib/algorithms/study-planner.ts)— vuelve a
+  // clasificar toda entrega creada por UI, que antes quedaba capitalizada y se ignoraba.
+  type: z.string()
+    .transform((t) => t.trim().toLowerCase().replace(/\s+/g, '_'))
+    .pipe(
+      z.enum(['taller', 'proyecto', 'parcial', 'quiz', 'laboratorio', 'examen_final'], {
+        message: 'Tipo de entrega inválido (taller, proyecto, parcial, quiz, laboratorio, examen_final)',
+      })
+    ),
   location_modality: z.enum(['presencial', 'virtual']).optional(),
   is_group: z.boolean().optional(),
   complexity: z.enum(['Fácil', 'Medio', 'Difícil', 'facil', 'medio', 'dificil']),

@@ -5,8 +5,7 @@ import { saveDeliverable, deleteDeliverable } from '@/lib/db/repository';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
-import { FormErrors } from '@/components/ui/FormErrors';
+import { DeliverableFormModal } from '@/components/ui/DeliverableFormModal';
 import {
   CheckSquare,
   Plus,
@@ -17,25 +16,12 @@ import {
 } from 'lucide-react';
 import { calculateRequiredGradeForRemaining } from '@/lib/domain/subject';
 import { formatDeliverableDate } from '@/lib/domain/deliverable';
-import { DeliverableSchema, validateEntity } from '@/lib/validations/schemas';
 
 export const DeliverablesDashboard: React.FC = () => {
   const { isLoaded, subjects, deliverables, universities } = usePureData();
   const [filterGroup, setFilterGroup] = useState<'all' | 'individual' | 'group'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingDeliv, setEditingDeliv] = useState<DeliverableEntity | null>(null);
-
-  // Form states
-  const [title, setTitle] = useState('');
-  const [subjectId, setSubjectId] = useState('');
-  const [weight, setWeight] = useState(20);
-  const [isGroup, setIsGroup] = useState(false);
-  const [complexity, setComplexity] = useState<'facil' | 'medio' | 'dificil'>('medio');
-  const [dueDate, setDueDate] = useState('');
-  const [status, setStatus] = useState<'pendiente' | 'entregado' | 'calificado'>('pendiente');
-  const [grade, setGrade] = useState<number | undefined>(undefined);
-
-  const [delivErrors, setDelivErrors] = useState<Record<string, string>>({});
 
   if (!isLoaded) {
     return (
@@ -75,91 +61,28 @@ export const DeliverablesDashboard: React.FC = () => {
     .filter((r): r is NonNullable<typeof r> => r !== null);
 
   const openAddModal = () => {
-    setTitle('');
-    setSubjectId(subjects[0]?.id || '');
-    setWeight(20);
-    setIsGroup(false);
-    setComplexity('medio');
-    setDueDate('');
-    setStatus('pendiente');
-    setGrade(undefined);
-    setDelivErrors({});
+    setEditingDeliv(null);
     setIsAddModalOpen(true);
   };
 
   const openEditModal = (deliv: DeliverableEntity) => {
+    setIsAddModalOpen(false);
     setEditingDeliv(deliv);
-    setTitle(deliv.title);
-    setSubjectId(deliv.subject_id);
-    setWeight(deliv.weight_percentage);
-    setIsGroup(deliv.is_group);
-    setComplexity(deliv.complexity);
-    setDueDate(deliv.due_date ? deliv.due_date.replace('Z', '').slice(0, 16) : '');
-    setStatus(deliv.status);
-    setGrade(deliv.grade);
-    setDelivErrors({});
   };
 
-  const handleSaveDeliverable = async () => {
-    let formattedDueDate = new Date().toISOString();
-    if (dueDate) {
-      if (dueDate.length === 10) {
-        formattedDueDate = `${dueDate}T00:00:00.000Z`;
-      } else if (dueDate.includes('T')) {
-        formattedDueDate = dueDate.endsWith('Z') ? dueDate : `${dueDate}:00.000Z`;
-      } else {
-        formattedDueDate = new Date(dueDate).toISOString();
-      }
-    }
+  const closeModal = () => {
+    setIsAddModalOpen(false);
+    setEditingDeliv(null);
+  };
 
-    const delivData = {
-      subject_id: subjectId,
-      title,
-      due_date: formattedDueDate,
-      weight_percentage: Number(weight),
-      type: 'Parcial',
-      is_group: isGroup,
-      complexity: complexity === 'dificil' ? 'Difícil' : complexity === 'facil' ? 'Fácil' : 'Medio',
-      status: status,
-      grade: grade !== undefined && grade !== null ? Number(grade) : undefined,
-    };
-
-    const validation = validateEntity(DeliverableSchema, delivData as any);
-    if (!validation.success) {
-      setDelivErrors(validation.errors);
-      return;
-    }
-
-    setDelivErrors({});
-
-    if (editingDeliv && editingDeliv.id) {
-      await saveDeliverable({
-        ...editingDeliv,
-        ...(validation.data as any),
-        complexity,
-        status,
-        grade: grade !== undefined && grade !== null ? Number(grade) : undefined,
-        id: editingDeliv.id,
-      });
-      setEditingDeliv(null);
-    } else {
-      await saveDeliverable({
-        ...(validation.data as any),
-        type: 'Parcial',
-        complexity: complexity,
-        status: status,
-        grade: grade !== undefined && grade !== null ? Number(grade) : undefined,
-      });
-      setIsAddModalOpen(false);
-    }
+  const handleSaveDeliverable = async (data: DeliverableEntity) => {
+    await saveDeliverable(data);
+    closeModal();
   };
 
   const handleDeleteDeliverable = async (id: string) => {
     await deleteDeliverable(id);
   };
-
-  const inputClass =
-    'w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-slate-400 dark:focus:border-slate-500 transition-colors';
 
   // Helper: Check if deliverable is overdue
   const isOverdue = (dueDate: string, status: string): boolean => {
@@ -440,132 +363,15 @@ export const DeliverablesDashboard: React.FC = () => {
         </>
       )}
 
-      {/* Modal Add / Edit Deliverable */}
-      <Modal
-        isOpen={isAddModalOpen || editingDeliv !== null}
-        onClose={() => {
-          setIsAddModalOpen(false);
-          setEditingDeliv(null);
-        }}
-        title={editingDeliv ? `Editar Actividad: ${editingDeliv.title}` : 'Registrar Nueva Actividad / Evaluación'}
-      >
-        <div className="space-y-4">
-          <FormErrors errors={delivErrors} />
-          <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Título de la Actividad</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className={inputClass}
-              placeholder="Ej: Parcial 2 de Mecánica Orbital"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Asignatura</label>
-            <select
-              value={subjectId}
-              onChange={(e) => setSubjectId(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Selecciona una asignatura</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.code})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Modalidad</label>
-              <select
-                value={isGroup ? 'group' : 'individual'}
-                onChange={(e) => setIsGroup(e.target.value === 'group')}
-                className={inputClass}
-              >
-                <option value="individual">Individual</option>
-                <option value="group">Grupal</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Peso % en la Nota</label>
-              <input
-                type="number"
-                value={weight}
-                onChange={(e) => setWeight(Number(e.target.value))}
-                className={inputClass}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Complejidad</label>
-              <select
-                value={complexity}
-                onChange={(e) => setComplexity(e.target.value as any)}
-                className={inputClass}
-              >
-                <option value="facil">Fácil</option>
-                <option value="medio">Medio</option>
-                <option value="dificil">Difícil</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Estado</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-                className={inputClass}
-              >
-                <option value="pendiente">Pendiente</option>
-                <option value="entregado">Entregado</option>
-                <option value="calificado">Calificado</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Fecha Límite</label>
-              <input
-                type="datetime-local"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Nota Calificada (Opcional)</label>
-              <input
-                type="number"
-                step="0.1"
-                value={grade !== undefined && grade !== null ? grade : ''}
-                onChange={(e) => setGrade(e.target.value !== '' ? Number(e.target.value) : undefined)}
-                className={inputClass}
-                placeholder="Ej: 4.8"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
-            <Button variant="ghost" className="w-full sm:w-auto" onClick={() => { setIsAddModalOpen(false); setEditingDeliv(null); }}>
-              Cancelar
-            </Button>
-            <Button
-              variant="synergy"
-              className="w-full sm:w-auto"
-              onClick={handleSaveDeliverable}
-              disabled={!title.trim() || !subjectId}
-            >
-              {editingDeliv ? 'Guardar Cambios' : 'Guardar Actividad'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* Modal Add / Edit Deliverable — formulario extraído y reutilizable */}
+      {(isAddModalOpen || editingDeliv !== null) && (
+        <DeliverableFormModal
+          initialData={editingDeliv}
+          subjects={subjects}
+          onSave={handleSaveDeliverable}
+          onCancel={closeModal}
+        />
+      )}
     </div>
   );
 };

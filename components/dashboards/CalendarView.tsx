@@ -1056,6 +1056,7 @@ export const CalendarView: React.FC = () => {
         university={detailsSched ? getUniversityBySubjectId(detailsSched.subject_id) || null : null}
         professor={detailsSched ? getProfessorBySubjectId(detailsSched.subject_id) || null : null}
         classSessions={classSessions}
+        deliverables={deliverables}
         schedule={detailsSched}
         onEditSchedule={handleOpenEdit}
       />
