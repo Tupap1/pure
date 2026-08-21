@@ -34,7 +34,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'command', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'syllabus', label: 'Temario', icon: GitMerge },
   { id: 'schedule', label: 'Horarios', icon: Calendar },
-  { id: 'deliverables', label: 'Entregas', icon: CheckSquare },
+  { id: 'deliverables', label: 'Agenda', icon: CheckSquare },
   { id: 'sessions', label: 'Clases', icon: Video },
   { id: 'config', label: 'Configuración', icon: Settings },
 ];

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
+import { useNavigation } from '@/lib/hooks/useNavigation';
 import { DeliverableEntity } from '@/lib/db/dexie-schema';
 import { saveDeliverable, deleteDeliverable } from '@/lib/db/repository';
 import { Card } from '@/components/ui/Card';
@@ -19,6 +20,7 @@ import { formatDeliverableDate } from '@/lib/domain/deliverable';
 
 export const DeliverablesDashboard: React.FC = () => {
   const { isLoaded, subjects, deliverables, universities } = usePureData();
+  const { openSubject } = useNavigation();
   const [filterGroup, setFilterGroup] = useState<'all' | 'individual' | 'group'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingDeliv, setEditingDeliv] = useState<DeliverableEntity | null>(null);
@@ -150,9 +152,20 @@ export const DeliverablesDashboard: React.FC = () => {
                 className={`space-y-4 p-5 ${overdue ? 'border-red-400/60 dark:border-red-500/30' : ''}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-                    {sub?.name || 'Asignatura'} • <span className="capitalize">{deliv.complexity}</span>
-                  </span>
+                  <div className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                    {sub && sub.id ? (
+                      <button
+                        onClick={() => openSubject(sub.id!)}
+                        className="hover:underline transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 dark:focus:ring-offset-slate-950 rounded px-0.5"
+                        aria-label={`Abrir detalles de ${sub.name}`}
+                      >
+                        {sub.name}
+                      </button>
+                    ) : (
+                      <span>{sub?.name || 'Asignatura'}</span>
+                    )}
+                    {' '} • <span className="capitalize">{deliv.complexity}</span>
+                  </div>
                 </div>
                 <div>
                   <h4 className={`text-base font-bold text-slate-900 dark:text-slate-100 ${isDone ? 'line-through text-slate-400' : ''}`}>
@@ -211,10 +224,10 @@ export const DeliverablesDashboard: React.FC = () => {
         <div>
           <h2 className="text-xl font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0" />
-            Entregas, evaluaciones y exámenes
+            Agenda
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Registro y edición de actividades con calculadora de nota mínima requerida.
+            Vencimientos de todas las materias, ordenados por cercanía.
           </p>
         </div>
         <Button
@@ -261,7 +274,17 @@ export const DeliverablesDashboard: React.FC = () => {
                   return (
                     <tr key={subject.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors">
                       <td className="px-4 py-2.5">
-                        <span className="font-medium text-slate-800 dark:text-slate-200">{subject.name}</span>
+                        {subject.id ? (
+                          <button
+                            onClick={() => openSubject(subject.id!)}
+                            className="font-medium text-slate-800 dark:text-slate-200 hover:underline transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 dark:focus:ring-offset-slate-950 rounded px-1"
+                            aria-label={`Abrir detalles de ${subject.name}`}
+                          >
+                            {subject.name}
+                          </button>
+                        ) : (
+                          <span className="font-medium text-slate-800 dark:text-slate-200">{subject.name}</span>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono tabular-nums text-slate-500 dark:text-slate-400">
                         {subject.target_grade.toFixed(1)}
