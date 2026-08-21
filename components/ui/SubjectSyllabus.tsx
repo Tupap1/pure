@@ -19,13 +19,6 @@ const MASTERY_LABELS: Record<string, { label: string; color: string }> = {
   dominado: { label: 'Dominado', color: 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400' },
 };
 
-const MASTERY_SCORES: Record<string, number> = {
-  no_iniciado: 0,
-  en_estudio: 0.33,
-  repasado: 0.66,
-  dominado: 1.0,
-};
-
 export const SubjectSyllabus: React.FC<SubjectSyllabusProps> = ({ topics }) => {
   if (topics.length === 0) {
     return (
