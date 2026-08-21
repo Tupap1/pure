@@ -1,18 +1,30 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { GraduationCap } from 'lucide-react';
+import { GraduationCap, BookOpen } from 'lucide-react';
 import { usePureData } from '@/lib/hooks/usePureData';
+import { useNavigation } from '@/lib/hooks/useNavigation';
 import { NAV_ITEMS, type DashboardTab } from '@/lib/navigation';
 
 export type { DashboardTab };
 
-interface SidebarProps {
-  activeTab: DashboardTab;
-  onSelectTab: (tab: DashboardTab) => void;
-}
-
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
+export const Sidebar: React.FC = () => {
   const { universities } = usePureData();
+  const { view, selectTab, openSubjectsIndex } = useNavigation();
+
+  // Cuando el hub de asignatura está activo, ninguna pestaña de función se marca seleccionada.
+  const activeTab: DashboardTab | null = view.kind === 'tab' ? view.tab : null;
+  const isSubjectsActive = view.kind === 'subjects-index' || view.kind === 'subject';
+
+  const itemClass = (active: boolean) =>
+    cn(
+      'w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors duration-150 cursor-pointer',
+      active
+        ? 'bg-surface-subtle text-slate-900 dark:text-slate-100 font-medium'
+        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
+    );
+
+  const iconClass = (active: boolean) =>
+    cn('w-4 h-4 shrink-0', active ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500');
 
   return (
     <aside className="hidden md:flex w-60 bg-white dark:bg-obsidian-900 border-r border-surface-border flex-col justify-between h-screen sticky top-0 z-30 transition-colors">
@@ -36,19 +48,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
               key={item.id}
               role="tab"
               aria-selected={isActive}
-              onClick={() => onSelectTab(item.id)}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors duration-150 cursor-pointer',
-                isActive
-                  ? 'bg-surface-subtle text-slate-900 dark:text-slate-100 font-medium'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
-              )}
+              onClick={() => selectTab(item.id)}
+              className={itemClass(isActive)}
             >
-              <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500')} />
+              <Icon className={iconClass(isActive)} />
               <span className="text-xs font-semibold leading-snug truncate">{item.label}</span>
             </button>
           );
         })}
+
+        {/* Asignaturas — superficie de detalle (drill-in), fuera de NAV_ITEMS para no ocupar
+            un slot en la barra inferior, que mapea la misma lista. */}
+        <div className="pt-1 mt-1 border-t border-surface-border">
+          <button
+            role="tab"
+            aria-selected={isSubjectsActive}
+            onClick={openSubjectsIndex}
+            className={itemClass(isSubjectsActive)}
+          >
+            <BookOpen className={iconClass(isSubjectsActive)} />
+            <span className="text-xs font-semibold leading-snug truncate">Asignaturas</span>
+          </button>
+        </div>
       </nav>
 
       {/* Clean Minimal Footer */}
@@ -62,5 +83,3 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
     </aside>
   );
 };
-
-

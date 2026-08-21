@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { SubjectEntity, ProfessorEntity, UniversityEntity } from '@/lib/db/dexie-schema';
-import { usePureData } from '@/lib/hooks/usePureData';
+import { useNavigation } from '@/lib/hooks/useNavigation';
 import { useAcademicLoad } from '@/lib/hooks/useAcademicLoad';
 import type { SubjectAcademicLoad } from '@/lib/algorithms/academic-load';
 import { Badge } from './Badge';
 import { Card } from './Card';
 import { EmptyState } from './EmptyState';
 import { GradeProgressBar } from './GradeProgressBar';
-import { SubjectDetailsModal } from './SubjectDetailsModal';
 import {
   BookOpen,
   User,
@@ -129,10 +128,9 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
   professors = [],
   universities = []
 }) => {
-  const { classSessions, deliverables } = usePureData();
+  const { openSubject } = useNavigation();
   const [selectedUniId, setSelectedUniId] = useState<string>('all');
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
-  const [modalSubject, setModalSubject] = useState<SubjectEntity | null>(null);
 
   // Misma fuente que el encabezado y el Command Center, para que las horas no discrepen.
   const { perSubject } = useAcademicLoad();
@@ -213,9 +211,13 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs font-heading truncate">
+                    <button
+                      onClick={() => openSubject(sub.id!)}
+                      title={`Abrir el hub de ${sub.name}`}
+                      className="font-bold text-slate-900 dark:text-slate-100 text-xs font-heading truncate text-left hover:underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2"
+                    >
                       {sub.name}
-                    </h4>
+                    </button>
                     <Badge variant={sub.modality === 'presencial' ? 'aeroespacial' : 'software'}>
                       {sub.modality}
                     </Badge>
@@ -397,8 +399,8 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
                         </Badge>
                       )}
                       <button
-                        onClick={() => setModalSubject(sub)}
-                        title="Ver detalles de la materia"
+                        onClick={() => openSubject(sub.id!)}
+                        title="Abrir el hub de la materia"
                         className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-sky-500 text-[11px] font-medium transition-colors"
                       >
                         Ver Detalle
@@ -431,18 +433,6 @@ export const SubjectTelemetryTable: React.FC<SubjectTelemetryTableProps> = ({
         </table>
       </div>
 
-      {/* Subject Details Modal */}
-      {modalSubject && (
-        <SubjectDetailsModal
-          isOpen={modalSubject !== null}
-          onClose={() => setModalSubject(null)}
-          subject={modalSubject}
-          professor={professors.find((p) => p.id === modalSubject.professor_id)}
-          university={universities.find((u) => u.id === modalSubject.university_id)}
-          classSessions={classSessions}
-          deliverables={deliverables}
-        />
-      )}
     </div>
   );
 };

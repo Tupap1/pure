@@ -1,24 +1,44 @@
 import React from 'react';
-import { Clock, Cpu, Sun, Moon, AlertTriangle } from 'lucide-react';
+import { Clock, Cpu, Sun, Moon, AlertTriangle, ChevronLeft } from 'lucide-react';
 import { useTheme } from '@/lib/hooks/useTheme';
 import { useAcademicLoad } from '@/lib/hooks/useAcademicLoad';
+import { usePureData } from '@/lib/hooks/usePureData';
+import { useNavigation } from '@/lib/hooks/useNavigation';
+import { getNavLabel } from '@/lib/navigation';
 
-import { getNavLabel, type DashboardTab } from '@/lib/navigation';
-
-interface HeaderProps {
-  activeTab?: DashboardTab;
-}
-
-export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
+export const Header: React.FC = () => {
   const { normativeIndependentHours, netFreeTime, isOverloaded } = useAcademicLoad();
   const { theme, toggleTheme } = useTheme();
+  const { view, goBack } = useNavigation();
+  const { subjects } = usePureData();
 
-  const title = getNavLabel(activeTab);
+  // Título según la superficie: nombre de la materia en el hub, "Asignaturas" en el índice,
+  // y la etiqueta de la pestaña en las seis vistas de función.
+  let title: string;
+  if (view.kind === 'subject') {
+    title = subjects.find((s) => s.id === view.subjectId)?.name ?? 'Asignatura';
+  } else if (view.kind === 'subjects-index') {
+    title = 'Asignaturas';
+  } else {
+    title = getNavLabel(view.tab);
+  }
+
+  const canGoBack = view.kind !== 'tab';
 
   return (
     <header className="sticky top-0 z-20 bg-white/90 dark:bg-obsidian-900/90 backdrop-blur-md border-b border-surface-border px-4 sm:px-6 py-3.5 flex items-center justify-between transition-colors">
       {/* Title / Context */}
-      <div className="min-w-0 pr-2">
+      <div className="min-w-0 pr-2 flex items-center gap-2">
+        {canGoBack && (
+          <button
+            onClick={goBack}
+            aria-label="Volver"
+            className="flex items-center gap-1 -ml-1.5 px-1.5 py-1 rounded-md text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.03] dark:hover:bg-white/[0.05] transition-colors shrink-0"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Volver</span>
+          </button>
+        )}
         <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 truncate tracking-tight font-heading">
           {title}
         </h2>
@@ -87,5 +107,3 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'command' }) => {
     </header>
   );
 };
-
-

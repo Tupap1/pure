@@ -1,13 +1,14 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { useNavigation } from '@/lib/hooks/useNavigation';
 import { NAV_ITEMS, type DashboardTab } from '@/lib/navigation';
 
-interface BottomNavProps {
-  activeTab: DashboardTab;
-  onSelectTab: (tab: DashboardTab) => void;
-}
+export const BottomNav: React.FC = () => {
+  const { view, selectTab } = useNavigation();
 
-export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) => {
+  // El hub de asignatura no ocupa slot aquí: cuando está activo, ninguna pestaña se marca.
+  const activeTab: DashboardTab | null = view.kind === 'tab' ? view.tab : null;
+
   return (
     <nav
       role="tablist"
@@ -22,7 +23,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) 
             key={item.id}
             role="tab"
             aria-selected={isActive}
-            onClick={() => onSelectTab(item.id)}
+            onClick={() => selectTab(item.id)}
             className={cn(
               'min-h-[44px] min-w-[44px] flex flex-col items-center justify-center flex-1 px-1 py-1 rounded-lg border transition-colors duration-200',
               isActive
