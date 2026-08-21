@@ -103,7 +103,8 @@ describe('Class Session Transcript On-Demand Access', () => {
       [subjectId, uniId, 'S', 'S-1', 3, 3, 'presencial', 4.5, 0.0]
     );
 
-    // Guardar la sesión con transcripción y campos de IA (como hace el sync de Fireflies)
+    // Guardar la sesión con transcripción y campos de IA (como hace el sync de Fireflies).
+    // duration_minutes viene como FLOAT desde Fireflies y la columna es INT: debe redondearse.
     await saveClassSessionToDb({
       id: sessionId,
       subject_id: subjectId,
@@ -114,12 +115,17 @@ describe('Class Session Transcript On-Demand Access', () => {
       ai_action_items: ['a1'],
       ai_questions: ['¿q1?'],
       fireflies_transcript_id: 'ff-persist-1',
-      duration_minutes: 90,
+      duration_minutes: 112.31999969482422,
       session_source: 'fireflies',
     });
 
     const transcript = await fetchClassSessionTranscriptFromDb(sessionId);
     expect(transcript?.transcript_text).toBe('Prof: hola\nAna: chau');
+
+    // La duración float se persiste redondeada a entero.
+    const data = await fetchAllDataFromDb();
+    const stored = data.classSessions.find((s: any) => s.id === sessionId);
+    expect(stored.duration_minutes).toBe(112);
   });
 
   it('should NOT wipe transcript_text when a partial save omits it (COALESCE)', async () => {
