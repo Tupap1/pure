@@ -497,7 +497,9 @@ export async function saveClassSessionToDb(session: any) {
     ai_summary: session.ai_summary ?? null,
     ai_action_items: session.ai_action_items || [],
     ai_questions: session.ai_questions || [],
-    duration_minutes: session.duration_minutes ?? null,
+    // Fireflies devuelve la duración como float (ej: 112.31 min) pero la columna es INT:
+    // hay que redondear o Postgres rechaza el INSERT ("invalid input syntax for type integer").
+    duration_minutes: session.duration_minutes != null ? Math.round(Number(session.duration_minutes)) : null,
     session_source: session.session_source || 'manual',
     updated_at: new Date().toISOString(),
   };
