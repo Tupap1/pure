@@ -13,8 +13,6 @@ import {
   Loader2,
 } from 'lucide-react';
 
-const WEEKDAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-
 interface ClassSessionDetailProps {
   session: ClassSessionEntity;
   subjects: SubjectEntity[];
