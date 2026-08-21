@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ClassSessionForm } from '@/components/ui/ClassSessionForm';
+import { ClassSessionDetail } from '@/components/ui/ClassSessionDetail';
 import { AttendancePanel } from '@/components/ui/AttendancePanel';
 import {
   Video,
@@ -28,6 +29,7 @@ export const ClassSessionsDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingSession, setEditingSession] = useState<ClassSessionEntity | null>(null);
+  const [detailSession, setDetailSession] = useState<ClassSessionEntity | null>(null);
 
   if (!isLoaded) {
     return (
@@ -197,7 +199,8 @@ export const ClassSessionsDashboard: React.FC = () => {
             return (
               <Card
                 key={session.id}
-                className="p-5 space-y-4 border border-slate-200/40 dark:border-slate-800/30 hover:border-slate-200/60 dark:hover:border-slate-700/50 transition-all bg-white dark:bg-slate-950 shadow-sm"
+                onClick={() => setDetailSession(session)}
+                className="p-5 space-y-4 border border-slate-200/40 dark:border-slate-800/30 hover:border-slate-200/60 dark:hover:border-slate-700/50 transition-all bg-white dark:bg-slate-950 shadow-sm cursor-pointer"
               >
                 {/* Header Row */}
                 <div className="flex items-start justify-between gap-2">
@@ -217,14 +220,20 @@ export const ClassSessionsDashboard: React.FC = () => {
                   {/* Edit / Delete actions */}
                   <div className="flex items-center gap-1 shrink-0">
                     <button
-                      onClick={() => handleOpenEdit(session)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEdit(session);
+                      }}
                       title="Editar Sesión"
                       className="p-1.5 rounded-lg text-slate-400 hover:text-sky-500 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDeleteSession(session.id!)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSession(session.id!);
+                      }}
                       title="Eliminar Sesión"
                       className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
                     >
@@ -312,6 +321,15 @@ export const ClassSessionsDashboard: React.FC = () => {
           }}
         />
       </Modal>
+
+      {/* Detail Modal */}
+      {detailSession && (
+        <ClassSessionDetail
+          session={detailSession}
+          subjects={subjects}
+          onClose={() => setDetailSession(null)}
+        />
+      )}
     </div>
   );
 };
