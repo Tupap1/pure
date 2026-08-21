@@ -63,7 +63,10 @@ export async function fetchAllDataFromDb() {
     pgPool.query('SELECT * FROM schedules ORDER BY day_of_week ASC, start_time ASC'),
     pgPool.query('SELECT * FROM deliverables ORDER BY due_date ASC'),
     pgPool.query('SELECT * FROM syllabus_topics ORDER BY order_index ASC'),
-    pgPool.query('SELECT * FROM class_sessions ORDER BY session_date DESC'),
+    pgPool.query(
+      `SELECT id, subject_id, schedule_id, session_date, title, summary, notion_link, recording_url, topics_covered, notes, created_at, updated_at, fireflies_transcript_id, ai_summary, ai_action_items, ai_questions, duration_minutes, session_source
+       FROM class_sessions ORDER BY session_date DESC`
+    ),
   ]);
 
   return {
@@ -700,4 +703,13 @@ export async function fetchClassSessionByFirefliesIdFromDb(firefliesId: string) 
     [firefliesId]
   );
   return res.rows[0] || null;
+}
+
+export async function fetchClassSessionTranscriptFromDb(id: string): Promise<{ transcript_text: string | null } | null> {
+  const res = await pgPool.query(
+    'SELECT transcript_text FROM class_sessions WHERE id = $1',
+    [id]
+  );
+  if (res.rows.length === 0) return null;
+  return { transcript_text: res.rows[0].transcript_text };
 }

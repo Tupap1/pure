@@ -92,6 +92,9 @@ const TRANSCRIPT_FIELDS = `
     text
     start_time
     end_time
+    ai_filters {
+      question
+    }
   }
 `;
 
