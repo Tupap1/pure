@@ -490,12 +490,26 @@ export async function saveClassSessionToDb(session: any) {
     recording_url: session.recording_url || null,
     topics_covered: session.topics_covered || [],
     notes: session.notes || null,
+    // Campos de Fireflies/IA: antes NO se persistían, así que las transcripciones que
+    // el sync construía en memoria nunca llegaban a Postgres (quedaban en null).
+    fireflies_transcript_id: session.fireflies_transcript_id ?? null,
+    transcript_text: session.transcript_text ?? null,
+    ai_summary: session.ai_summary ?? null,
+    ai_action_items: session.ai_action_items || [],
+    ai_questions: session.ai_questions || [],
+    duration_minutes: session.duration_minutes ?? null,
+    session_source: session.session_source || 'manual',
     updated_at: new Date().toISOString(),
   };
 
+  // COALESCE en los campos pesados/IA: un writer parcial (p.ej. el push del navegador,
+  // que tras el lote C ya no arrastra transcript_text) NO debe sobrescribir con null lo
+  // que el sync de Fireflies sí guardó. Si el valor entrante es null, se conserva el actual.
   await pgPool.query(
-    `INSERT INTO class_sessions (id, subject_id, schedule_id, session_date, title, summary, notion_link, recording_url, topics_covered, notes, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `INSERT INTO class_sessions
+       (id, subject_id, schedule_id, session_date, title, summary, notion_link, recording_url, topics_covered, notes,
+        fireflies_transcript_id, transcript_text, ai_summary, ai_action_items, ai_questions, duration_minutes, session_source, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      ON CONFLICT (id) DO UPDATE SET
        subject_id = EXCLUDED.subject_id,
        schedule_id = EXCLUDED.schedule_id,
@@ -506,6 +520,13 @@ export async function saveClassSessionToDb(session: any) {
        recording_url = EXCLUDED.recording_url,
        topics_covered = EXCLUDED.topics_covered,
        notes = EXCLUDED.notes,
+       fireflies_transcript_id = COALESCE(EXCLUDED.fireflies_transcript_id, class_sessions.fireflies_transcript_id),
+       transcript_text = COALESCE(EXCLUDED.transcript_text, class_sessions.transcript_text),
+       ai_summary = COALESCE(EXCLUDED.ai_summary, class_sessions.ai_summary),
+       ai_action_items = EXCLUDED.ai_action_items,
+       ai_questions = EXCLUDED.ai_questions,
+       duration_minutes = COALESCE(EXCLUDED.duration_minutes, class_sessions.duration_minutes),
+       session_source = EXCLUDED.session_source,
        updated_at = EXCLUDED.updated_at`,
     [
       record.id,
@@ -518,6 +539,13 @@ export async function saveClassSessionToDb(session: any) {
       record.recording_url,
       record.topics_covered,
       record.notes,
+      record.fireflies_transcript_id,
+      record.transcript_text,
+      record.ai_summary,
+      record.ai_action_items,
+      record.ai_questions,
+      record.duration_minutes,
+      record.session_source,
       record.updated_at,
     ]
   );

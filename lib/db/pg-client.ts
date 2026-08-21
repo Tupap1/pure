@@ -127,6 +127,13 @@ export async function initPostgresSchema() {
           recording_url TEXT,
           topics_covered TEXT[] DEFAULT '{}',
           notes TEXT,
+          fireflies_transcript_id TEXT,
+          transcript_text TEXT,
+          ai_summary TEXT,
+          ai_action_items TEXT[] DEFAULT '{}',
+          ai_questions TEXT[] DEFAULT '{}',
+          duration_minutes INT,
+          session_source TEXT DEFAULT 'manual',
           created_at TIMESTAMPTZ DEFAULT NOW(),
           updated_at TIMESTAMPTZ DEFAULT NOW()
         );
