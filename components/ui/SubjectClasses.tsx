@@ -65,7 +65,7 @@ export const SubjectClasses: React.FC<SubjectClassesProps> = ({ sessions, subjec
                 <div className="flex items-center gap-1 shrink-0">
                   {session.recording_url && (
                     <Badge variant="outline" className="text-[10px] py-0.5">
-                      <Play className="w-2.5 h-2.5 mr-0.5" /> Grab
+                      <Play className="w-2.5 h-2.5 mr-0.5" /> Grabación
                     </Badge>
                   )}
                   {session.notion_link && (
@@ -75,7 +75,7 @@ export const SubjectClasses: React.FC<SubjectClassesProps> = ({ sessions, subjec
                   )}
                   {(session.transcript_text || session.fireflies_transcript_id) && (
                     <Badge variant="outline" className="text-[10px] py-0.5">
-                      Trnsc
+                      Transcripción
                     </Badge>
                   )}
                 </div>

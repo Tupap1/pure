@@ -40,10 +40,9 @@ export const SubjectSyllabus: React.FC<SubjectSyllabusProps> = ({ topics }) => {
   // Calculate overall progress
   const progress = calculateSyllabusProgress(topics as any);
 
-  // Group topics by parent_id
-  const parentIds = new Set(topics.map((t) => t.parent_id).filter(Boolean));
-  const units = topics.filter((t) => t.parent_id === undefined || parentIds.has(t.id));
-  const childTopics = topics.filter((t) => t.parent_id !== undefined);
+  // Group topics by parent_id: units are topics with falsy parent_id, children have truthy parent_id
+  const units = topics.filter((t) => !t.parent_id);
+  const childTopics = topics.filter((t) => t.parent_id);
 
   // Build hierarchical structure
   const unitMap = new Map<string, SyllabusTopicEntity[]>();

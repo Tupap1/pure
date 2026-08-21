@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { SubjectEntity, UniversityEntity, ProfessorEntity, ScheduleEntity } from '@/lib/db/dexie-schema';
-import { Mail, Clock, MapPin, BookOpen, Percent, Users } from 'lucide-react';
+import { Mail, Clock, MapPin, BookOpen, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SubjectFichaProps {
@@ -145,7 +145,7 @@ export const SubjectFicha: React.FC<SubjectFichaProps> = ({
           </div>
         </div>
         <div className="space-y-1.5 text-xs pl-6">
-          {subject.code && <FichaRow label="Código" value={subject.code} />}
+          {subject.code && <FichaRow label="Código" value={subject.code} mono />}
           <FichaRow label="Créditos" value={`${subject.credits}`} mono />
           <FichaRow label="Dificultad" value={`${subject.difficulty}/5`} mono />
           <FichaRow label="Modalidad" value={subject.modality} />
