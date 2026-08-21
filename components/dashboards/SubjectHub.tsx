@@ -6,9 +6,12 @@ import { GradeProgressBar } from '@/components/ui/GradeProgressBar';
 import { Badge } from '@/components/ui/Badge';
 import { SubjectEvaluation } from '@/components/ui/SubjectEvaluation';
 import { AttendancePanel } from '@/components/ui/AttendancePanel';
+import { SubjectFicha } from '@/components/ui/SubjectFicha';
+import { SubjectClasses } from '@/components/ui/SubjectClasses';
+import { SubjectSyllabus } from '@/components/ui/SubjectSyllabus';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
-import { BookOpen, FileText, Video, GitMerge, Construction } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 
 interface SubjectHubProps {
   subjectId: string;
@@ -41,29 +44,21 @@ const BreakdownRow: React.FC<{ label: string; value: string; strong?: boolean }>
   </div>
 );
 
-/** Panel de sección aún no cableada. Se completa en la Fase 2b (Ficha, Clases, Temario). */
-const ComingSoon: React.FC<{ icon: React.ComponentType<{ className?: string }>; title: string }> = ({
-  icon: Icon,
-  title,
-}) => (
-  <div className="p-8 text-center border border-dashed border-surface-border rounded-xl space-y-2 bg-surface-subtle/50">
-    <Icon className="w-7 h-7 text-slate-400 mx-auto" />
-    <h4 className="text-sm font-heading font-semibold text-slate-700 dark:text-slate-300">{title}</h4>
-    <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1.5">
-      <Construction className="w-3.5 h-3.5" /> Se completa en la siguiente iteración.
-    </p>
-  </div>
-);
 
 /**
  * Hub de una asignatura: superficie de detalle a la que se llega por drill-in. Reúne en un
  * solo lugar todo lo relativo a una materia, con una sub-navegación de seis secciones.
  *
- * En esta fase (2a) quedan cableadas Resumen, Evaluación y Asistencia por composición de piezas
- * ya existentes; Ficha, Clases y Temario son marcadores que se llenan en la Fase 2b.
+ * Secciones:
+ * - Resumen: desglose de carga de estudio y progreso hacia la meta
+ * - Ficha: datos del profesor, horario, datos de la materia y escala de calificación
+ * - Evaluación: esquema ponderado de evaluación y notas
+ * - Clases: listado de sesiones de clase con enlaces a grabaciones y transcripciones
+ * - Temario: syllabus agrupado por unidades con estados de dominio
+ * - Asistencia: registro de asistencias
  */
 export const SubjectHub: React.FC<SubjectHubProps> = ({ subjectId }) => {
-  const { subjects, universities, professors, schedules, deliverables, attendanceRecords } = usePureData();
+  const { subjects, universities, professors, schedules, deliverables, attendanceRecords, classSessions, syllabusTopics } = usePureData();
   const { perSubject } = useAcademicLoad();
   const [section, setSection] = useState<HubSection>('resumen');
 
@@ -225,15 +220,31 @@ export const SubjectHub: React.FC<SubjectHubProps> = ({ subjectId }) => {
           </div>
         )}
 
-        {section === 'ficha' && <ComingSoon icon={FileText} title="Ficha de la asignatura" />}
+        {section === 'ficha' && (
+          <SubjectFicha
+            subject={subject}
+            university={university}
+            professor={professor}
+            schedules={subjectSchedules}
+          />
+        )}
 
         {section === 'evaluacion' && (
           <SubjectEvaluation subject={subject} deliverables={deliverables} />
         )}
 
-        {section === 'clases' && <ComingSoon icon={Video} title="Clases y grabaciones" />}
+        {section === 'clases' && (
+          <SubjectClasses
+            sessions={classSessions.filter((cs) => cs.subject_id === subject.id)}
+            subjects={subjects}
+          />
+        )}
 
-        {section === 'temario' && <ComingSoon icon={GitMerge} title="Temario de la asignatura" />}
+        {section === 'temario' && (
+          <SubjectSyllabus
+            topics={syllabusTopics.filter((st) => st.subject_id === subject.id)}
+          />
+        )}
 
         {section === 'asistencia' && (
           <AttendancePanel
