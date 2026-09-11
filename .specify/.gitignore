@@ -7,3 +7,6 @@ feature.json
 
 # Per-machine extension config overrides.
 extensions/*/local-config.yml
+
+# Caché de Python que generan los scripts de Spec Kit al ejecutarse.
+scripts/python/__pycache__/
