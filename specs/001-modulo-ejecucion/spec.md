@@ -12,6 +12,33 @@
 > no marcado `[manual]` DEBE tener una prueba automatizada con ese ID en su nombre (Constitución,
 > Principio II). Los `[manual]` se verifican con el quickstart de la feature.
 
+## Clarifications
+
+### Session 2026-09-11
+
+- Q: ¿Por qué canal sale el reporte semanal? → A: Por correo, desde el buzón de Andres (su
+  cuenta de Zoho Mail), así que las respuestas del destinatario le llegan a él.
+- Q: ¿Cómo se usa Pure en el iPhone y cómo llegan los avisos? → A: Como app instalada desde el
+  navegador en la pantalla de inicio, con avisos del sistema. No pasa por ninguna tienda de
+  aplicaciones.
+- Q: ¿Qué se ve al abrir Pure y qué pasa con la barra inferior móvil, que ya tiene 6 destinos?
+  → A: Hoy es la pantalla de inicio y el primer destino. En móvil, Configuración sale de la barra
+  inferior y se abre desde el encabezado; en escritorio sigue en la barra lateral.
+- Q: ¿Puede el diseño depender de que Pure corra en un equipo de la casa? → A: No. Pure migrará a
+  servicios gratuitos, así que los procesos programados y los canales de salida deben poder
+  moverse sin rediseño.
+- Q: ¿Quién es el destinatario inicial del reporte y hay consentimiento? → A: El propio Andres,
+  con consentimiento dado el 2026-09-11. Más adelante puede cambiarse por otra persona.
+- Q: ¿Con qué método se especifica y se construye la feature? → A: Spec-Driven Development con
+  Spec Kit y TDD obligatorio: cada escenario no manual tiene su prueba, escrita antes que el
+  código.
+- Q: ¿Qué define el veredicto semanal? → A: "Cumplida" con 6 o 7 días cumplidos, "fallida" con 3
+  o menos y "parcial" en los demás casos. Así quedó en el plan aprobado; los umbrales los puede
+  ajustar Andres.
+- Q: ¿Qué materias entran en la sección "En riesgo" del reporte? → A: Las perdidas, las que
+  necesitan 3.5 o más en lo que falta para aprobar (con la cifra y la próxima evaluación), las
+  abandonadas y, en una sola línea, las ciegas. Así quedó en el plan aprobado.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Tanda de 10 minutos en un toque (Priority: P1)
@@ -23,9 +50,9 @@ La tanda cuenta para el día en que la empecé.
 **Why this priority**: la tanda es la unidad de ejecución; sin ella nada del módulo existe. La
 prueba de diseño es poder empezar a estudiar con un toque desde que se abre la app.
 
-**Independent Test**: empezar una tanda, recargar la app, bloquear el teléfono y comprobar que la
-tanda se completa sola a los 10 minutos. Después, intentar una segunda tanda simultánea y una
-interrupción sin razón.
+**Independent Test**: comprobar que al abrir Pure la primera pantalla es Hoy. Empezar una tanda,
+recargar la app, bloquear el teléfono y comprobar que la tanda se completa sola a los 10 minutos.
+Después, intentar una segunda tanda simultánea y una interrupción sin razón.
 
 **Acceptance Scenarios**:
 
@@ -50,6 +77,9 @@ interrupción sin razón.
 8. **US1-AS8** — **Given** reabro Pure con una tanda en curso y el reloj del teléfono desfasado,
    **When** se muestra el conteo, **Then** el tiempo restante se calcula con la hora del sistema y
    no con la del teléfono.
+9. **US1-AS9** — **Given** abro Pure, **When** carga, **Then** la primera pantalla es Hoy; **and
+   given** estoy en un teléfono, **Then** la barra inferior no incluye Configuración y la abro
+   desde el encabezado.
 
 ---
 
@@ -311,6 +341,8 @@ la tercera pide razón y queda contada; revisar las alertas en la agenda.
 
 - ¿Qué pasa con una tanda que cruza la medianoche? Cuenta para el día en que empezó (US1-AS7).
 - ¿Y si el reloj del teléfono está desfasado? El conteo usa la hora del sistema (US1-AS8).
+- ¿Y si no hay conexión con Pure? La pantalla lo indica y permite reintentar. Sin conexión no se
+  puede empezar una tanda, porque la hora la fija el sistema.
 - ¿Y si dos dispositivos empiezan una tanda al mismo tiempo? Solo una puede quedar en curso.
 - ¿Y si se borra la clase de un disparador "al salir de clase"? El disparador queda huérfano: no
   se muestra y se marca para revisión.
@@ -333,7 +365,9 @@ la tercera pide razón y queda contada; revisar las alertas en la agenda.
 **Tandas**
 
 - **FR-001**: El sistema DEBE permitir empezar una tanda de estudio de 10 minutos con un solo
-  toque desde la pantalla de inicio, sin exigir elegir materia antes.
+  toque desde la pantalla de inicio, sin exigir elegir materia antes. La pantalla de inicio
+  siempre usa 10 minutos; solo desde el asistente de IA puede fijarse otra duración, entre 5 y 25
+  minutos.
 - **FR-002**: El sistema DEBE registrar el inicio y el fin de cada tanda con la hora oficial del
   sistema. NO DEBE aceptar horas aportadas por el dispositivo ni permitir registrar tandas en
   retrospectiva.
@@ -392,9 +426,14 @@ la tercera pide razón y queda contada; revisar las alertas en la agenda.
   reporte DEBE decir "<nombre> no dio explicación."
 - **FR-022**: El reporte DEBE incluir:
   - los días cumplidos sobre 7;
+  - los días cumplidos acumulados desde el inicio frente al horizonte del hábito (66 días por
+    defecto);
   - cada hábito como fracción;
-  - el veredicto (cumplida / parcial / fallida);
-  - las materias en riesgo;
+  - el veredicto: "cumplida" con 6 o 7 días cumplidos, "fallida" con 3 o menos, "parcial" en los
+    demás casos;
+  - la sección "En riesgo": materias perdidas, materias que necesitan 3.5 o más en lo que falta
+    para aprobar (con la cifra y la próxima evaluación), materias abandonadas y una sola línea con
+    las materias ciegas;
   - la nota literal del usuario;
   - el número de ediciones tardías;
   - si el reporte anterior no pudo enviarse;
@@ -431,8 +470,9 @@ la tercera pide razón y queda contada; revisar las alertas en la agenda.
 
 **Acceso móvil y avisos**
 
-- **FR-030**: Pure DEBE poder instalarse en la pantalla de inicio del iPhone y abrirse a pantalla
-  completa, con su nombre y su ícono.
+- **FR-030**: Pure DEBE poder instalarse en la pantalla de inicio del iPhone desde el navegador,
+  sin pasar por ninguna tienda de aplicaciones, y abrirse a pantalla completa con su nombre y su
+  ícono.
 - **FR-031**: Ninguna parte de Pure DEBE ser accesible desde internet sin autenticación previa.
 - **FR-032**: El sistema DEBE enviar avisos solo de tres tipos. NUNCA DEBE enviar recordatorios
   del plan.
@@ -465,6 +505,12 @@ la tercera pide razón y queda contada; revisar las alertas en la agenda.
 - **FR-040**: El programa, los hábitos, los disparadores y el destinatario del reporte DEBEN
   cargarse exclusivamente a través del asistente de IA conectado, sin datos incrustados en el
   sistema.
+
+**Navegación**
+
+- **FR-041**: Hoy DEBE ser la primera pantalla al abrir Pure y el primer destino de la
+  navegación. En móvil, Configuración NO DEBE ocupar la barra inferior y DEBE abrirse desde el
+  encabezado. En escritorio, la barra lateral conserva todos los destinos.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -517,6 +563,8 @@ la tercera pide razón y queda contada; revisar las alertas en la agenda.
 - Un solo usuario (Andres). La zona horaria por defecto es la de Bogotá y es configurable.
 - La escala de notas y la nota aprobatoria son las de cada universidad (típicamente 0 a 5, con
   aprobatoria 3.0).
+- "Evaluación" y "entrega" designan la misma entidad existente de Pure: un ítem con peso en la
+  nota y fecha límite.
 - Pure permanece encendido mientras no se migre a un hosting externo. Si estuvo apagado, al
   volver se pone al día (FR-024).
 - El correo sale desde el buzón de Andres, así que las respuestas del destinatario le llegan a él.
