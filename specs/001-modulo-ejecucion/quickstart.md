@@ -45,7 +45,7 @@ Esperado: las migraciones `008`–`011` aparecen aplicadas, `/health` responde O
 | US3 | Responder los hábitos de hoy; completar la tanda mínima | Las filas Sí/No desaparecen; el pie muestra "1 tanda hoy · Día cumplido"; nunca aparece "te faltan" |
 | US4 `[manual]` | En el iPhone: Safari → `PUBLIC_WEB_URL` → Compartir → Agregar a inicio → abrir desde el ícono. Desde otro navegador sin sesión, abrir la URL | Abre a pantalla completa con el ícono de Pure; sin sesión de Access no se ve nada |
 | US5 | Por MCP: `get_grade_projection` para Química | 3.33 para aprobar, 5.20 para la meta (inalcanzable), techo 4.34 |
-| US6 | Destinatario de prueba: `manage_weekly_report set_partner` con el correo de Andres y `consented_at`. Luego `preview`, forzar el congelamiento (tick con la hora del domingo 19:00 o `send` sobre un reporte congelado) y repetir el tick | Llega **un** correo a Zoho con los números congelados; el segundo tick no reenvía; la web muestra el reporte sin el correo del destinatario |
+| US6 | En la base local: `manage_weekly_report set_partner` con el correo de Andres y `consented_at`; `manage_program init` con una semana que ya terminó (el lunes anterior); `preview`; y después `manage_weekly_report run_tick` dos veces | Llega **un** correo a Zoho con los números congelados y la línea de retraso; el segundo `run_tick` no reenvía; la web muestra el reporte sin el correo del destinatario |
 | US7 | En la PWA: Configuración → Activar notificaciones → Enviar prueba. Empezar una tanda y bloquear el teléfono | Llega la prueba; a los 10:00 (±20 s) llega "Terminó la tanda", una sola vez |
 | US8–US9 | Recorrer la planeación del domingo; abrir la vista de semana 3 veces | Materias con intención < 6 sin disparadores sugeridos; la 3.ª apertura pide razón |
 

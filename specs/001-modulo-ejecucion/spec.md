@@ -250,8 +250,8 @@ nota, llegar a las 20:00 y comprobar que sale un único correo con los números 
    **Then** el reporte queda fallido por falta de destinatario; **and given** intento registrar un
    destinatario sin fecha de consentimiento, **Then** se rechaza.
 10. **US6-AS10** — **Given** una semana con datos, **When** se congela el reporte, **Then**
-    contiene los días cumplidos sobre 7, cada hábito como fracción, el veredicto, la sección "En
-    riesgo" y el número de ediciones tardías.
+    contiene los días cumplidos sobre 7, los días cumplidos acumulados frente al horizonte, cada
+    hábito como fracción, el veredicto, la sección "En riesgo" y el número de ediciones tardías.
 11. **US6-AS11** — **Given** el domingo entre el congelamiento y el envío, **When** abro Pure,
     **Then** veo el reporte congelado y la caja para mi nota, y en ningún lugar de la interfaz web
     aparece el correo del destinatario.
@@ -455,16 +455,16 @@ la tercera pide razón y queda contada; revisar las alertas en la agenda.
   - la nota necesaria para aprobar y para la meta, redondeadas hacia arriba;
   - el techo alcanzable, redondeado hacia abajo.
 - **FR-027**: El sistema DEBE marcar los siguientes casos:
-  - materia sin evaluaciones registradas;
+  - materia **ciega**: no tiene evaluaciones registradas;
   - pesos que no suman 100% (en ese caso no calcula cifras);
   - evaluación entregada sin nota;
   - evaluación pendiente vencida;
   - meta inalcanzable;
   - materia perdida.
-- **FR-028**: El sistema DEBE alertar de dos situaciones:
-  - materia abandonada: tiene una evaluación en menos de 7 días y ninguna tanda en los últimos
-    7 días;
-  - materia ciega: no tiene evaluaciones registradas.
+- **FR-028**: El sistema DEBE elevar a alerta dos de esos casos, para el reporte y para la agenda:
+  - materia **abandonada**: tiene una evaluación en menos de 7 días y ninguna tanda en los
+    últimos 7 días;
+  - materia **ciega**: la misma condición marcada en FR-027, sin nombre alterno.
 - **FR-029**: Una evaluación DEBE considerarse calificada cuando tiene nota y no está pendiente.
   El estado heredado "completado" DEBE tratarse como "entregado".
 
@@ -554,7 +554,7 @@ la tercera pide razón y queda contada; revisar las alertas en la agenda.
 - **SC-005**: La proyección de Química reproduce exactamente 3.33 (aprobar), 5.20 (meta) y 4.34
   (techo).
 - **SC-006**: Al final de la semana 3, los datos registrados permiten comparar la tasa de
-  interrupción por tipo de trabajo y por razón.
+  interrupción por razón y por materia.
 - **SC-007**: El 100% de los escenarios de aceptación no manuales tienen una prueba automatizada
   nombrada con su ID.
 
@@ -565,6 +565,8 @@ la tercera pide razón y queda contada; revisar las alertas en la agenda.
   aprobatoria 3.0).
 - "Evaluación" y "entrega" designan la misma entidad existente de Pure: un ítem con peso en la
   nota y fecha límite.
+- "Destinatario" es la persona que recibe el reporte; en el código y en los contratos aparece como
+  *partner* (`accountability_partners`).
 - Pure permanece encendido mientras no se migre a un hosting externo. Si estuvo apagado, al
   volver se pone al día (FR-024).
 - El correo sale desde el buzón de Andres, así que las respuestas del destinatario le llegan a él.

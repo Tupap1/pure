@@ -117,7 +117,7 @@ interrumpidas y `por_materia: [{ subject_id, name, count, minutes }]`), los disp
     subject_id, name,
     projection: { declaredWeight, gradedWeight, awaitingGradeWeight, remainingWeight,
                   currentAverage, consolidated, neededToPass, neededForTarget, ceiling },
-    flags: ('sin_entregas' | 'pesos_inconsistentes' | 'entregado_sin_nota'
+    flags: ('ciega' | 'pesos_inconsistentes' | 'entregado_sin_nota'
             | 'vencido_sin_registrar' | 'meta_inalcanzable' | 'materia_perdida')[]
   }],
   alertas: [{ kind: 'abandonada' | 'ciega', subject_id, detalle }]
@@ -134,6 +134,7 @@ interrumpidas y `por_materia: [{ subject_id, name, count, minutes }]`), los disp
 | `set_note` | `program_week_id`, `note` (≤ 400) | El reporte · `REPORTE_NO_CONGELADO` · `VENTANA_CERRADA` |
 | `send` | `program_week_id` | El reporte (envío manual con claim atómico) · `REPORTE_NO_CONGELADO` · `YA_ENVIADO` |
 | `read` | `program_week_id?` | El reporte o los reportes, con `status`, `attempts`, `last_error` |
+| `run_tick` | — | Ejecuta `runExecutionTick(new Date())` una vez y devuelve `{ frozen, sent, failed, notified }`. Es idempotente: repetirla no reenvía. Cubre el disparador externo que exige FR-039 y es lo que usa el quickstart para forzar el congelamiento |
 
 ### `manage_tasks` (US8)
 
