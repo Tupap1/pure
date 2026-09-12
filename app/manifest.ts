@@ -15,7 +15,6 @@ export default function manifest(): ManifestWithId {
     id: '/',
     background_color: '#191919',
     theme_color: '#191919',
-    orientation: 'portrait',
     icons: [
       {
         src: '/icons/192',

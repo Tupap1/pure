@@ -20,7 +20,6 @@ export default function Icon() {
           alignItems: 'center',
           justifyContent: 'center',
           color: '#e9e9e7',
-          fontFamily: 'IBM Plex Sans',
           fontWeight: 'bold',
         }}
       >
