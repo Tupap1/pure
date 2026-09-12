@@ -78,12 +78,12 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 - [X] T007 IMPL lib/execution/time.ts y lib/execution/constants.ts:
   - time.ts resuelve `PURE_TZ` (por defecto `America/Bogota`) con `Intl.DateTimeFormat`, igual que lib/integrations/fireflies-sync.ts:14, y exporta `localParts`, `localDateTimeToInstant`, `addDays` y `mondayOf`;
   - constants.ts: `TANDA_MINUTES=10` (rango 5–25), `TRIGGER_WINDOW_MINUTES=240`, `DAY_LOCK_TIME='03:00'`, `REPORT_FREEZE='19:00'`, `REPORT_NOTE_MINUTES=60`, `CUE_TEXT 5–80`, `ACTION_TEXT 5–90`, `INTERRUPT_REASON ≤140`, `USER_NOTE ≤400`, `VERDICT` (≥6/7 cumplida, ≤3/7 fallida, resto parcial) y `REPORT_MAX_ATTEMPTS=3`.
-- [ ] T008 [P] TEST Esquema en __tests__/db/execution-schema.test.ts con `createTestDb()`:
+- [X] T008 [P] TEST Esquema en __tests__/db/execution-schema.test.ts con `createTestDb()`:
   - la migración 008 corre en pg-mem;
   - `running_lock TEXT UNIQUE` admite varios NULL y rechaza un segundo `'running'` (FR-004);
   - borrar un `schedules` deja `routine_slots.schedule_id` en NULL;
   - `harness.reset()` vacía las tablas nuevas.
-- [ ] T009 IMPL db/migrations/008_execution_core.sql y el `reset()` de __tests__/helpers/test-db.ts:
+- [X] T009 IMPL db/migrations/008_execution_core.sql y el `reset()` de __tests__/helpers/test-db.ts:
   - usar el SQL exacto de specs/001-modulo-ejecucion/data-model.md: `program_weeks`, `habits`, `daily_checks`, `routine_slots`, `slot_outcomes`, `plan_rehearsals`, `tasks` con `CHECK (estimated_tandas BETWEEN 1 AND 3)` y `tandas` con `running_lock TEXT UNIQUE`;
   - sin plpgsql, sin `AT TIME ZONE` y sin índices parciales;
   - agregar a `reset()` las tablas nuevas hijas primero (`tandas`, `slot_outcomes`, `plan_rehearsals`, `daily_checks`, `tasks`, `routine_slots`, `habits`, `program_weeks`) antes de la lista actual.
