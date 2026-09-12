@@ -64,6 +64,33 @@ describe('[001] US1 — Rutas web del Módulo de Ejecución', () => {
     expect(json.code).toBe('NO_ENCONTRADO');
   });
 
+  it('Principio VI: un fallo interno inesperado (p. ej. de la base de datos) no filtra su mensaje crudo en la respuesta', async () => {
+    // lib/execution/handlers.ts atrapa cualquier excepción inesperada dentro de cada handler y la
+    // traduce a {status:'error', code, message}; si ese `message` fuera el `error.message` crudo,
+    // un fallo real de Postgres (credenciales, host, nombres de tabla) llegaría intacto hasta
+    // quien llame a esta ruta, que no tiene autenticación propia (Constitución, Principio VI).
+    const { pgPool } = await import('@/lib/db/pg-client');
+    const originalQuery = pgPool.query;
+    const rawDbMessage = 'password authentication failed for user "produser_secreto" at host 10.0.0.7:5432';
+    (pgPool as any).query = vi.fn().mockRejectedValue(new Error(rawDbMessage));
+
+    try {
+      const request = new Request('http://localhost/api/execution', {
+        method: 'POST',
+        body: JSON.stringify({ tool: 'manage_tandas', action: 'current', data: {} }),
+      });
+      const response = await POST(request);
+      const text = await response.text();
+
+      expect(response.status).toBe(400);
+      expect(text).not.toContain('produser_secreto');
+      expect(text).not.toContain('10.0.0.7');
+      expect(text).not.toContain('password authentication failed');
+    } finally {
+      pgPool.query = originalQuery;
+    }
+  });
+
   it('GET /api/execution/today exporta dynamic=force-dynamic y devuelve el payload de get_today', async () => {
     expect(dynamic).toBe('force-dynamic');
 
