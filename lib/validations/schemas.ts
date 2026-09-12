@@ -1,4 +1,16 @@
 import { z } from 'zod';
+import { mondayOf } from '../execution/time';
+import {
+  TANDA_MINUTES_MIN,
+  TANDA_MINUTES_MAX,
+  CUE_TEXT_MIN,
+  CUE_TEXT_MAX,
+  ACTION_TEXT_MIN,
+  ACTION_TEXT_MAX,
+  INTERRUPT_REASON_MIN,
+  INTERRUPT_REASON_MAX,
+  USER_NOTE_MAX,
+} from '../execution/constants';
 
 export const UniversitySchema = z.object({
   id: z.string().optional(),
@@ -200,3 +212,318 @@ export function validateEntity<T>(schema: z.ZodSchema<T>, data: unknown): Valida
 
   return { success: false, errors };
 }
+
+// =============================================================================
+// Módulo de Ejecución
+// =============================================================================
+//
+// Esquemas Zod estrictos (`.strict()`) para las entidades solo-Postgres del módulo (data-model.md).
+// Las reglas que exigen consultar la base de datos (TANDA_EN_CURSO, HABITO_INACTIVO, DIA_CERRADO,
+// SEMANA_EN_CURSO, etc.) NO viven aquí: se resuelven en los servicios de lib/execution/*, que sí
+// tienen acceso al repositorio. Aquí solo se valida la FORMA del dato y las reglas que se pueden
+// decidir sin mirar la base (rangos, campos condicionales, y si `starts_on` cae en lunes).
+
+/** Códigos de error de negocio del módulo (contracts/mcp-tools.md). */
+export type ExecutionErrorCode =
+  | 'DATOS_INVALIDOS'
+  | 'SOBRE_ESPECIFICACION'
+  | 'NO_ENCONTRADO'
+  | 'TANDA_EN_CURSO'
+  | 'TANDA_NO_TERMINADA'
+  | 'RAZON_REQUERIDA'
+  | 'DIA_CERRADO'
+  | 'FECHA_FUTURA'
+  | 'HABITO_INACTIVO'
+  | 'NO_ES_LUNES'
+  | 'PROGRAMA_EXISTENTE'
+  | 'SEMANA_EN_CURSO'
+  | 'CONSENTIMIENTO_REQUERIDO'
+  | 'SIN_PARTNER'
+  | 'REPORTE_NO_CONGELADO'
+  | 'VENTANA_CERRADA'
+  | 'YA_ENVIADO'
+  | 'PARTIR_TAREA';
+
+export interface ExecutionErrorResult {
+  status: 'error';
+  code: ExecutionErrorCode;
+  message: string;
+}
+
+/**
+ * Traduce un ZodError a `{ status: 'error', code, message }`. Un `superRefine` puede fijar el
+ * código exacto agregando `params: { code: '...' }` a su `issue` (así es como `starts_on` no
+ * lunes se convierte en `NO_ES_LUNES`); si ningún issue trae un código explícito y hay claves no
+ * reconocidas (`.strict()`), se usa `opts.unrecognizedKeysCode` (por defecto `DATOS_INVALIDOS`;
+ * el disparador pasa `SOBRE_ESPECIFICACION`, porque ahí una clave extra es sobre-especificación,
+ * no un error de forma cualquiera). Cualquier otro caso cae en `DATOS_INVALIDOS` genérico.
+ */
+export function zodErrorToExecutionResult(
+  error: z.ZodError,
+  opts?: { unrecognizedKeysCode?: ExecutionErrorCode }
+): ExecutionErrorResult {
+  for (const issue of error.issues) {
+    const customCode = (issue as { params?: { code?: ExecutionErrorCode } }).params?.code;
+    if (customCode) {
+      return { status: 'error', code: customCode, message: issue.message };
+    }
+  }
+
+  const hasUnrecognizedKeys = error.issues.some((issue) => issue.code === 'unrecognized_keys');
+  if (hasUnrecognizedKeys) {
+    return {
+      status: 'error',
+      code: opts?.unrecognizedKeysCode ?? 'DATOS_INVALIDOS',
+      message: error.issues.map((issue) => issue.message).join('; '),
+    };
+  }
+
+  return {
+    status: 'error',
+    code: 'DATOS_INVALIDOS',
+    message: error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`.replace(/^: /, '')).join('; '),
+  };
+}
+
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// --- Programa (program_weeks, fundacional) ---
+
+export const ExecutionWeekInputSchema = z
+  .object({
+    min_tandas_dia: z.number().int().min(0).max(12),
+    phase: z.enum(['arranque', 'consolidacion', 'automatizacion']).optional().default('arranque'),
+  })
+  .strict();
+
+export const ExecutionProgramInitSchema = z
+  .object({
+    starts_on: z.string().regex(DATE_KEY_RE, { message: 'starts_on debe ser una fecha YYYY-MM-DD' }),
+    weeks: z.array(ExecutionWeekInputSchema).min(1),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.starts_on !== mondayOf(data.starts_on)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['starts_on'],
+        message: 'starts_on debe ser un lunes',
+        params: { code: 'NO_ES_LUNES' satisfies ExecutionErrorCode },
+      });
+    }
+  });
+
+export const ExecutionProgramUpdateWeekSchema = z
+  .object({
+    id: z.string().min(1),
+    min_tandas_dia: z.number().int().min(0).max(12).optional(),
+    phase: z.enum(['arranque', 'consolidacion', 'automatizacion']).optional(),
+  })
+  .strict();
+
+// --- Hábito (habits, daily_checks) ---
+
+export const HabitUpsertSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    started_on: z.string().regex(DATE_KEY_RE),
+    days_of_week: z.array(z.number().int().min(1).max(7)).min(1).optional().nullable(),
+    target_days: z.number().int().min(18).max(254).optional(),
+  })
+  .strict();
+
+export const HabitRetireSchema = z
+  .object({
+    id: z.string().min(1),
+    retired_on: z.string().regex(DATE_KEY_RE),
+  })
+  .strict();
+
+export const DailyCheckSetSchema = z
+  .object({
+    habit_id: z.string().min(1),
+    status: z.enum(['cumplido', 'fallado', 'na']),
+    date: z.string().regex(DATE_KEY_RE).optional(),
+    value: z.number().optional(),
+    note: z.string().max(200).optional(),
+  })
+  .strict();
+
+// --- Disparador (routine_slots, slot_outcomes, plan_rehearsals) ---
+
+export const RoutineSlotSchema = z
+  .object({
+    id: z.string().min(1).optional(),
+    days_of_week: z.array(z.number().int().min(1).max(7)).min(1),
+    cue_kind: z.enum(['hora', 'tras_clase', 'tras_habito', 'lugar']),
+    cue_text: z.string().min(CUE_TEXT_MIN).max(CUE_TEXT_MAX),
+    action_text: z.string().min(ACTION_TEXT_MIN).max(ACTION_TEXT_MAX),
+    anchor_time: z.string().regex(TIME_HHMM_RE).optional(),
+    schedule_id: z.string().optional(),
+    subject_id: z.string().optional(),
+    habit_id: z.string().optional(),
+    kind: z.enum(['estudio', 'habito', 'otro']).optional().default('estudio'),
+    periodicity: z.enum(['semanal', 'sabado_a', 'sabado_b']).optional().default('semanal'),
+    is_active: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.cue_kind !== 'tras_clase' && !data.anchor_time) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['anchor_time'],
+        message: 'anchor_time es obligatorio salvo en disparadores tras_clase',
+      });
+    }
+    if (data.cue_kind === 'tras_clase' && !data.schedule_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['schedule_id'],
+        message: 'un disparador tras_clase exige schedule_id (hereda día y alternancia del horario)',
+      });
+    }
+    if (data.kind === 'habito' && !data.habit_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['habit_id'],
+        message: "kind='habito' exige habit_id",
+      });
+    }
+    if (data.periodicity !== 'semanal') {
+      const esSoloSabado = data.days_of_week.length === 1 && data.days_of_week[0] === 6;
+      if (!esSoloSabado) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['periodicity'],
+          message: 'una periodicity distinta de semanal solo aplica con days_of_week=[6]',
+        });
+      }
+    }
+  });
+
+export const RoutineSlotRespondSchema = z
+  .object({
+    routine_slot_id: z.string().min(1),
+    outcome: z.enum(['hecho', 'no']),
+  })
+  .strict();
+
+export const RoutineSlotRehearseSchema = z
+  .object({
+    routine_slot_id: z.string().min(1),
+    program_week_id: z.string().min(1).optional(),
+  })
+  .strict();
+
+// --- Tanda (tandas) ---
+// Ninguna acción admite `started_at` ni `ended_at`: los fija siempre el reloj del servidor
+// (FR-002). Al ser esquemas `.strict()`, cualquiera de esas dos claves cae en `unrecognized_keys`
+// y, por defecto, se traduce a DATOS_INVALIDOS.
+
+export const TandaStartSchema = z
+  .object({
+    subject_id: z.string().optional(),
+    topic_id: z.string().optional(),
+    deliverable_id: z.string().optional(),
+    task_id: z.string().optional(),
+    routine_slot_id: z.string().optional(),
+    planned_minutes: z.number().int().min(TANDA_MINUTES_MIN).max(TANDA_MINUTES_MAX).optional(),
+  })
+  .strict();
+
+export const TandaFinishSchema = z
+  .object({
+    id: z.string().min(1),
+  })
+  .strict();
+
+export const TandaInterruptSchema = z
+  .object({
+    id: z.string().min(1),
+    interrupt_reason: z.string().min(INTERRUPT_REASON_MIN).max(INTERRUPT_REASON_MAX),
+  })
+  .strict();
+
+export const TandaReadSchema = z
+  .object({
+    from: z.string().regex(DATE_KEY_RE).optional(),
+    to: z.string().regex(DATE_KEY_RE).optional(),
+    subject_id: z.string().optional(),
+  })
+  .strict();
+
+// Update solo toca campos de clasificación: nunca tiempos (`started_at`/`ended_at`/`local_date`).
+export const TandaUpdateSchema = z
+  .object({
+    id: z.string().min(1),
+    subject_id: z.string().optional(),
+    topic_id: z.string().optional(),
+    deliverable_id: z.string().optional(),
+    task_id: z.string().optional(),
+    mode: z.string().optional(),
+    interrupt_reason: z.string().min(INTERRUPT_REASON_MIN).max(INTERRUPT_REASON_MAX).optional(),
+  })
+  .strict();
+
+// --- Destinatario del reporte (accountability_partners) ---
+
+export const AccountabilityPartnerSetSchema = z
+  .object({
+    name: z.string().min(1),
+    email: z.string().email(),
+    consented_at: z.string().optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (!data.consented_at || !data.consented_at.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['consented_at'],
+        message: 'consented_at es obligatorio para registrar un destinatario',
+        params: { code: 'CONSENTIMIENTO_REQUERIDO' satisfies ExecutionErrorCode },
+      });
+    }
+  });
+
+// --- Nota del reporte semanal (weekly_reports) ---
+
+export const WeeklyReportNoteSchema = z
+  .object({
+    program_week_id: z.string().min(1),
+    note: z.string().max(USER_NOTE_MAX),
+  })
+  .strict();
+
+// --- Tarea (tasks) ---
+
+export const ExecutionTaskSchema = z
+  .object({
+    id: z.string().optional(),
+    title: z.string().min(3).max(120),
+    subject_id: z.string().min(1),
+    deliverable_id: z.string().optional(),
+    topic_id: z.string().optional(),
+    estimated_tandas: z.number().int().min(1).max(3),
+    status: z.enum(['pendiente', 'hecha', 'descartada']).optional(),
+    scheduled_date: z.string().regex(DATE_KEY_RE).optional(),
+  })
+  .strict();
+
+// --- Intención (intentions) ---
+
+export const IntentionItemSchema = z
+  .object({
+    subject_id: z.string().min(1),
+    strength: z.number().int().min(0).max(10),
+    reason: z.string().optional(),
+  })
+  .strict();
+
+export const IntentionsSetSchema = z
+  .object({
+    program_week_id: z.string().min(1),
+    items: z.array(IntentionItemSchema).min(1),
+  })
+  .strict();

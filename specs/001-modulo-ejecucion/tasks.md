@@ -87,14 +87,14 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - usar el SQL exacto de specs/001-modulo-ejecucion/data-model.md: `program_weeks`, `habits`, `daily_checks`, `routine_slots`, `slot_outcomes`, `plan_rehearsals`, `tasks` con `CHECK (estimated_tandas BETWEEN 1 AND 3)` y `tandas` con `running_lock TEXT UNIQUE`;
   - sin plpgsql, sin `AT TIME ZONE` y sin índices parciales;
   - agregar a `reset()` las tablas nuevas hijas primero (`tandas`, `slot_outcomes`, `plan_rehearsals`, `daily_checks`, `tasks`, `routine_slots`, `habits`, `program_weeks`) antes de la lista actual.
-- [ ] T010 [P] TEST Validación en __tests__/validations/execution-schemas.test.ts:
+- [X] T010 [P] TEST Validación en __tests__/validations/execution-schemas.test.ts:
   - un disparador con una clave extra (`default_tandas`, `duration`, `how`) → `SOBRE_ESPECIFICACION` (FR-009);
   - "`cue_text` 5–80", "`action_text` 5–90";
   - "`anchor_time` obligatorio salvo en `tras_clase`"; "`kind='habito'` exige `habit_id`";
   - "`periodicity ≠ semanal` solo con `days_of_week=[6]`";
   - "`starts_on` es lunes" → `NO_ES_LUNES` (FR-017);
   - "`planned_minutes` 5–25", "`estimated_tandas` 1–3", "`interrupt_reason` 1–140", "`user_note` ≤ 400", "`strength` 0–10", "`note` ≤ 200".
-- [ ] T011 IMPL Sección "Módulo de Ejecución" en lib/validations/schemas.ts:
+- [X] T011 IMPL Sección "Módulo de Ejecución" en lib/validations/schemas.ts:
   - esquemas Zod estrictos (`.strict()`) para programa, hábito, check, disparador, respuesta, ensayo, tanda (start, interrupt y update sin campos de tiempo), destinatario (`consented_at` obligatorio), nota de reporte, tarea e intención, con las reglas de T010;
   - un helper que traduzca los errores de Zod a `{ status: 'error', code, message }`.
 - [ ] T012 TEST `manage_program` en __tests__/mcp/execution-program.test.ts (pg-mem):
