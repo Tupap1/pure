@@ -70,12 +70,12 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - un archivo por fila de la matriz;
   - cada archivo con `describe('[001] USn — <historia>')`;
   - T004 debe quedar en verde sin romper `npm run test:all`.
-- [ ] T006 [P] TEST Zona horaria en __tests__/domain/execution-time.test.ts (FR-006, US1-AS7):
+- [X] T006 [P] TEST Zona horaria en __tests__/domain/execution-time.test.ts (FR-006, US1-AS7):
   - `localParts('2026-09-15T01:30:00Z')` devuelve `{ dateKey: '2026-09-14', dayOfWeek: 1, minutes: 1230 }`;
   - `localDateTimeToInstant('2026-09-15', '03:00')` devuelve `2026-09-15T08:00:00.000Z`;
   - `addDays` y `mondayOf`;
   - un instante `…T04:55:00Z` cae en el día anterior de Bogotá.
-- [ ] T007 IMPL lib/execution/time.ts y lib/execution/constants.ts:
+- [X] T007 IMPL lib/execution/time.ts y lib/execution/constants.ts:
   - time.ts resuelve `PURE_TZ` (por defecto `America/Bogota`) con `Intl.DateTimeFormat`, igual que lib/integrations/fireflies-sync.ts:14, y exporta `localParts`, `localDateTimeToInstant`, `addDays` y `mondayOf`;
   - constants.ts: `TANDA_MINUTES=10` (rango 5–25), `TRIGGER_WINDOW_MINUTES=240`, `DAY_LOCK_TIME='03:00'`, `REPORT_FREEZE='19:00'`, `REPORT_NOTE_MINUTES=60`, `CUE_TEXT 5–80`, `ACTION_TEXT 5–90`, `INTERRUPT_REASON ≤140`, `USER_NOTE ≤400`, `VERDICT` (≥6/7 cumplida, ≤3/7 fallida, resto parcial) y `REPORT_MAX_ATTEMPTS=3`.
 - [ ] T008 [P] TEST Esquema en __tests__/db/execution-schema.test.ts con `createTestDb()`:
