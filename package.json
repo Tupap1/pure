@@ -12,7 +12,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:all": "npm run typecheck && vitest run"
+    "test:all": "npm run typecheck && npm run lint && vitest run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
