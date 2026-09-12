@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
 import { useNavigation } from '@/lib/hooks/useNavigation';
+import { useGradeAlerts } from '@/lib/hooks/useGradeAlerts';
 import { DeliverableEntity } from '@/lib/db/dexie-schema';
 import { saveDeliverable, deleteDeliverable } from '@/lib/db/repository';
 import { Card } from '@/components/ui/Card';
@@ -13,14 +14,17 @@ import {
   Users,
   User,
   Trash2,
-  Edit3
+  Edit3,
+  AlertTriangle,
+  CalendarRange,
 } from 'lucide-react';
 import { calculateRequiredGradeForRemaining } from '@/lib/domain/subject';
 import { formatDeliverableDate } from '@/lib/domain/deliverable';
 
 export const DeliverablesDashboard: React.FC = () => {
   const { isLoaded, subjects, deliverables, universities } = usePureData();
-  const { openSubject } = useNavigation();
+  const { openSubject, selectTab } = useNavigation();
+  const { alerts } = useGradeAlerts();
   const [filterGroup, setFilterGroup] = useState<'all' | 'individual' | 'group'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingDeliv, setEditingDeliv] = useState<DeliverableEntity | null>(null);
@@ -230,16 +234,46 @@ export const DeliverablesDashboard: React.FC = () => {
             Vencimientos de todas las materias, ordenados por cercanía.
           </p>
         </div>
-        <Button
-          variant="synergy"
-          size="sm"
-          className="w-full sm:w-auto"
-          onClick={openAddModal}
-          disabled={subjects.length === 0}
-        >
-          <Plus className="w-4 h-4" /> Registrar Actividad
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* 'semana' no ocupa slot en la barra inferior (mobile: false, igual que Configuración:
+              consultarla es deliberado, FR-037, no algo de todos los días); en escritorio ya
+              está en el Sidebar, así que este enlace es solo para móvil. */}
+          <Button variant="ghost" size="sm" className="sm:hidden" onClick={() => selectTab('semana')}>
+            <CalendarRange className="w-4 h-4" /> Ver semana
+          </Button>
+          <Button
+            variant="synergy"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={openAddModal}
+            disabled={subjects.length === 0}
+          >
+            <Plus className="w-4 h-4" /> Registrar Actividad
+          </Button>
+        </div>
       </div>
+
+      {/* Alertas (US9-AS3): materias abandonadas (evaluación próxima sin tandas recientes) o
+          ciegas (sin evaluaciones registradas). get_grade_projection ya calcula esto (US5); aquí
+          solo se muestra. */}
+      {alerts.length > 0 && (
+        <Card className="p-0 overflow-hidden border-amber-300/50 dark:border-amber-900/40">
+          <div className="px-4 pt-4 pb-3 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-500 shrink-0" />
+            <h4 className="text-sm font-heading font-semibold text-slate-900 dark:text-slate-100">Alertas</h4>
+          </div>
+          <div className="divide-y divide-surface-border">
+            {alerts.map((alert, index) => (
+              <div key={`${alert.subject_id}-${alert.kind}-${index}`} className="px-4 py-2.5 flex items-center justify-between gap-3 text-xs">
+                <span className="text-slate-700 dark:text-slate-300">{alert.detalle}</span>
+                <Badge variant={alert.kind === 'ciega' ? 'warning' : 'danger'} className="shrink-0">
+                  {alert.kind === 'ciega' ? 'Ciega' : 'Abandonada'}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Nota requerida por materia — dato, no prosa */}
       {gradeRows.length > 0 && (

@@ -230,7 +230,7 @@ export const SubjectHub: React.FC<SubjectHubProps> = ({ subjectId }) => {
         )}
 
         {section === 'evaluacion' && (
-          <SubjectEvaluation subject={subject} deliverables={deliverables} />
+          <SubjectEvaluation subject={subject} deliverables={deliverables} university={university} />
         )}
 
         {section === 'clases' && (

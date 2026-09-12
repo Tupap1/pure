@@ -16,7 +16,7 @@ PURE OS es una consola de trabajo académico con la calma editorial de Notion: s
 - ❌ **No Eyebrows / Kickers:** Prohibidos arriba de los títulos principales.
 - ❌ **No Marketing Fluff / Slogans:** Prohibidos eslóganes o badges decorativos sin métricas numéricas asociadas.
 - ❌ **No Unearned Containers:** Prohibido anidar tarjetas dentro de tarjetas sin jerarquía estructural.
-- ❌ **No Monospace as Costume:** La fuente `JetBrains Mono` se restringe estrictamente a datos, códigos, horas y notas numéricas.
+- ❌ **No Monospace as Costume:** La fuente `IBM Plex Mono` se restringe estrictamente a datos, códigos, horas y notas numéricas.
 - ❌ **No Neon / No Glow:** Prohibidos acentos saturados (cian/verde ácido/violeta neón), `box-shadow` luminosos, retículas de puntos decorativas y scrollbars de color. El acento es sobrio y desaturado.
 - ❌ **No Colored Icon Boxes:** Prohibido el patrón "icono de color dentro de cajita tintada redondeada" (`bg-cyan-100 text-cyan-600`). Los iconos son monocromos (`text-slate-400/500`), sin caja.
 - ❌ **No Side-Tab Accent Bars:** Prohibida la barra de acento gruesa a un lado de una tarjeta o item de navegación. El estado activo se marca con fondo gris sutil.

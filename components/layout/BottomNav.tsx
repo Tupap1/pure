@@ -9,13 +9,17 @@ export const BottomNav: React.FC = () => {
   // El hub de asignatura no ocupa slot aquí: cuando está activo, ninguna pestaña se marca.
   const activeTab: DashboardTab | null = view.kind === 'tab' ? view.tab : null;
 
+  // FR-041: Configuración sale de la barra inferior (la barra ya tenía 6 destinos); se abre
+  // desde el engranaje del encabezado en su lugar.
+  const mobileItems = NAV_ITEMS.filter((item) => item.mobile !== false);
+
   return (
     <nav
       role="tablist"
       aria-label="Secciones"
       className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-obsidian-900/95 backdrop-blur-md border-t border-surface-border px-2 py-1.5 flex items-center justify-around"
     >
-      {NAV_ITEMS.map((item) => {
+      {mobileItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
         return (
@@ -25,13 +29,13 @@ export const BottomNav: React.FC = () => {
             aria-selected={isActive}
             onClick={() => selectTab(item.id)}
             className={cn(
-              'min-h-[44px] min-w-[44px] flex flex-col items-center justify-center flex-1 px-1 py-1 rounded-lg border transition-colors duration-200',
+              'min-h-[44px] min-w-[44px] flex flex-col items-center justify-center flex-1 px-1 py-1 rounded-lg border border-transparent transition-colors duration-200',
               isActive
-                ? 'text-cyan-700 dark:text-cyan-300 bg-cyan-500/10 border-cyan-500/30 font-semibold'
-                : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-slate-200'
+                ? 'text-slate-900 dark:text-slate-100 bg-black/[0.05] dark:bg-white/[0.08] font-semibold'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             )}
           >
-            <Icon className={cn('w-5 h-5', isActive ? 'text-cyan-700 dark:text-cyan-300' : 'text-slate-400')} />
+            <Icon className={cn('w-5 h-5', isActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400')} />
             <span className="text-[11px] mt-0.5 tracking-tight leading-tight font-semibold">
               {item.label}
             </span>

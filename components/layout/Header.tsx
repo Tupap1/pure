@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Cpu, Sun, Moon, AlertTriangle, ChevronLeft } from 'lucide-react';
+import { Clock, Cpu, Sun, Moon, AlertTriangle, ChevronLeft, Settings } from 'lucide-react';
 import { useTheme } from '@/lib/hooks/useTheme';
 import { useAcademicLoad } from '@/lib/hooks/useAcademicLoad';
 import { usePureData } from '@/lib/hooks/usePureData';
@@ -9,7 +9,7 @@ import { getNavLabel } from '@/lib/navigation';
 export const Header: React.FC = () => {
   const { normativeIndependentHours, netFreeTime, isOverloaded } = useAcademicLoad();
   const { theme, toggleTheme } = useTheme();
-  const { view, goBack } = useNavigation();
+  const { view, goBack, selectTab } = useNavigation();
   const { subjects } = usePureData();
 
   // Título según la superficie: nombre de la materia en el hub, "Asignaturas" en el índice,
@@ -102,6 +102,16 @@ export const Header: React.FC = () => {
           className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-surface-subtle text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 border border-surface-border transition-colors"
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+
+        {/* FR-041: en móvil Configuración no vive en la barra inferior; se abre desde aquí. */}
+        <button
+          onClick={() => selectTab('config')}
+          aria-label="Configuración"
+          title="Configuración"
+          className="md:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-surface-subtle text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 border border-surface-border transition-colors"
+        >
+          <Settings className="w-4 h-4" />
         </button>
       </div>
     </header>

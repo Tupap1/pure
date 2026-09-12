@@ -73,6 +73,20 @@ export async function createTestDb(): Promise<TestDbHarness> {
     pool,
     reset: async () => {
       const tables = [
+        // Módulo de Ejecución (migración 008): hijas primero, igual que el resto de la lista.
+        'tandas',
+        'slot_outcomes',
+        'plan_rehearsals',
+        'daily_checks',
+        'tasks',
+        'intentions',
+        'plan_views',
+        'weekly_reports',
+        'accountability_partners',
+        'push_subscriptions',
+        'routine_slots',
+        'habits',
+        'program_weeks',
         'oauth_access_tokens',
         'oauth_auth_codes',
         'oauth_clients',

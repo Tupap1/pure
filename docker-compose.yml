@@ -24,6 +24,10 @@ services:
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-demo_key}
       - FIREFLIES_API_KEY=${FIREFLIES_API_KEY:-}
+      - PURE_TZ=${PURE_TZ:-America/Bogota}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
     depends_on:
       - pure-db
     restart: unless-stopped
@@ -44,6 +48,17 @@ services:
       - FIREFLIES_API_KEY=${FIREFLIES_API_KEY:-}
       - PURE_TZ=${PURE_TZ:-America/Bogota}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-pure_user}:${POSTGRES_PASSWORD:-pure_secure_password_2026}@pure-db:5432/${POSTGRES_DB:-pure_academic}?sslmode=disable
+      - EXECUTION_SCHEDULER=${EXECUTION_SCHEDULER:-on}
+      - REPORT_OWNER_NAME=${REPORT_OWNER_NAME:-Andres}
+      - PUBLIC_WEB_URL=${PUBLIC_WEB_URL:-}
+      - ZEPTOMAIL_TOKEN=${ZEPTOMAIL_TOKEN:-}
+      - ZEPTOMAIL_URL=${ZEPTOMAIL_URL:-https://api.zeptomail.com/v1.1/email}
+      - REPORT_FROM=${REPORT_FROM:-}
+      - REPORT_FROM_NAME=${REPORT_FROM_NAME:-}
+      - REPORT_REPLY_TO=${REPORT_REPLY_TO:-}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
     stdin_open: true
     tty: true
     depends_on:

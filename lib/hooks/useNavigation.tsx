@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
-import type { DashboardTab } from '@/lib/navigation';
+import { HOME_TAB, type DashboardTab } from '@/lib/navigation';
 
 /**
  * Modelo de la vista activa de la app.
@@ -35,7 +35,7 @@ const NavigationContext = createContext<NavigationContextValue | null>(null);
  * de materias enterradas en los dashboards puedan disparar el drill-in sin prop-drilling.
  */
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [view, setView] = useState<NavView>({ kind: 'tab', tab: 'command' });
+  const [view, setView] = useState<NavView>({ kind: 'tab', tab: HOME_TAB });
 
   const selectTab = useCallback((tab: DashboardTab) => setView({ kind: 'tab', tab }), []);
   const openSubjectsIndex = useCallback(() => setView({ kind: 'subjects-index' }), []);
@@ -45,7 +45,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   );
   const goBack = useCallback(() => {
     setView((prev) =>
-      prev.kind === 'subject' ? { kind: 'subjects-index' } : { kind: 'tab', tab: 'command' }
+      prev.kind === 'subject' ? { kind: 'subjects-index' } : { kind: 'tab', tab: HOME_TAB }
     );
   }, []);
 

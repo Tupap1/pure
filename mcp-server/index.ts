@@ -30,7 +30,19 @@ import {
   handleManageStudyBlocks,
   handleManageFlashcards,
   handleGetClassContext,
+  handleManageProgram,
+  handleManageTandas,
+  handleGetToday,
+  handleManageRoutineSlots,
+  handleManageDailyChecks,
+  handleGetGradeProjection,
+  handleManageWeeklyReport,
+  handleGetComplianceReport,
+  handleManageTasks,
+  handlePlanWeek,
 } from './tools-handler';
+import { runExecutionTick } from '../lib/execution/tick';
+import { createZeptoMailer } from '../lib/execution/mailer';
 
 export const TOOLS_LIST = [
   {
@@ -268,6 +280,200 @@ export const TOOLS_LIST = [
       },
     },
   },
+  {
+    name: 'manage_program',
+    description:
+      'Módulo de Ejecución: programa de semanas (arranque/consolidación/automatización) y hábitos diarios. ' +
+      '"init" crea el programa una sola vez, con las semanas numeradas desde un lunes (rechaza otro día y un segundo init). ' +
+      '"update_week" solo edita semanas cuyo inicio todavía no llegó (la semana en curso o pasada se rechaza). ' +
+      '"upsert_habit"/"retire_habit" dan de alta o retiran un hábito diario, con days_of_week 1=lunes..7=domingo. ' +
+      'El programa, sus semanas y los hábitos se cargan exclusivamente por esta herramienta: nunca se siembran por migración ni por la UI.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['init', 'read', 'update_week', 'upsert_habit', 'retire_habit'] },
+        data: {
+          type: 'object',
+          description:
+            'init: { starts_on (YYYY-MM-DD, lunes), weeks: [{ min_tandas_dia, phase }] }. ' +
+            'update_week: { id, min_tandas_dia?, phase? }. ' +
+            'upsert_habit: { id, label, started_on, days_of_week? (1=lunes..7=domingo), target_days? }. ' +
+            'retire_habit: { id, retired_on }. read: sin data.',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_tandas',
+    description:
+      'Módulo de Ejecución: tanda de estudio de 10 minutos (US1), la unidad de ejecución de Pure. ' +
+      '"start" la empieza con la hora del servidor (rechaza started_at/ended_at del cliente: sin tandas retroactivas) y falla con TANDA_EN_CURSO si ya hay una en curso. ' +
+      '"finish" solo funciona si ya se cumplió el tiempo planeado; antes de eso usa "interrupt" con interrupt_reason (1-140 caracteres, obligatorio). ' +
+      '"current" devuelve la tanda en curso y los segundos restantes. "read" lista tandas con su resumen por día. ' +
+      '"update" solo reclasifica una tanda ya cerrada (materia, tema, entregable, tarea, modo); nunca acepta tiempos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['start', 'finish', 'interrupt', 'current', 'read', 'update'] },
+        data: {
+          type: 'object',
+          description:
+            'start: { subject_id?, topic_id?, deliverable_id?, task_id?, routine_slot_id?, planned_minutes? (5-25, 10 por defecto) }. ' +
+            'finish: { id }. interrupt: { id, interrupt_reason (1-140) }. current: sin data. ' +
+            'read: { from?, to? (YYYY-MM-DD), subject_id? }. ' +
+            'update: { id, subject_id?, topic_id?, deliverable_id?, task_id?, mode?, interrupt_reason? }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'get_today',
+    description:
+      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (con los segundos restantes), el disparador vigente si lo hay, los hábitos pendientes y si el día quedó cumplido.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: { type: 'object', description: '{ at? } ISO, opcional: solo para pruebas o una consulta puntual en otro instante.' },
+      },
+    },
+  },
+  {
+    name: 'manage_routine_slots',
+    description:
+      'Módulo de Ejecución: disparador "Si <señal>, entonces <acción>" (US2). ' +
+      '"create"/"update" son estrictos: una clave de duración, número de tandas o método de estudio se rechaza (SOBRE_ESPECIFICACION), porque un disparador solo dice cuándo y qué. ' +
+      'Un cue_kind="tras_clase" exige schedule_id y SIEMPRE hereda de ese horario days_of_week y la alternancia de sábados (nunca se declaran a mano). ' +
+      '"read" marca huerfano:true un tras_clase cuyo horario ya no existe. ' +
+      '"respond" (outcome hecho/no) es idempotente por día; en un disparador de hábito también fija el check de ese hábito hoy. ' +
+      'El "hecho" real de un disparador de estudio ocurre iniciando la tanda (manage_tandas con action="start" y routine_slot_id en data), que liga la tanda al disparador y hereda su materia — no hay un "respond hecho" separado para ese caso. ' +
+      '"rehearse" es idempotente por semana del programa (como máximo un ensayo). days_of_week usa 1=lunes..7=domingo.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'update', 'read', 'delete', 'respond', 'rehearse'] },
+        data: {
+          type: 'object',
+          description:
+            'create/update: { id? (update), days_of_week (1-7), cue_kind (hora/tras_clase/tras_habito/lugar), cue_text (5-80), action_text (5-90), anchor_time? (HH:MM, obligatorio salvo tras_clase), schedule_id? (obligatorio en tras_clase), subject_id?, habit_id? (obligatorio si kind=habito), kind? (estudio/habito/otro), periodicity? (semanal/sabado_a/sabado_b, solo con days_of_week=[6]), is_active? }. ' +
+            'read: { id? }. delete: { id }. ' +
+            'respond: { routine_slot_id, outcome (hecho/no) }. rehearse: { routine_slot_id, program_week_id? }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_daily_checks',
+    description:
+      'Módulo de Ejecución: registro diario de hábitos y evaluación de "día cumplido" (US3), sin deuda acumulada entre días. ' +
+      '"set" acepta hasta las 03:00 del día siguiente a la fecha registrada (después, DIA_CERRADO), rechaza fechas futuras (FECHA_FUTURA) y hábitos que no están activos ese día (HABITO_INACTIVO); es upsert idempotente por fecha y hábito. ' +
+      '"read" devuelve, por día, sus checks y la evaluación (tandas completadas ≥ mínimo de la semana y todo hábito activo cumplido o na; null si el día cae fuera del programa).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['set', 'read'] },
+        data: {
+          type: 'object',
+          description:
+            'set: { habit_id, status (cumplido/fallado/na), date? (YYYY-MM-DD, hoy por defecto), value?, note? (≤200) }. ' +
+            'read: { from?, to? (YYYY-MM-DD) }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'get_grade_projection',
+    description:
+      'Módulo de Ejecución: proyección de nota por materia (US5), de solo lectura. Por materia, con la escala y la aprobatoria de su universidad: aporte acumulado, promedio evaluado, peso restante, la nota necesaria para aprobar y para la meta (redondeadas hacia arriba) y el techo alcanzable (redondeado hacia abajo). ' +
+      'Marca "ciega" una materia sin evaluaciones registradas, "pesos_inconsistentes" si los pesos declarados no suman 100% (en ese caso no calcula necesaria ni techo), "entregado_sin_nota", "vencido_sin_registrar", "meta_inalcanzable" y "materia_perdida". ' +
+      'Además eleva a alerta (para el reporte semanal y la agenda) las materias "ciega" y las "abandonada" (una evaluación pendiente en menos de 7 días y ninguna tanda en los últimos 7 días).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: { type: 'object', description: '{ subject_id? }: sin subject_id, calcula todas las materias.' },
+      },
+    },
+  },
+  {
+    name: 'get_compliance_report',
+    description:
+      'Módulo de Ejecución: vista de salud del hábito para un rango de días o una semana del programa entera (US6), de solo lectura. Devuelve los días con su evaluación, days_fulfilled, los hábitos como fracción, las tandas (completadas/interrumpidas y por materia), los disparadores (hecho/no/sin_respuesta), las razones de interrupción, las ediciones tardías, los días cumplidos acumulados desde el inicio del programa y el horizonte del hábito (66 por defecto).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description:
+            '{ from?, to? (YYYY-MM-DD) } o { program_week_id? }. Sin ninguno, cubre solo hoy.',
+        },
+      },
+    },
+  },
+  {
+    name: 'manage_weekly_report',
+    description:
+      'Módulo de Ejecución: destinatario del reporte semanal y su ciclo de vida (US6). "set_partner" registra al único destinatario vigente (exige consented_at: sin consentimiento no se guarda) y desactiva el anterior. "preview" muestra la forma del reporte con los datos de AHORA, sin congelar ni guardar nada. El congelamiento en sí (domingo 19:00) y el envío (tras 60 minutos de ventana de nota) los hace el tick, no una acción manual: "set_note" solo escribe la nota dentro de esa ventana, "send" fuerza el envío de un reporte ya congelado (con el mismo claim atómico del tick: como mucho un envío por reporte) y "read" devuelve el reporte guardado (status, intentos, último error). ' +
+      '"run_tick" ejecuta un ciclo completo del tick (congelar semanas vencidas + intentar enviar las que ya cerraron su ventana de nota) con el mailer real: es el disparador externo que exige FR-039 (repetirlo nunca duplica un envío) y sirve para forzar el congelamiento sin esperar al reloj del servidor.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['set_partner', 'read_partner', 'preview', 'set_note', 'send', 'read', 'run_tick'] },
+        data: {
+          type: 'object',
+          description:
+            'set_partner: { name, email, consented_at (ISO) }. read_partner/run_tick: sin data. ' +
+            'preview: { program_week_id? } (la semana en curso si se omite). ' +
+            'set_note: { program_week_id, note (≤400) }. send: { program_week_id }. read: { program_week_id? }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_tasks',
+    description:
+      'Módulo de Ejecución: tarea de 1 a 3 tandas, ligada a una materia (US8). ' +
+      '"create"/"update" rechazan estimated_tandas > 3 con PARTIR_TAREA: la tarea hay que partirla, nunca aceptarla grande. ' +
+      '"today" devuelve solo las tareas con scheduled_date = hoy y status="pendiente"; las de ayer sin hacer NO se arrastran (no hay deuda acumulada de tareas en este sistema).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete', 'today'] },
+        data: {
+          type: 'object',
+          description:
+            'create: { id?, title (3-120), subject_id, deliverable_id?, topic_id?, estimated_tandas (1-3), status? (pendiente/hecha/descartada), scheduled_date? (YYYY-MM-DD) }. ' +
+            'read: { id?, subject_id?, status? }. update: { id, ...campos de create, todos opcionales }. delete: { id }. today: sin data.',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'plan_week',
+    description:
+      'Módulo de Ejecución: planeación del domingo y la vista de semana (US8-US9). ' +
+      '"preview" arma el asistente del domingo: la semana pasada (cumplimiento), las entregas de los próximos 14 días con sus alertas, las intenciones y disparadores de la semana que viene con su ensayo, y el reparto sugerido de tandas por materia (de la norma de créditos, 48h/crédito/semestre, con la urgencia y la proyección de nota en columnas aparte) — excluye de ese reparto una materia con intención declarada menor a 6. ' +
+      '"set_intentions" registra, por materia y semana, una intención de 0 a 10; menor a 6 exige razón (RAZON_REQUERIDA si falta) y esa materia deja de recibir reparto sugerido. ' +
+      '"open_view" es la compuerta de la vista de semana (FR-037): libre 2 veces por semana; desde la 3.ª exige reason (RAZON_REQUERIDA si falta) y esa apertura queda contada en el reporte semanal ("Aperturas del plan"). Devuelve la rejilla de la semana en curso: cada disparador con su resultado por día y las tandas por día, sin gráficas.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['preview', 'set_intentions', 'open_view'] },
+        data: {
+          type: 'object',
+          description:
+            'preview: { program_week_id? } (la semana en curso, o la siguiente si hoy es domingo, si se omite). ' +
+            'set_intentions: { program_week_id, items: [{ subject_id, strength (0-10), reason? }] }. ' +
+            'open_view: { reason? } (obligatorio desde la 3.ª apertura de la semana en curso).',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -463,6 +669,133 @@ export function createMcpServerInstance() {
     },
     async ({ session_id, subject_id, date }) => {
       const res = await handleGetClassContext({ session_id, subject_id, date });
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_program',
+    'Módulo de Ejecución: programa de semanas y hábitos diarios. init/read/update_week/upsert_habit/retire_habit. Datos cargados solo por esta herramienta (nunca sembrados por migración ni por la UI); days_of_week de los hábitos usa 1=lunes..7=domingo.',
+    {
+      action: z.enum(['init', 'read', 'update_week', 'upsert_habit', 'retire_habit']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageProgram(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_tandas',
+    'Módulo de Ejecución: tanda de estudio de 10 minutos (US1). start/finish/interrupt/current/read/update. La hora siempre la fija el servidor; sin tandas retroactivas; interrupt exige una razón de 1-140 caracteres.',
+    {
+      action: z.enum(['start', 'finish', 'interrupt', 'current', 'read', 'update']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageTandas(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'get_today',
+    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso, disparador vigente, hábitos pendientes, día cumplido). Solo lectura.',
+    {
+      data: z.any().optional(),
+    },
+    async ({ data }) => {
+      const res = await handleGetToday(data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_routine_slots',
+    'Módulo de Ejecución: disparador "Si <señal>, entonces <acción>" (US2). create/update/read/delete/respond/rehearse. Un tras_clase hereda día y alternancia de sábados de su horario; respond es idempotente por día y rehearse por semana del programa.',
+    {
+      action: z.enum(['create', 'update', 'read', 'delete', 'respond', 'rehearse']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageRoutineSlots(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_daily_checks',
+    'Módulo de Ejecución: registro diario de hábitos y "día cumplido" (US3). set/read. set acepta hasta las 03:00 del día siguiente, rechaza fechas futuras y hábitos inactivos ese día; es upsert idempotente por fecha+hábito.',
+    {
+      action: z.enum(['set', 'read']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageDailyChecks(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'get_grade_projection',
+    'Módulo de Ejecución: proyección de nota por materia (US5), de solo lectura. Necesaria para aprobar/meta y techo, con las alertas ciega/pesos_inconsistentes/entregado_sin_nota/vencido_sin_registrar/meta_inalcanzable/materia_perdida, y las alertas elevadas ciega/abandonada.',
+    {
+      data: z.any().optional(),
+    },
+    async ({ data }) => {
+      const res = await handleGetGradeProjection(data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'get_compliance_report',
+    'Módulo de Ejecución: vista de salud del hábito (US6), de solo lectura. Días con su evaluación, days_fulfilled, hábitos por fracción, tandas, disparadores, razones de interrupción, ediciones tardías, días cumplidos acumulados y horizonte.',
+    {
+      data: z.any().optional(),
+    },
+    async ({ data }) => {
+      const res = await handleGetComplianceReport(data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_weekly_report',
+    'Módulo de Ejecución: destinatario del reporte semanal y su ciclo de vida (US6). set_partner/read_partner/preview/set_note/send/read/run_tick. El congelamiento (domingo 19:00) y el envío (tras la ventana de nota de 60 min) los hace el tick; run_tick lo dispara una vez con el mailer real y es idempotente (FR-039).',
+    {
+      action: z.enum(['set_partner', 'read_partner', 'preview', 'set_note', 'send', 'read', 'run_tick']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageWeeklyReport(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_tasks',
+    'Módulo de Ejecución: tarea de 1 a 3 tandas ligada a una materia (US8). create/read/update/delete/today. Más de 3 tandas se rechaza con PARTIR_TAREA; today nunca arrastra las de ayer.',
+    {
+      action: z.enum(['create', 'read', 'update', 'delete', 'today']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageTasks(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'plan_week',
+    'Módulo de Ejecución: planeación del domingo y vista de semana (US8-US9). preview/set_intentions/open_view. El reparto sugerido sale de la norma de créditos (urgencia y proyección aparte) y excluye materias con intención < 6; open_view es la compuerta de la semana (2 aperturas libres, desde la 3.ª pide razón) y devuelve la rejilla de disparadores y tandas por día, sin gráficas.',
+    {
+      action: z.enum(['preview', 'set_intentions', 'open_view']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handlePlanWeek(action, data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );
@@ -1009,6 +1342,42 @@ async function main() {
     await instance.connect(stdioTransport);
     console.error('Servidor MCP de Pure conectado vía stdio');
   }
+
+  startExecutionScheduler();
+}
+
+/**
+ * US6/FR-039: el tick que congela y envía el reporte semanal (y, más adelante, US7) tiene que
+ * correr aunque nadie abra la app. `EXECUTION_SCHEDULER=on` (docker-compose.yml: solo en
+ * `pure-mcp`, nunca en `pure-web`, para no correrlo dos veces) lo activa; sin la variable, el
+ * proceso no hace nada distinto de hoy. Guardia anti-solapamiento: si un tick todavía no termina
+ * cuando toca el siguiente intervalo, ese intervalo se salta en vez de apilar llamadas.
+ * `.unref()` para que este timer nunca sea, por sí solo, la razón de que el proceso siga vivo.
+ */
+function startExecutionScheduler(): void {
+  if (process.env.EXECUTION_SCHEDULER !== 'on') return;
+
+  let running = false;
+  const tick = async () => {
+    if (running) return;
+    running = true;
+    try {
+      const result = await runExecutionTick(new Date(), { mailer: createZeptoMailer() });
+      if (result.frozen || result.sent || result.failed) {
+        console.error(
+          `[execution-tick] frozen=${result.frozen} sent=${result.sent} failed=${result.failed} notified=${result.notified}`
+        );
+      }
+    } catch (error: any) {
+      console.error('[execution-tick] error inesperado:', error?.message || error);
+    } finally {
+      running = false;
+    }
+  };
+
+  tick();
+  setInterval(tick, 20_000).unref();
+  console.error('[execution-tick] scheduler activo (EXECUTION_SCHEDULER=on), cada 20s');
 }
 
 if (process.env.NODE_ENV !== 'test') {
