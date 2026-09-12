@@ -155,6 +155,47 @@ describe('[001] US7 — Avisos en el teléfono', () => {
     expect(pusher.calls.filter((c) => c.tag === 'reporte-fallo')).toHaveLength(1);
   });
 
+  it('un envío manual (manage_weekly_report:send) que agota los intentos también emite el aviso de fallo', async () => {
+    // Auditoría: handleManageWeeklyReport('send') (lib/execution/handlers.ts) llamaba a
+    // attemptSend sin pasarle un Pusher, a diferencia del tick — quien forzaba el envío a mano
+    // desde Configuración se quedaba sin el aviso "No se pudo enviar el reporte" que
+    // contracts/notifications.md exige para cualquier reporte que pase a 'fallido', sin importar
+    // si el intento que lo agotó vino del tick o de un envío manual.
+    process.env.VAPID_PUBLIC_KEY = 'pub';
+    process.env.VAPID_PRIVATE_KEY = 'priv';
+    process.env.VAPID_SUBJECT = 'mailto:andres@example.com';
+
+    const webpush = (await import('web-push')).default as any;
+    webpush.sendNotification.mockClear();
+    webpush.sendNotification.mockResolvedValue(undefined);
+
+    await upsertPushSubscriptionToDb({ id: 'sub-1', endpoint: 'https://x.example.com/1', p256dh: 'p', auth: 'a' });
+
+    await setupProgram();
+    await setupPartner();
+
+    // Congela la semana con un mailer y un pusher que sí funcionan, para no gastar aquí ninguno
+    // de los 3 intentos de envío que la prueba necesita agotar a mano.
+    vi.setSystemTime(new Date('2026-09-21T00:00:30.000Z')); // domingo 19:00:30 Bogotá: se congela
+    await runExecutionTick(new Date(), { mailer: makeFakeMailer(), pusher: makeFakePusher() });
+
+    // Sin ZEPTOMAIL_TOKEN (el beforeEach de este archivo lo borra), manage_weekly_report:send usa
+    // el mailer real (createZeptoMailer) tal como en producción, y falla de inmediato en cada
+    // intento: tres envíos manuales seguidos agotan REPORT_MAX_ATTEMPTS, igual que le pasaría a
+    // Andrés forzando el envío desde la UI mientras ZeptoMail está mal configurado.
+    await handleManageWeeklyReport('send', { program_week_id: 'pw-01' });
+    await handleManageWeeklyReport('send', { program_week_id: 'pw-01' });
+    const third = await handleManageWeeklyReport('send', { program_week_id: 'pw-01' });
+    expect(third.status).toBe('success'); // send siempre responde con el estado actual del reporte
+    if (third.status === 'success') expect((third.data as any).status).toBe('fallido');
+
+    const failCalls = webpush.sendNotification.mock.calls.filter((call: any[]) => {
+      const payload = JSON.parse(call[1] as string);
+      return payload.tag === 'reporte-fallo';
+    });
+    expect(failCalls).toHaveLength(1);
+  });
+
   it('US7-AS4 · una respuesta 404/410 del servicio de push borra la suscripción', async () => {
     process.env.VAPID_PUBLIC_KEY = 'pub';
     process.env.VAPID_PRIVATE_KEY = 'priv';
