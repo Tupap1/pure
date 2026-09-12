@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { createTestDb, TestDbHarness } from '../helpers/test-db';
 import { handleManageTandas } from '../../lib/execution/handlers';
+import { handleManageUniversities, handleManageSubjects } from '../../mcp-server/tools-handler';
 
 // US1 — Tanda de 10 minutos en un toque (FR-001..FR-008). manage_tandas es la herramienta MCP
 // de la tanda: toda hora sale del reloj del servidor (nunca del cliente), como máximo una tanda
@@ -110,6 +111,9 @@ describe('[001] US1 — Tanda de 10 minutos en un toque', () => {
   });
 
   it('US1-AS6 · cambiar la materia de una tanda cerrada después de las 03:00 se guarda y queda marcada como editada tras el cierre', async () => {
+    await handleManageUniversities('create', { id: 'uni-1', name: 'UdeA' });
+    await handleManageSubjects('create', { id: 'sub-calculo', university_id: 'uni-1', name: 'Cálculo' });
+
     vi.setSystemTime(new Date('2026-09-14T15:00:00.000Z')); // 10:00 Bogotá, lunes 14
     const start = await handleManageTandas('start', {});
     if (start.status !== 'success') return;

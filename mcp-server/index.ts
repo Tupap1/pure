@@ -31,6 +31,8 @@ import {
   handleManageFlashcards,
   handleGetClassContext,
   handleManageProgram,
+  handleManageTandas,
+  handleGetToday,
 } from './tools-handler';
 
 export const TOOLS_LIST = [
@@ -293,6 +295,41 @@ export const TOOLS_LIST = [
       required: ['action'],
     },
   },
+  {
+    name: 'manage_tandas',
+    description:
+      'Módulo de Ejecución: tanda de estudio de 10 minutos (US1), la unidad de ejecución de Pure. ' +
+      '"start" la empieza con la hora del servidor (rechaza started_at/ended_at del cliente: sin tandas retroactivas) y falla con TANDA_EN_CURSO si ya hay una en curso. ' +
+      '"finish" solo funciona si ya se cumplió el tiempo planeado; antes de eso usa "interrupt" con interrupt_reason (1-140 caracteres, obligatorio). ' +
+      '"current" devuelve la tanda en curso y los segundos restantes. "read" lista tandas con su resumen por día. ' +
+      '"update" solo reclasifica una tanda ya cerrada (materia, tema, entregable, tarea, modo); nunca acepta tiempos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['start', 'finish', 'interrupt', 'current', 'read', 'update'] },
+        data: {
+          type: 'object',
+          description:
+            'start: { subject_id?, topic_id?, deliverable_id?, task_id?, routine_slot_id?, planned_minutes? (5-25, 10 por defecto) }. ' +
+            'finish: { id }. interrupt: { id, interrupt_reason (1-140) }. current: sin data. ' +
+            'read: { from?, to? (YYYY-MM-DD), subject_id? }. ' +
+            'update: { id, subject_id?, topic_id?, deliverable_id?, task_id?, mode?, interrupt_reason? }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'get_today',
+    description:
+      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (con los segundos restantes), el disparador vigente si lo hay, los hábitos pendientes y si el día quedó cumplido.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: { type: 'object', description: '{ at? } ISO, opcional: solo para pruebas o una consulta puntual en otro instante.' },
+      },
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -501,6 +538,31 @@ export function createMcpServerInstance() {
     },
     async ({ action, data }) => {
       const res = await handleManageProgram(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_tandas',
+    'Módulo de Ejecución: tanda de estudio de 10 minutos (US1). start/finish/interrupt/current/read/update. La hora siempre la fija el servidor; sin tandas retroactivas; interrupt exige una razón de 1-140 caracteres.',
+    {
+      action: z.enum(['start', 'finish', 'interrupt', 'current', 'read', 'update']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageTandas(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'get_today',
+    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso, disparador vigente, hábitos pendientes, día cumplido). Solo lectura.',
+    {
+      data: z.any().optional(),
+    },
+    async ({ data }) => {
+      const res = await handleGetToday(data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );

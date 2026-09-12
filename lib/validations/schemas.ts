@@ -453,12 +453,26 @@ export const TandaFinishSchema = z
   })
   .strict();
 
+// interrupt_reason vacío o solo espacios → RAZON_REQUERIDA (US1-AS5), no el DATOS_INVALIDOS
+// genérico que daría el .min() de abajo por sí solo: el superRefine se evalúa igual aunque el
+// .min() ya haya marcado su propio issue (Zod acumula ambos), y zodErrorToExecutionResult
+// recorre todos los issues hasta encontrar uno con `params.code`, así que este gana.
 export const TandaInterruptSchema = z
   .object({
     id: z.string().min(1),
     interrupt_reason: z.string().min(INTERRUPT_REASON_MIN).max(INTERRUPT_REASON_MAX),
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    if (!data.interrupt_reason || !data.interrupt_reason.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['interrupt_reason'],
+        message: 'interrupt_reason es obligatorio para interrumpir una tanda (una razón de una línea).',
+        params: { code: 'RAZON_REQUERIDA' satisfies ExecutionErrorCode },
+      });
+    }
+  });
 
 export const TandaReadSchema = z
   .object({
