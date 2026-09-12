@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { createTestDb, TestDbHarness } from '../helpers/test-db';
 import { POST } from '@/app/api/execution/route';
 import { GET, dynamic } from '@/app/api/execution/today/route';
+import { handleManageProgram, handleManageWeeklyReport } from '@/lib/execution/handlers';
 
 // Rutas web del Módulo de Ejecución (contracts/web-api.md). Son delgadas: validan contra una
 // lista blanca y delegan en los mismos handlers que el MCP (lib/execution/handlers.ts). No
@@ -77,6 +78,77 @@ describe('[001] US1 — Rutas web del Módulo de Ejecución', () => {
   });
 });
 
+// GET /api/execution/report y la entrada de manage_weekly_report en la lista blanca dependen de
+// lib/execution/tick.ts (T054) y de app/api/execution/report/route.ts (T056), que todavía no
+// existen a la altura de este commit RED: se cargan con `import()` dinámico dentro de cada
+// prueba (nunca como import estático de archivo) para que la falta de esos módulos no rompa la
+// recolección de TODO este archivo, incluidas las pruebas de US1 de arriba que ya están en verde.
 describe('[001] US6 — Reporte semanal congelado por correo', () => {
-  it.todo('US6-AS11 · entre el congelamiento y el envío, la web muestra el reporte y la nota sin el correo del destinatario');
+  let harness: TestDbHarness;
+
+  beforeAll(async () => {
+    harness = await createTestDb();
+  });
+
+  beforeEach(async () => {
+    await harness.reset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function freezeOneWeek() {
+    await handleManageProgram('init', { starts_on: '2026-09-14', weeks: [{ min_tandas_dia: 1, phase: 'arranque' }] });
+    await handleManageWeeklyReport('set_partner', {
+      name: 'Andrés',
+      email: 'andres@example.com',
+      consented_at: '2026-09-11T00:00:00.000Z',
+    });
+    vi.setSystemTime(new Date('2026-09-21T00:00:30.000Z')); // domingo 19:00:30 Bogotá: se congela
+    const tickModulePath = '@/lib/execution/tick';
+    const { runExecutionTick } = await import(/* @vite-ignore */ tickModulePath);
+    await runExecutionTick(new Date(), { mailer: { send: async () => {} } });
+  }
+
+  it('US6-AS11 · entre el congelamiento y el envío, la web muestra el reporte y la nota sin el correo del destinatario', async () => {
+    await freezeOneWeek();
+
+    const reportRouteModulePath = '@/app/api/execution/report/route';
+    const { GET: getReport } = await import(/* @vite-ignore */ reportRouteModulePath);
+    const response = await getReport();
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.status).toBe('success');
+    expect(json.data.status).toBe('congelado');
+    expect(json.data.partner_name).toBe('Andrés');
+    expect(JSON.stringify(json)).not.toContain('andres@example.com');
+  });
+
+  it('manage_weekly_report:set_note está en la lista blanca de POST /api/execution y set_partner no', async () => {
+    await freezeOneWeek();
+
+    const okRequest = new Request('http://localhost/api/execution', {
+      method: 'POST',
+      body: JSON.stringify({
+        tool: 'manage_weekly_report',
+        action: 'set_note',
+        data: { program_week_id: 'pw-01', note: 'hola' },
+      }),
+    });
+    const okResponse = await POST(okRequest);
+    const okJson = await okResponse.json();
+    expect(okResponse.status).toBe(200);
+    expect(okJson.status).toBe('success');
+
+    const blockedRequest = new Request('http://localhost/api/execution', {
+      method: 'POST',
+      body: JSON.stringify({ tool: 'manage_weekly_report', action: 'set_partner', data: {} }),
+    });
+    const blockedResponse = await POST(blockedRequest);
+    const blockedJson = await blockedResponse.json();
+    expect(blockedResponse.status).toBe(400);
+    expect(blockedJson.code).toBe('DATOS_INVALIDOS');
+  });
 });
