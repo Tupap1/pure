@@ -1,4 +1,5 @@
 import { DeliverableEntity } from '../db/dexie-schema';
+import { isGradedDeliverable } from './subject';
 
 export type Deliverable = DeliverableEntity;
 
@@ -78,9 +79,7 @@ export function calculateSubjectGradeProgress(
 
   const totalConfiguredWeight = subDeliverables.reduce((acc, d) => acc + (Number(d.weight_percentage) || 0), 0);
 
-  const gradedDeliverables = subDeliverables.filter(
-    (d) => d.status === 'calificado' && d.grade !== undefined && d.grade !== null
-  );
+  const gradedDeliverables = subDeliverables.filter(isGradedDeliverable);
 
   const evaluatedWeight = gradedDeliverables.reduce((acc, d) => acc + (Number(d.weight_percentage) || 0), 0);
 
