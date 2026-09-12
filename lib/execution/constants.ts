@@ -43,3 +43,22 @@ export const REPORT_MAX_ATTEMPTS = 3;
  */
 export const VERDICT_CUMPLIDA_MIN_DAYS = 6;
 export const VERDICT_FALLIDA_MAX_DAYS = 3;
+
+/** FR-022: umbral de la sección "En riesgo" para "necesita 3.5 o más en lo que falta para
+ * aprobar". Es un número fijo del plan aprobado, no derivado de ninguna escala. */
+export const RISK_NEEDED_TO_PASS_THRESHOLD = 3.5;
+
+/**
+ * US6-AS8: cuánto tiene que exceder `now` al corte del domingo 19:00 para que un congelamiento
+ * se marque `late` (Pure estuvo apagado), en vez de la demora normal de hasta ~20s entre ticks.
+ * Decisión de implementación (no numerada en la spec): mayor que el intervalo del tick (20s) y
+ * lo bastante chica para no confundir un reinicio real con una demora operativa.
+ */
+export const FREEZE_LATE_THRESHOLD_MINUTES = 5;
+
+/** US6: como máximo 3 intentos de envío (ya en REPORT_MAX_ATTEMPTS) espaciados 10 minutos. */
+export const REPORT_RETRY_BACKOFF_MINUTES = 10;
+
+/** US6: un reporte que lleva más de 15 minutos en 'enviando' vuelve a 'congelado' (intento
+ * colgado: el proceso que lo reclamó murió antes de terminar el envío). */
+export const REPORT_STUCK_SENDING_MINUTES = 15;

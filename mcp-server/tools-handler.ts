@@ -7,6 +7,8 @@ import {
   handleManageRoutineSlots,
   handleManageDailyChecks,
   handleGetGradeProjection,
+  handleManageWeeklyReport,
+  handleGetComplianceReport,
 } from '../lib/execution/handlers';
 
 // Módulo de Ejecución: los handlers viven en lib/execution/handlers.ts (Principio I, una sola
@@ -19,6 +21,8 @@ export {
   handleManageRoutineSlots,
   handleManageDailyChecks,
   handleGetGradeProjection,
+  handleManageWeeklyReport,
+  handleGetComplianceReport,
 };
 import {
   fetchAcademicOverviewFromDb,

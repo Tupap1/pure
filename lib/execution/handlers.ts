@@ -25,6 +25,12 @@ import {
   DailyCheckSetSchema,
   DailyChecksReadSchema,
   GradeProjectionReadSchema,
+  AccountabilityPartnerSetSchema,
+  WeeklyReportPreviewSchema,
+  WeeklyReportNoteSchema,
+  WeeklyReportSendSchema,
+  WeeklyReportReadSchema,
+  ComplianceReportReadSchema,
   zodErrorToExecutionResult,
   type ExecutionResult,
 } from '../validations/schemas';
@@ -40,6 +46,20 @@ import {
 } from './routine';
 import { setDailyCheck, readDailyChecks } from './checks';
 import { computeGradeProjections } from './grade-projection';
+import { getCompliance } from './compliance';
+import { buildReportPayload, deriveRiskSection, renderReportText, type BuildReportPayloadInput } from './report';
+import { runExecutionTick, attemptSend } from './tick';
+import { createZeptoMailer } from './mailer';
+import { addDays, localParts } from './time';
+import {
+  fetchProgramWeeksFromDb,
+  fetchWeeklyReportsFromDb,
+  setActivePartnerInDb,
+  fetchActivePartnerFromDb,
+  updateWeeklyReportNoteInDb,
+  ProgramWeekRecord,
+  WeeklyReportRecord,
+} from '../db/execution-pg';
 
 export type ManageProgramAction = 'init' | 'read' | 'update_week' | 'upsert_habit' | 'retire_habit';
 
@@ -294,6 +314,246 @@ export async function handleGetGradeProjection(data?: unknown, now: Date = new D
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: error?.message || 'Error inesperado en get_grade_projection',
+    };
+  }
+}
+
+export type ManageWeeklyReportAction = 'set_partner' | 'read_partner' | 'preview' | 'set_note' | 'send' | 'read' | 'run_tick';
+
+/** Junta cumplimiento + proyección de nota de una semana en el `BuildReportPayloadInput` que
+ * espera buildReportPayload, cortando ambos al mismo instante `cutoff` (T053/T055: la misma
+ * forma que usa el congelamiento real en lib/execution/tick.ts, reutilizada aquí para `preview`
+ * y para armar la nota de "reporte anterior"). */
+async function assembleReportInput(
+  week: ProgramWeekRecord,
+  weeks: ProgramWeekRecord[],
+  cutoff: Date,
+  extras: { late: boolean; userNote: string | null }
+): Promise<BuildReportPayloadInput> {
+  const from = week.starts_on;
+  const to = addDays(week.starts_on, 6);
+
+  const [compliance, projections] = await Promise.all([
+    getCompliance({ from, to, cutoff }),
+    computeGradeProjections(cutoff),
+  ]);
+  const enRiesgo = deriveRiskSection(projections.materias, projections.alertas);
+
+  const prevWeek = weeks.find((w) => w.week_number === week.week_number - 1);
+  let previousReportFailed = false;
+  if (prevWeek) {
+    const prevReport = (await fetchWeeklyReportsFromDb(prevWeek.id)) as WeeklyReportRecord | null;
+    previousReportFailed = prevReport?.status === 'fallido';
+  }
+
+  return {
+    program_week_id: week.id,
+    week_number: week.week_number,
+    starts_on: week.starts_on,
+    days_fulfilled: compliance.days_fulfilled,
+    habits: compliance.habitos,
+    accumulated_fulfilled_days: compliance.dias_cumplidos_totales,
+    horizon_days: compliance.horizonte,
+    en_riesgo: enRiesgo,
+    user_note: extras.userNote,
+    late_edits: compliance.ediciones_tardias,
+    late: extras.late,
+    previous_report_failed: previousReportFailed,
+    // Un preview no anticipa "segunda semana fallida seguida": ese veredicto todavía puede
+    // cambiar mientras la semana en curso no se congele de verdad.
+    second_consecutive_failure: false,
+  };
+}
+
+/** `preview` (contracts/mcp-tools.md): la misma forma del reporte, con los datos hasta AHORA
+ * (nunca hasta el corte del domingo), y sin guardar nada. Sin `program_week_id`, usa la semana
+ * en curso. */
+async function previewWeeklyReport(programWeekId: string | undefined, now: Date): Promise<ExecutionResult> {
+  const weeksRaw = await fetchProgramWeeksFromDb();
+  const weeks = (Array.isArray(weeksRaw) ? weeksRaw : []) as ProgramWeekRecord[];
+
+  const todayKey = localParts(now).dateKey;
+  const week = programWeekId
+    ? weeks.find((w) => w.id === programWeekId)
+    : weeks.find((w) => w.starts_on <= todayKey && todayKey <= addDays(w.starts_on, 6));
+
+  if (!week) {
+    return { status: 'error', code: 'NO_ENCONTRADO', message: 'No hay una semana del programa para previsualizar.' };
+  }
+
+  const input = await assembleReportInput(week, weeks, now, { late: false, userNote: null });
+  const payload = buildReportPayload(input);
+  return { status: 'success', data: { payload, verdict: payload.verdict, text: renderReportText(payload) } };
+}
+
+async function setWeeklyReportNote(input: { program_week_id: string; note: string }, now: Date): Promise<ExecutionResult> {
+  const reportRaw = await fetchWeeklyReportsFromDb(input.program_week_id);
+  const report = reportRaw as WeeklyReportRecord | null;
+  if (!report) {
+    return {
+      status: 'error',
+      code: 'REPORTE_NO_CONGELADO',
+      message: `La semana ${input.program_week_id} todavía no tiene un reporte congelado.`,
+    };
+  }
+  if (now.getTime() > new Date(report.note_deadline).getTime()) {
+    return {
+      status: 'error',
+      code: 'VENTANA_CERRADA',
+      message: 'La ventana de 60 minutos para escribir la nota ya cerró.',
+    };
+  }
+
+  const updated = await updateWeeklyReportNoteInDb(input.program_week_id, input.note);
+  return { status: 'success', data: updated };
+}
+
+/** `send` (envío manual, contracts/mcp-tools.md): reusa el mismo claim atómico que el tick
+ * (lib/execution/tick.ts:attemptSend) — Andrés forzando el envío a mano no es una vía distinta. */
+async function sendWeeklyReportManually(programWeekId: string, now: Date): Promise<ExecutionResult> {
+  const reportRaw = await fetchWeeklyReportsFromDb(programWeekId);
+  const report = reportRaw as WeeklyReportRecord | null;
+  if (!report) {
+    return {
+      status: 'error',
+      code: 'REPORTE_NO_CONGELADO',
+      message: `La semana ${programWeekId} todavía no tiene un reporte congelado.`,
+    };
+  }
+  if (report.status === 'enviado') {
+    return { status: 'error', code: 'YA_ENVIADO', message: 'Este reporte ya se envió.' };
+  }
+
+  const outcome = await attemptSend(report, now, createZeptoMailer());
+  if (outcome === 'skipped') {
+    return {
+      status: 'error',
+      code: 'REPORTE_NO_CONGELADO',
+      message: 'El reporte no está en estado congelado ahora mismo (puede estar enviándose o haber fallado ya).',
+    };
+  }
+
+  const updated = await fetchWeeklyReportsFromDb(programWeekId);
+  return { status: 'success', data: updated };
+}
+
+async function readWeeklyReport(programWeekId?: string): Promise<ExecutionResult> {
+  if (programWeekId) {
+    const reportRaw = await fetchWeeklyReportsFromDb(programWeekId);
+    if (!reportRaw) {
+      return {
+        status: 'error',
+        code: 'REPORTE_NO_CONGELADO',
+        message: `La semana ${programWeekId} todavía no tiene un reporte congelado.`,
+      };
+    }
+    return { status: 'success', data: reportRaw };
+  }
+  const all = await fetchWeeklyReportsFromDb();
+  return { status: 'success', data: all };
+}
+
+/**
+ * `manage_weekly_report` (US6): destinatario del reporte y su ciclo de vida (congelar es
+ * automático, vía el tick; esta herramienta cubre lo que sí pide un humano o un disparador
+ * externo). `run_tick` ejecuta `runExecutionTick` una vez con el mailer real — es lo que
+ * contracts/mcp-tools.md documenta como el disparador externo que exige FR-039, y lo que usa el
+ * quickstart para forzar el congelamiento sin esperar al reloj.
+ */
+export async function handleManageWeeklyReport(
+  action: ManageWeeklyReportAction,
+  data?: unknown,
+  now: Date = new Date()
+): Promise<ExecutionResult> {
+  try {
+    switch (action) {
+      case 'set_partner': {
+        const parsed = AccountabilityPartnerSetSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        // El superRefine del esquema ya rechazó (CONSENTIMIENTO_REQUERIDO) un consented_at
+        // ausente o vacío antes de llegar aquí: en este punto siempre es un string real.
+        const partner = await setActivePartnerInDb({ ...parsed.data, consented_at: parsed.data.consented_at! });
+        return { status: 'success', data: partner };
+      }
+      case 'read_partner': {
+        const partner = await fetchActivePartnerFromDb();
+        return { status: 'success', data: partner };
+      }
+      case 'preview': {
+        const parsed = WeeklyReportPreviewSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await previewWeeklyReport(parsed.data.program_week_id, now);
+      }
+      case 'set_note': {
+        const parsed = WeeklyReportNoteSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await setWeeklyReportNote(parsed.data, now);
+      }
+      case 'send': {
+        const parsed = WeeklyReportSendSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await sendWeeklyReportManually(parsed.data.program_week_id, now);
+      }
+      case 'read': {
+        const parsed = WeeklyReportReadSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await readWeeklyReport(parsed.data.program_week_id);
+      }
+      case 'run_tick': {
+        const result = await runExecutionTick(now, { mailer: createZeptoMailer() });
+        return { status: 'success', data: result };
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para manage_weekly_report: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: error?.message || 'Error inesperado en manage_weekly_report',
+    };
+  }
+}
+
+export type GetComplianceReportInput = { from?: string; to?: string; program_week_id?: string };
+
+/**
+ * `get_compliance_report` (US6): vista de salud del hábito para cualquier rango, o para una
+ * semana del programa entera si se da `program_week_id`. Sin ninguno de los dos, cubre solo hoy.
+ */
+export async function handleGetComplianceReport(data?: unknown, now: Date = new Date()): Promise<ExecutionResult> {
+  try {
+    const parsed = ComplianceReportReadSchema.safeParse(data ?? {});
+    if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+
+    let from = parsed.data.from;
+    let to = parsed.data.to;
+
+    if (parsed.data.program_week_id) {
+      const weekRaw = await fetchProgramWeeksFromDb(parsed.data.program_week_id);
+      const week = weekRaw as ProgramWeekRecord | null;
+      if (!week) {
+        return { status: 'error', code: 'NO_ENCONTRADO', message: `No existe la semana ${parsed.data.program_week_id}.` };
+      }
+      from = week.starts_on;
+      to = addDays(week.starts_on, 6);
+    }
+
+    const todayKey = localParts(now).dateKey;
+    from = from ?? todayKey;
+    to = to ?? todayKey;
+
+    const compliance = await getCompliance({ from, to, cutoff: now });
+    return { status: 'success', data: compliance };
+  } catch (error: any) {
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: error?.message || 'Error inesperado en get_compliance_report',
     };
   }
 }

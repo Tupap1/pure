@@ -534,12 +534,38 @@ export const AccountabilityPartnerSetSchema = z
     }
   });
 
-// --- Nota del reporte semanal (weekly_reports) ---
+// --- Reporte semanal (weekly_reports, US6) ---
 
 export const WeeklyReportNoteSchema = z
   .object({
     program_week_id: z.string().min(1),
     note: z.string().max(USER_NOTE_MAX),
+  })
+  .strict();
+
+export const WeeklyReportPreviewSchema = z
+  .object({
+    program_week_id: z.string().optional(),
+  })
+  .strict();
+
+export const WeeklyReportSendSchema = z
+  .object({
+    program_week_id: z.string().min(1),
+  })
+  .strict();
+
+export const WeeklyReportReadSchema = z
+  .object({
+    program_week_id: z.string().optional(),
+  })
+  .strict();
+
+export const ComplianceReportReadSchema = z
+  .object({
+    from: z.string().regex(DATE_KEY_RE).optional(),
+    to: z.string().regex(DATE_KEY_RE).optional(),
+    program_week_id: z.string().optional(),
   })
   .strict();
 

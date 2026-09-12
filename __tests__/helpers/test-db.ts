@@ -79,6 +79,8 @@ export async function createTestDb(): Promise<TestDbHarness> {
         'plan_rehearsals',
         'daily_checks',
         'tasks',
+        'weekly_reports',
+        'accountability_partners',
         'routine_slots',
         'habits',
         'program_weeks',

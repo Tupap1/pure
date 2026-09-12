@@ -36,7 +36,11 @@ import {
   handleManageRoutineSlots,
   handleManageDailyChecks,
   handleGetGradeProjection,
+  handleManageWeeklyReport,
+  handleGetComplianceReport,
 } from './tools-handler';
+import { runExecutionTick } from '../lib/execution/tick';
+import { createZeptoMailer } from '../lib/execution/mailer';
 
 export const TOOLS_LIST = [
   {
@@ -391,6 +395,41 @@ export const TOOLS_LIST = [
       },
     },
   },
+  {
+    name: 'get_compliance_report',
+    description:
+      'Módulo de Ejecución: vista de salud del hábito para un rango de días o una semana del programa entera (US6), de solo lectura. Devuelve los días con su evaluación, days_fulfilled, los hábitos como fracción, las tandas (completadas/interrumpidas y por materia), los disparadores (hecho/no/sin_respuesta), las razones de interrupción, las ediciones tardías, los días cumplidos acumulados desde el inicio del programa y el horizonte del hábito (66 por defecto).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description:
+            '{ from?, to? (YYYY-MM-DD) } o { program_week_id? }. Sin ninguno, cubre solo hoy.',
+        },
+      },
+    },
+  },
+  {
+    name: 'manage_weekly_report',
+    description:
+      'Módulo de Ejecución: destinatario del reporte semanal y su ciclo de vida (US6). "set_partner" registra al único destinatario vigente (exige consented_at: sin consentimiento no se guarda) y desactiva el anterior. "preview" muestra la forma del reporte con los datos de AHORA, sin congelar ni guardar nada. El congelamiento en sí (domingo 19:00) y el envío (tras 60 minutos de ventana de nota) los hace el tick, no una acción manual: "set_note" solo escribe la nota dentro de esa ventana, "send" fuerza el envío de un reporte ya congelado (con el mismo claim atómico del tick: como mucho un envío por reporte) y "read" devuelve el reporte guardado (status, intentos, último error). ' +
+      '"run_tick" ejecuta un ciclo completo del tick (congelar semanas vencidas + intentar enviar las que ya cerraron su ventana de nota) con el mailer real: es el disparador externo que exige FR-039 (repetirlo nunca duplica un envío) y sirve para forzar el congelamiento sin esperar al reloj del servidor.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['set_partner', 'read_partner', 'preview', 'set_note', 'send', 'read', 'run_tick'] },
+        data: {
+          type: 'object',
+          description:
+            'set_partner: { name, email, consented_at (ISO) }. read_partner/run_tick: sin data. ' +
+            'preview: { program_week_id? } (la semana en curso si se omite). ' +
+            'set_note: { program_week_id, note (≤400) }. send: { program_week_id }. read: { program_week_id? }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -662,6 +701,31 @@ export function createMcpServerInstance() {
     },
     async ({ data }) => {
       const res = await handleGetGradeProjection(data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'get_compliance_report',
+    'Módulo de Ejecución: vista de salud del hábito (US6), de solo lectura. Días con su evaluación, days_fulfilled, hábitos por fracción, tandas, disparadores, razones de interrupción, ediciones tardías, días cumplidos acumulados y horizonte.',
+    {
+      data: z.any().optional(),
+    },
+    async ({ data }) => {
+      const res = await handleGetComplianceReport(data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_weekly_report',
+    'Módulo de Ejecución: destinatario del reporte semanal y su ciclo de vida (US6). set_partner/read_partner/preview/set_note/send/read/run_tick. El congelamiento (domingo 19:00) y el envío (tras la ventana de nota de 60 min) los hace el tick; run_tick lo dispara una vez con el mailer real y es idempotente (FR-039).',
+    {
+      action: z.enum(['set_partner', 'read_partner', 'preview', 'set_note', 'send', 'read', 'run_tick']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageWeeklyReport(action, data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );
@@ -1208,6 +1272,42 @@ async function main() {
     await instance.connect(stdioTransport);
     console.error('Servidor MCP de Pure conectado vía stdio');
   }
+
+  startExecutionScheduler();
+}
+
+/**
+ * US6/FR-039: el tick que congela y envía el reporte semanal (y, más adelante, US7) tiene que
+ * correr aunque nadie abra la app. `EXECUTION_SCHEDULER=on` (docker-compose.yml: solo en
+ * `pure-mcp`, nunca en `pure-web`, para no correrlo dos veces) lo activa; sin la variable, el
+ * proceso no hace nada distinto de hoy. Guardia anti-solapamiento: si un tick todavía no termina
+ * cuando toca el siguiente intervalo, ese intervalo se salta en vez de apilar llamadas.
+ * `.unref()` para que este timer nunca sea, por sí solo, la razón de que el proceso siga vivo.
+ */
+function startExecutionScheduler(): void {
+  if (process.env.EXECUTION_SCHEDULER !== 'on') return;
+
+  let running = false;
+  const tick = async () => {
+    if (running) return;
+    running = true;
+    try {
+      const result = await runExecutionTick(new Date(), { mailer: createZeptoMailer() });
+      if (result.frozen || result.sent || result.failed) {
+        console.error(
+          `[execution-tick] frozen=${result.frozen} sent=${result.sent} failed=${result.failed} notified=${result.notified}`
+        );
+      }
+    } catch (error: any) {
+      console.error('[execution-tick] error inesperado:', error?.message || error);
+    } finally {
+      running = false;
+    }
+  };
+
+  tick();
+  setInterval(tick, 20_000).unref();
+  console.error('[execution-tick] scheduler activo (EXECUTION_SCHEDULER=on), cada 20s');
 }
 
 if (process.env.NODE_ENV !== 'test') {

@@ -504,3 +504,183 @@ export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaR
 export async function deleteTandaFromDb(id: string): Promise<void> {
   await pgPool.query('DELETE FROM tandas WHERE id = $1', [id]);
 }
+
+// --- accountability_partners (US6) ---
+
+export interface AccountabilityPartnerRecord {
+  id: string;
+  name: string;
+  email: string;
+  consented_at: string;
+  active_lock: string | null;
+  created_at?: string;
+}
+
+export async function fetchAccountabilityPartnersFromDb(
+  id?: string
+): Promise<AccountabilityPartnerRecord | AccountabilityPartnerRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM accountability_partners WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM accountability_partners ORDER BY created_at ASC');
+  return res.rows;
+}
+
+export async function fetchActivePartnerFromDb(): Promise<AccountabilityPartnerRecord | null> {
+  const res = await pgPool.query(`SELECT * FROM accountability_partners WHERE active_lock = 'active' LIMIT 1`);
+  return res.rows[0] || null;
+}
+
+/**
+ * Deja este destinatario como el único vigente (data-model.md: "vigente ⇔ set_partner de otro ⇔
+ * histórico"). Dentro de una transacción: desactiva el anterior (`active_lock = NULL`) y crea el
+ * nuevo con `active_lock = 'active'` — nunca hay un instante con dos filas 'active' a la vez
+ * (violaría la UNIQUE), igual que `running_lock` en tandas.
+ */
+export async function setActivePartnerInDb(input: {
+  name: string;
+  email: string;
+  consented_at: string;
+}): Promise<AccountabilityPartnerRecord> {
+  return withExecutionTransaction(async (client) => {
+    await client.query(`UPDATE accountability_partners SET active_lock = NULL WHERE active_lock = 'active'`);
+    const id = `partner-${Date.now()}`;
+    const res = await client.query(
+      `INSERT INTO accountability_partners (id, name, email, consented_at, active_lock)
+       VALUES ($1, $2, $3, $4, 'active')
+       RETURNING *`,
+      [id, input.name, input.email, input.consented_at]
+    );
+    return res.rows[0];
+  });
+}
+
+// --- weekly_reports (US6) ---
+
+export interface WeeklyReportRecord {
+  id: string;
+  program_week_id: string;
+  partner_id: string | null;
+  payload: any;
+  verdict: string;
+  user_note: string | null;
+  frozen_at: string;
+  note_deadline: string;
+  status: string;
+  attempts: number;
+  last_attempt_at: string | null;
+  last_error: string | null;
+  sent_at: string | null;
+  created_at?: string;
+}
+
+/** El driver de Postgres normalmente ya entrega `jsonb` como objeto; esta función solo cubre el
+ * caso (algunos entornos de pg-mem) en que llega como texto, y castea `attempts` a número. */
+function normalizeWeeklyReportRow(row: any): WeeklyReportRecord {
+  const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
+  return { ...row, payload, attempts: Number(row.attempts) };
+}
+
+export async function fetchWeeklyReportsFromDb(id?: string): Promise<WeeklyReportRecord | WeeklyReportRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM weekly_reports WHERE id = $1', [id]);
+    return res.rows[0] ? normalizeWeeklyReportRow(res.rows[0]) : null;
+  }
+  const res = await pgPool.query('SELECT * FROM weekly_reports ORDER BY frozen_at ASC');
+  return res.rows.map(normalizeWeeklyReportRow);
+}
+
+/**
+ * Congela una semana (id = program_week_id) una sola vez: `ON CONFLICT (id) DO NOTHING` hace que
+ * un segundo tick concurrente que intente congelar la misma semana no haga nada y no lance error
+ * (FR-039). Devuelve la fila insertada, o null si ya existía (otro proceso ya la había congelado).
+ */
+export async function insertWeeklyReportIfAbsentInDb(input: {
+  id: string;
+  program_week_id: string;
+  partner_id: string | null;
+  payload: unknown;
+  verdict: string;
+  frozen_at: string;
+  note_deadline: string;
+}): Promise<WeeklyReportRecord | null> {
+  const res = await pgPool.query(
+    `INSERT INTO weekly_reports (id, program_week_id, partner_id, payload, verdict, frozen_at, note_deadline, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'congelado')
+     ON CONFLICT (id) DO NOTHING
+     RETURNING *`,
+    [
+      input.id,
+      input.program_week_id,
+      input.partner_id,
+      JSON.stringify(input.payload),
+      input.verdict,
+      input.frozen_at,
+      input.note_deadline,
+    ]
+  );
+  return res.rows[0] ? normalizeWeeklyReportRow(res.rows[0]) : null;
+}
+
+export async function updateWeeklyReportNoteInDb(id: string, note: string): Promise<WeeklyReportRecord | null> {
+  const res = await pgPool.query(`UPDATE weekly_reports SET user_note = $2 WHERE id = $1 RETURNING *`, [id, note]);
+  return res.rows[0] ? normalizeWeeklyReportRow(res.rows[0]) : null;
+}
+
+/**
+ * Claim atómico (US6-AS4, FR-039): entre todas las llamadas concurrentes que compitan por el
+ * mismo reporte, como mucho una obtiene la fila (y por lo tanto el permiso de enviarla). Si no
+ * devuelve fila, es porque el reporte ya no está en 'congelado' (otro tick ya lo tomó, ya se
+ * envió, o ya está fallido) y este intento no hace nada.
+ */
+export async function claimWeeklyReportForSendingInDb(id: string, now: Date): Promise<WeeklyReportRecord | null> {
+  const res = await pgPool.query(
+    `UPDATE weekly_reports SET status = 'enviando', attempts = attempts + 1, last_attempt_at = $2
+     WHERE id = $1 AND status = 'congelado'
+     RETURNING *`,
+    [id, now.toISOString()]
+  );
+  return res.rows[0] ? normalizeWeeklyReportRow(res.rows[0]) : null;
+}
+
+export async function markWeeklyReportSentInDb(id: string, now: Date): Promise<WeeklyReportRecord | null> {
+  const res = await pgPool.query(`UPDATE weekly_reports SET status = 'enviado', sent_at = $2 WHERE id = $1 RETURNING *`, [
+    id,
+    now.toISOString(),
+  ]);
+  return res.rows[0] ? normalizeWeeklyReportRow(res.rows[0]) : null;
+}
+
+/** `exhausted`: si ya se agotaron los 3 intentos, el reporte queda 'fallido'; si no, vuelve a
+ * 'congelado' para que el siguiente tick lo reintente pasado el backoff. */
+export async function markWeeklyReportFailedAttemptInDb(
+  id: string,
+  error: string,
+  exhausted: boolean
+): Promise<WeeklyReportRecord | null> {
+  const status = exhausted ? 'fallido' : 'congelado';
+  const res = await pgPool.query(`UPDATE weekly_reports SET status = $2, last_error = $3 WHERE id = $1 RETURNING *`, [
+    id,
+    status,
+    error,
+  ]);
+  return res.rows[0] ? normalizeWeeklyReportRow(res.rows[0]) : null;
+}
+
+/** Recuperación de un intento colgado: un reporte con más de `staleMinutes` en 'enviando' vuelve
+ * a 'congelado' (plan.md, US6 · Reporte). Devuelve cuántos reportes se recuperaron así. */
+export async function revertStuckSendingToFrozenInDb(now: Date, staleMinutes: number): Promise<number> {
+  const allRaw = await fetchWeeklyReportsFromDb();
+  const all = (Array.isArray(allRaw) ? allRaw : []) as WeeklyReportRecord[];
+  let count = 0;
+  for (const report of all) {
+    if (report.status !== 'enviando' || !report.last_attempt_at) continue;
+    const elapsedMinutes = (now.getTime() - new Date(report.last_attempt_at).getTime()) / 60_000;
+    if (elapsedMinutes > staleMinutes) {
+      await pgPool.query(`UPDATE weekly_reports SET status = 'congelado' WHERE id = $1`, [report.id]);
+      count++;
+    }
+  }
+  return count;
+}

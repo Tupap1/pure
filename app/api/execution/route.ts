@@ -6,6 +6,8 @@ import {
   type ManageRoutineSlotsAction,
   handleManageDailyChecks,
   type ManageDailyChecksAction,
+  handleManageWeeklyReport,
+  type ManageWeeklyReportAction,
 } from '@/lib/execution/handlers';
 
 // Ruta delgada del Módulo de Ejecución (contracts/web-api.md): valida contra una lista blanca y
@@ -21,6 +23,9 @@ const ALLOWED_ACTIONS: Record<string, readonly string[]> = {
   manage_tandas: ['start', 'finish', 'interrupt', 'current', 'update'],
   manage_routine_slots: ['respond'],
   manage_daily_checks: ['set'],
+  // Solo set_note: cambiar el destinatario (set_partner) no se hace desde la web (FR-025 /
+  // Constitución VI); congelar y enviar los hace el tick, no una acción de la web.
+  manage_weekly_report: ['set_note'],
 };
 
 async function dispatch(tool: string, action: string, data: unknown) {
@@ -31,6 +36,8 @@ async function dispatch(tool: string, action: string, data: unknown) {
       return handleManageRoutineSlots(action as ManageRoutineSlotsAction, data);
     case 'manage_daily_checks':
       return handleManageDailyChecks(action as ManageDailyChecksAction, data);
+    case 'manage_weekly_report':
+      return handleManageWeeklyReport(action as ManageWeeklyReportAction, data);
     default:
       // No debería alcanzarse: `tool` ya pasó el filtro de ALLOWED_ACTIONS.
       throw new Error(`Herramienta no soportada: ${tool}`);

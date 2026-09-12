@@ -65,6 +65,11 @@ function readReport(programWeekId: string) {
   >;
 }
 
+async function runTickAction() {
+  const res = await handleManageWeeklyReport('run_tick', undefined);
+  return res as { status: 'success'; data: { frozen: number; sent: number; failed: number; notified: number } };
+}
+
 describe('[001] US6 — Reporte semanal congelado por correo', () => {
   let harness: TestDbHarness;
 
@@ -184,23 +189,19 @@ describe('[001] US6 — Reporte semanal congelado por correo', () => {
     await setupPartner();
 
     vi.setSystemTime(new Date('2026-09-21T00:00:30.000Z')); // domingo 19:00:30 Bogotá: se congela
-    const frozen = await handleManageWeeklyReport('run_tick', undefined);
+    const frozen = await runTickAction();
     expect(frozen.status).toBe('success');
-    if (frozen.status === 'success') {
-      expect(frozen.data.frozen).toBe(1);
-      expect(frozen.data.sent).toBe(0); // la ventana de nota (fresca) sigue abierta
-    }
+    expect(frozen.data.frozen).toBe(1);
+    expect(frozen.data.sent).toBe(0); // la ventana de nota (fresca) sigue abierta
 
     vi.setSystemTime(new Date('2026-09-21T01:05:00.000Z')); // la ventana ya cerró
-    const first = await handleManageWeeklyReport('run_tick', undefined);
+    const first = await runTickAction();
     expect(first.status).toBe('success');
-    if (first.status !== 'success') return;
     expect(first.data.frozen).toBe(0); // ya estaba congelado: no se congela dos veces
     expect(first.data.sent + first.data.failed).toBe(1); // un solo intento (sin ZEPTOMAIL_TOKEN, falla)
 
-    const second = await handleManageWeeklyReport('run_tick', undefined);
+    const second = await runTickAction();
     expect(second.status).toBe('success');
-    if (second.status !== 'success') return;
     expect(second.data.frozen).toBe(0);
     expect(second.data.sent).toBe(0);
     expect(second.data.failed).toBe(0); // dentro del backoff de 10 min: no reintenta todavía
