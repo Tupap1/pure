@@ -76,6 +76,7 @@ Ediciones después del cierre: 1
   - Sin nota: `Andrés no dio explicación.` (en lugar de la línea "dice").
   - Congelado tarde: `Pure estuvo apagado: este reporte se congeló con el corte del domingo 19:00 y se envía con retraso.`
   - El reporte anterior falló: `La semana pasada el reporte no se pudo entregar.`
-  - Segunda semana `fallida` seguida: `Segunda semana fallida. Si puedes, llámalo.`
+  - Segunda semana `fallida` seguida: `Segunda semana fallida seguida. Esto ya no es un mal día:
+    revisa el plan antes del domingo.`
   - Desde US9: `Aperturas del plan: {N}`.
 - **Veredicto**: ≥ 6/7 días cumplidos → `cumplida`; ≤ 3/7 → `fallida`; en otro caso `parcial`.

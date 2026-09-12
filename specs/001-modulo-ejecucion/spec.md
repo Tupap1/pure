@@ -16,6 +16,9 @@
 
 ### Session 2026-09-11
 
+- Q: ¿Quién recibe el reporte semanal? → A: Andres mismo, en `andresdavidcantillo@gmail.com`. El mecanismo de destinatario con consentimiento se
+  conserva por si algún día se le manda a otra persona, pero hoy el reporte es un espejo
+  propio, no una rendición de cuentas ante un tercero.
 - Q: ¿Por qué canal sale el reporte semanal? → A: Por correo, enviado con ZeptoMail desde el
   dominio propio `btw-one.com`; las respuestas del destinatario llegan al buzón de Andres.
 - Q: ¿Cómo se usa Pure en el iPhone y cómo llegan los avisos? → A: Como app instalada desde el
