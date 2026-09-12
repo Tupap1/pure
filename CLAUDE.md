@@ -67,7 +67,11 @@ Treat auth code changes as security-sensitive: wrap HTTP route handlers in try/c
 
 ### Design system
 
-Dark-first "Titanium Cybernetic" aesthetic (deep obsidian `#05080e` backgrounds, Space Grotesk headings, JetBrains Mono reserved strictly for numeric/data values, Cyber Cyan/Orbital Violet/Telemetry Emerald accents by degree/status). Full token values and the anti-pattern ban list (no eyebrows, no decorative badges without numbers, no nested unearned cards, no monospace-as-costume) are in `DESIGN.md`. Product voice/positioning constraints (no marketing slogans, every element must earn its place) are in `PRODUCT.md`. An `impeccable` design-review skill hook runs automatically on UI file edits (see `.claude/settings.local.json`) — expect it to flag anti-pattern violations.
+Dark-first editorial aesthetic (warm charcoal `#191919` backgrounds, IBM Plex Sans for all text, IBM Plex Mono for metrics, muted accents by degree/status: `#529cca` aeroespacial, `#9a6dd7` software, `#529e72` synergy). Full token values, palette, and the anti-pattern ban list (no eyebrows, no decorative badges without numbers, no nested unearned cards, no monospace-as-costume, no neon) are in `DESIGN.md`. Product voice/positioning constraints (no marketing slogans, every element must earn its place) are in `PRODUCT.md`. An `impeccable` design-review skill hook runs automatically on UI file edits (see `.claude/settings.local.json`) — expect it to flag anti-pattern violations.
+
+### Execution Module (Módulo de Ejecución)
+
+The execution module (`lib/execution/`, `mcp-server/`) is a PostgreSQL-only layer with its own scheduler. Tables (`program_weeks`, `habits`, `daily_checks`, `routine_slots`, `slot_outcomes`, `plan_rehearsals`, `tasks`, `tandas`, `weekly_reports`, `accountability_partners`, `push_subscriptions`) do not sync to Dexie because correctness depends on the server clock. A periodic tick inside the MCP process activates when `EXECUTION_SCHEDULER=on`, handling day closures, report freezing, and notifications. Spec Kit scripts on Windows require `PYTHONUTF8=1` in the shell.
 
 ## Deployment
 

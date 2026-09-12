@@ -20,3 +20,11 @@ Welcome, AI Agent! You are connected to **PURE OS (Personal University Resource 
 
 4. **Zero Mock Preference**:
    - Use `ingest_academic_enrollment` to retrieve or seed authentic multi-university student enrollments instead of generating placeholder items.
+
+5. **Execution Module Rules** (Módulo de Ejecución — US1–US9):
+   - **Days of the week** go from 1 (Monday) to 7 (Sunday), never 0–6.
+   - **Only one active trigger per moment**: `get_today` returns a single trigger (`trigger: { ... } | null`), never a list. The trigger that matches first wins, based on anchor time and a 240-minute window.
+   - **Triggers have no duration, batch count, or method**: a trigger contains only the signal (`cue_text`, `anchor_time`) and the action (`action_text`). Fields like `default_tandas`, `duration`, or `how` are not allowed and trigger `SOBRE_ESPECIFICACION`.
+   - **No retroactive task entry**: `manage_tandas:start` accepts no `started_at` from the client. All time comes from the server clock. Auditing past sessions happens through `manage_tandas:read` with date filters, never by inserting backdated rows.
+   - **Seed data only via MCP tools**: the program, habits, triggers, tasks, and report recipient are created and updated only through tool handlers (`manage_program`, `manage_routine_slots`, `manage_tasks`, `manage_weekly_report:set_partner`). They are never written directly to SQL, hardcoded in UI, or passed via migrations.
+   - **Report data flows through the same schema**: when you call `manage_weekly_report:preview` or `run_tick`, you get the payload for that week. The payload is frozen on Sunday 19:00 and sent once on Sunday 20:00; calling `run_tick` again does not resend and is idempotent.

@@ -40,7 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 
 # OS
-.DS_Store
 Thumbs.db
 
 # Docker

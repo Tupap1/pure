@@ -33,3 +33,5 @@ Bienvenido al centro de documentación técnica del ecosistema **Pure**. Aquí e
 - [README Principal](file:///c:/Proyectos/Pure/README.md) — Resumen general del proyecto y comandos de ejecución.
 - [PRODUCT.md](file:///c:/Proyectos/Pure/PRODUCT.md) — Visión estratégica del producto.
 - [DESIGN.md](file:///c:/Proyectos/Pure/DESIGN.md) — Lineamientos estéticos del sistema.
+- [Especificaciones de Features](/specs/) — Documentos Spec Kit por feature (constitución, plan, spec, tareas, checklist).
+- [Constitución de PURE OS](/.specify/memory/constitution.md) — Principios fundamentales, restricciones técnicas y flujo de trabajo.
