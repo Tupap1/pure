@@ -410,11 +410,11 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Tests for User Story 7 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T058 [P] [US7] TEST US7-AS1 en __tests__/api/push-subscribe.test.ts:
+- [X] T058 [P] [US7] TEST US7-AS1 en __tests__/api/push-subscribe.test.ts:
   - el POST valida con Zod `endpoint` https y `keys.p256dh`/`keys.auth`, y hace upsert idempotente con `id = sha256(endpoint)`;
   - el DELETE borra;
   - `GET /api/push/public-key` devuelve la clave.
-- [ ] T059 [P] [US7] TEST US7-AS2…US7-AS5 en __tests__/mcp/execution-push.test.ts (pg-mem + `Pusher` falso y `vi.mock('web-push')`):
+- [X] T059 [P] [US7] TEST US7-AS2…US7-AS5 en __tests__/mcp/execution-push.test.ts (pg-mem + `Pusher` falso y `vi.mock('web-push')`):
   - al finalizar por tiempo se envía un único "Terminó la tanda" y se marca `end_notified_at`;
   - al congelar se avisa con la hora límite (`freeze_notified_at`), y al pasar a `fallido` se avisa del fallo;
   - una respuesta 404/410 borra la suscripción;
@@ -422,15 +422,15 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Implementation for User Story 7
 
-- [ ] T060 [US7] IMPL db/migrations/010_push.sql y las rutas app/api/push/public-key/route.ts, app/api/push/subscribe/route.ts y app/api/push/test/route.ts:
+- [X] T060 [US7] IMPL db/migrations/010_push.sql y las rutas app/api/push/public-key/route.ts, app/api/push/subscribe/route.ts y app/api/push/test/route.ts:
   - `push_subscriptions` + `ALTER TABLE … ADD COLUMN IF NOT EXISTS end_notified_at` y `freeze_notified_at`;
   - agregar la tabla a `reset()` en __tests__/helpers/test-db.ts.
-- [ ] T061 [US7] IMPL lib/execution/push.ts y lib/execution/tick.ts:
+- [X] T061 [US7] IMPL lib/execution/push.ts y lib/execution/tick.ts:
   - interfaz `Pusher`; `createWebPusher()` con web-push `setVapidDetails`;
   - `urgency: 'high'`; TTL de 600 para la tanda y 3600 para el resto;
   - sin VAPID → no-op con `warn`;
   - los tres tipos de aviso de contracts/notifications.md dentro del tick.
-- [ ] T062 [US7] IMPL public/sw.js, lib/hooks/usePushNotifications.ts, components/dashboards/ConfigDashboard.tsx y components/dashboards/TodayDashboard.tsx:
+- [X] T062 [US7] IMPL public/sw.js, lib/hooks/usePushNotifications.ts, components/dashboards/ConfigDashboard.tsx y components/dashboards/TodayDashboard.tsx:
   - sw.js: en `push` siempre `showNotification`; en `notificationclick` enfoca o abre `url`; sin `fetch` ni caché;
   - hook: registro del SW, detección de standalone en iOS, suscripción con gesto;
   - ConfigDashboard: sección "Notificaciones" con los estados no soportado / instalar en inicio / denegado / activar / activo + prueba + desactivar;
