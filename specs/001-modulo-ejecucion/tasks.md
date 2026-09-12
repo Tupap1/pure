@@ -46,9 +46,9 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 **Purpose**: línea base y configuración compartida
 
-- [ ] T001 Confirmar la rama `001-modulo-ejecucion` y la línea base: `npm run test:all` en verde antes de tocar código (package.json)
-- [ ] T002 [P] Agregar la dependencia `web-push` y en devDependencies `@types/web-push`, con `npm install` (package.json). El correo NO usa `nodemailer`: sale por la API HTTP de ZeptoMail con `fetch`
-- [ ] T003 [P] Declarar las variables del módulo en .env.example y docker-compose.yml, sin valores secretos:
+- [X] T001 Confirmar la rama `001-modulo-ejecucion` y la línea base: `npm run test:all` en verde antes de tocar código (package.json)
+- [X] T002 [P] Agregar la dependencia `web-push` y en devDependencies `@types/web-push`, con `npm install` (package.json). El correo NO usa `nodemailer`: sale por la API HTTP de ZeptoMail con `fetch`
+- [X] T003 [P] Declarar las variables del módulo en .env.example y docker-compose.yml, sin valores secretos:
   - .env.example, sección "Módulo de Ejecución": `PURE_TZ`, `EXECUTION_SCHEDULER=off`, `REPORT_OWNER_NAME`, `PUBLIC_WEB_URL`, `ZEPTOMAIL_TOKEN`, `ZEPTOMAIL_URL`, `REPORT_FROM`, `REPORT_FROM_NAME`, `REPORT_REPLY_TO`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT`, todas vacías o con su valor por defecto no secreto;
   - docker-compose.yml, servicio `pure-web`: `PURE_TZ` y `VAPID_*`;
   - docker-compose.yml, servicio `pure-mcp`: `EXECUTION_SCHEDULER=on`, `ZEPTOMAIL_*`, `REPORT_*`, `VAPID_*` y `PUBLIC_WEB_URL`.
