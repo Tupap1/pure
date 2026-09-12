@@ -316,7 +316,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Tests for User Story 5 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T044 [P] [US5] TEST US5-AS1…US5-AS5 y US5-AS7 en __tests__/domain/grade-projection.test.ts:
+- [X] T044 [P] [US5] TEST US5-AS1…US5-AS5 y US5-AS7 en __tests__/domain/grade-projection.test.ts:
   - Química (1.7 al 20%, 80% pendiente, aprobatoria 3.0, meta 4.5) → `consolidated 0.34`, `neededToPass 3.33`, `neededForTarget 5.20` + `meta_inalcanzable`, `ceiling 4.34`;
   - pesos 105% → `pesos_inconsistentes` y cifras `null`;
   - `completado` sin nota → `entregado_sin_nota`;
@@ -328,7 +328,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Implementation for User Story 5
 
-- [ ] T046 [US5] IMPL lib/domain/subject.ts y lib/domain/deliverable.ts:
+- [X] T046 [US5] IMPL lib/domain/subject.ts y lib/domain/deliverable.ts:
   - `normalizeDeliverableStatus`: `'completado'` → `'entregado'`; un valor desconocido → `'pendiente'`;
   - `isGradedDeliverable` (estado normalizado ≠ pendiente y `grade` numérico), usado en `calculateWeightedGrade` y en `calculateSubjectGradeProgress` (lib/domain/deliverable.ts:81);
   - `projectSubjectGrade(delivs, { scaleMax, passingGrade, targetGrade }, now)`: necesaria = ceil2 sobre `(puntos*100)/peso`; techo = floor2; flags de FR-027 incluyendo `ciega`;
