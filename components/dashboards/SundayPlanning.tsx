@@ -58,8 +58,6 @@ export const SundayPlanning: React.FC<SundayPlanningProps> = ({ onClose }) => {
     });
   }, [preview, subjects]);
 
-  const subjectName = (id: string) => subjects.find((s) => s.id === id)?.name ?? id;
-
   const handleSaveIntentions = async () => {
     setSavingIntentions(true);
     const items = Object.entries(drafts).map(([subject_id, draft]) => ({

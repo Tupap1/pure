@@ -147,9 +147,6 @@ export const SubjectEvaluation: React.FC<SubjectEvaluationProps> = ({ subject, d
     await deleteDeliverable(id);
   };
 
-  const tileClass =
-    'p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800';
-
   return (
     <div className="space-y-5">
       {/* Encabezado */}

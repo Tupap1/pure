@@ -37,7 +37,6 @@ export const TodayDashboard: React.FC = () => {
     countdown,
     refresh,
     start,
-    finish,
     interrupt,
     tagSubject,
     respondTrigger,
