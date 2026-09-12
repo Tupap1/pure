@@ -504,7 +504,11 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - CLAUDE.md: un párrafo del módulo (tablas solo-Postgres, tick, `EXECUTION_SCHEDULER`, Spec Kit con `PYTHONUTF8=1`);
   - docs/README.md: enlaces a specs/ y a .specify/memory/constitution.md.
 - [X] T073 Limpieza y refactor con los tests en verde; revisar el diff que `/speckit-implement` agregue a .gitignore y .dockerignore.
-- [ ] T074 [P] Tests de regresión en __tests__/ para cada bug que aparezca durante la implementación.
+- [X] T074 [P] Tests de regresión en __tests__/ para cada bug que aparezca durante la implementación.
+  - **Auditoría** (los tres ya tenían su test de regresión; ver el cuerpo del commit que marca
+    esta tarea): `tandas_today` contando tandas sin completar; un reporte congelado sin
+    destinatario quemando intentos y perdiéndose para siempre; el adaptador de correo enviando
+    con `reply_to` vacío y leyendo las variables de entorno al construirse en vez de al enviar.
 - [X] T075 Endurecimiento de seguridad (Principio VI) en app/api/execution/ y app/api/push/:
   - rutas nuevas con try/catch y sin detalles internos en los errores;
   - ningún secreto en código ni en artefactos;
