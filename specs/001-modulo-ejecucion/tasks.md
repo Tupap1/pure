@@ -350,14 +350,14 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Tests for User Story 6 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T049 [P] [US6] TEST US6-AS5, US6-AS7 y US6-AS10 en __tests__/domain/weekly-report.test.ts:
+- [X] T049 [P] [US6] TEST US6-AS5, US6-AS7 y US6-AS10 en __tests__/domain/weekly-report.test.ts:
   - `computeVerdict`: ≥ 6/7 cumplida, ≤ 3/7 fallida, resto parcial;
   - `renderReportText` sin nota incluye "Andrés no dio explicación.";
   - `createZeptoMailer` con `fetch` mockeado: manda la cabecera `Authorization: Zoho-enczapikey ...`, `reply_to` y `track_clicks`/`track_opens` en `false`; con 201 resuelve y con 400 o error de red lanza un error que empieza por el código HTTP;
   - con dos `fallida` seguidas agrega "Segunda semana fallida. Si puedes, llámalo.";
   - el payload trae días x/7, los días acumulados frente al horizonte de 66 (FR-022), hábitos x/7, veredicto, "En riesgo" (perdidas, necesaria ≥ 3.5 con cifra y próxima evaluación, abandonadas, una línea de ciegas) y ediciones tardías;
   - el corte del domingo 19:00 excluye las tandas posteriores.
-- [ ] T050 [P] [US6] TEST US6-AS1…US6-AS4, US6-AS6, US6-AS8 y US6-AS9 en __tests__/mcp/weekly-report.test.ts (pg-mem + `Mailer` falso + `vi.setSystemTime`):
+- [X] T050 [P] [US6] TEST US6-AS1…US6-AS4, US6-AS6, US6-AS8 y US6-AS9 en __tests__/mcp/weekly-report.test.ts (pg-mem + `Mailer` falso + `vi.setSystemTime`):
   - el tick del domingo 19:00 congela, y las tandas posteriores no cambian el payload;
   - `set_note` antes del plazo → OK; después → `VENTANA_CERRADA`; sin reporte congelado → `REPORTE_NO_CONGELADO`;
   - el tick de las 20:00 envía una vez y el segundo no reenvía (claim atómico); `send` sobre uno ya enviado → `YA_ENVIADO`;
@@ -366,20 +366,20 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - si arranca el lunes, congela con el corte del domingo y `late=true`;
   - sin destinatario → `SIN_PARTNER`; `set_partner` sin `consented_at` → `CONSENTIMIENTO_REQUERIDO`;
   - si se cambia de destinatario después del congelamiento, el envío usa el vigente al congelar (caso borde de spec.md).
-- [ ] T051 [P] [US6] TEST US6-AS11 ampliando __tests__/api/execution-routes.test.ts:
+- [X] T051 [P] [US6] TEST US6-AS11 ampliando __tests__/api/execution-routes.test.ts:
   - `GET /api/execution/report` devuelve `partner_name` y nunca el correo del destinatario;
   - `manage_weekly_report:set_note` está en la lista blanca y `set_partner` no.
 
 ### Implementation for User Story 6
 
-- [ ] T052 [US6] IMPL db/migrations/009_weekly_reports.sql y el `reset()` de __tests__/helpers/test-db.ts:
+- [X] T052 [US6] IMPL db/migrations/009_weekly_reports.sql y el `reset()` de __tests__/helpers/test-db.ts:
   - SQL exacto de data-model.md: `accountability_partners` con `active_lock TEXT UNIQUE`, y `weekly_reports` con `payload JSONB` e índice por `status`;
   - agregar `weekly_reports` y `accountability_partners` antes de `program_weeks` en `reset()`.
-- [ ] T053 [US6] IMPL lib/execution/compliance.ts, lib/domain/execution.ts y lib/execution/report.ts:
+- [X] T053 [US6] IMPL lib/execution/compliance.ts, lib/domain/execution.ts y lib/execution/report.ts:
   - `getCompliance({ from, to, cutoff })`, incluidos `dias_cumplidos_totales` y `horizonte`;
   - `computeVerdict`;
   - `buildReportPayload` y `renderReportText`, con el formato de specs/001-modulo-ejecucion/contracts/notifications.md.
-- [ ] T054 [US6] IMPL lib/execution/mailer.ts y lib/execution/tick.ts:
+- [X] T054 [US6] IMPL lib/execution/mailer.ts y lib/execution/tick.ts:
   - mailer.ts: interfaz `Mailer` y `createZeptoMailer()` con `fetch` contra la API HTTP de ZeptoMail, exactamente como lo especifica contracts/notifications.md (cabecera `Zoho-enczapikey`, `reply_to` obligatorio, `textbody`, `track_clicks`/`track_opens` en `false` y éxito solo con 201);
   - tick.ts: `runExecutionTick(now, { mailer, pusher })`:
     1. `finalizeElapsed`;
@@ -387,11 +387,11 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
     3. claim `UPDATE … SET status='enviando', attempts=attempts+1, last_attempt_at=$now WHERE id=$1 AND status='congelado' RETURNING *`;
     4. backoff de 10 min y como máximo 3 intentos;
     5. un reporte con más de 15 min en `enviando` vuelve a `congelado`.
-- [ ] T055 [US6] IMPL `handleManageWeeklyReport` y `handleGetComplianceReport` en lib/execution/handlers.ts, con el scheduler en mcp-server/index.ts:
+- [X] T055 [US6] IMPL `handleManageWeeklyReport` y `handleGetComplianceReport` en lib/execution/handlers.ts, con el scheduler en mcp-server/index.ts:
   - acciones de contracts/mcp-tools.md, incluida `run_tick` (FR-039);
   - registro de `manage_weekly_report` y `get_compliance_report`, y conteo de `TOOLS_LIST` +2 (total 28);
   - en `main()`: si `EXECUTION_SCHEDULER === 'on'`, un tick al arrancar y `setInterval(tick, 20_000).unref()`, con guardia anti-solapamiento y logs `[execution-tick]`.
-- [ ] T056 [US6] IMPL app/api/execution/report/route.ts, app/api/execution/route.ts y components/dashboards/TodayDashboard.tsx:
+- [X] T056 [US6] IMPL app/api/execution/report/route.ts, app/api/execution/route.ts y components/dashboards/TodayDashboard.tsx:
   - la ruta del reporte, sin el correo del destinatario;
   - `manage_weekly_report:set_note` en la lista blanca;
   - bloque del domingo en Hoy, entre congelamiento y envío: números congelados, textarea ≤ 400 y la advertencia "no dio explicación" si el veredicto es fallida;
