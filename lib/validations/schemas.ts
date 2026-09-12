@@ -596,7 +596,21 @@ export const PushUnsubscribeSchema = z
   })
   .strict();
 
-// --- Tarea (tasks) ---
+// --- Tarea (tasks, US8) ---
+// FR-035: 1 a 3 tandas; 4 o más se rechaza con PARTIR_TAREA (no el DATOS_INVALIDOS genérico de
+// un .max() a secas), por eso el superRefine de abajo además del rango declarado en el campo —
+// mismo patrón que TandaInterruptSchema con RAZON_REQUERIDA.
+
+function flagPartirTarea(estimatedTandas: number | undefined, ctx: z.RefinementCtx) {
+  if (estimatedTandas != null && estimatedTandas > 3) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['estimated_tandas'],
+      message: 'Una tarea admite de 1 a 3 tandas. Si necesita más, hay que partirla.',
+      params: { code: 'PARTIR_TAREA' satisfies ExecutionErrorCode },
+    });
+  }
+}
 
 export const ExecutionTaskSchema = z
   .object({
@@ -608,6 +622,35 @@ export const ExecutionTaskSchema = z
     estimated_tandas: z.number().int().min(1).max(3),
     status: z.enum(['pendiente', 'hecha', 'descartada']).optional(),
     scheduled_date: z.string().regex(DATE_KEY_RE).optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => flagPartirTarea(data.estimated_tandas, ctx));
+
+export const ExecutionTaskUpdateSchema = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(3).max(120).optional(),
+    subject_id: z.string().min(1).optional(),
+    deliverable_id: z.string().optional(),
+    topic_id: z.string().optional(),
+    estimated_tandas: z.number().int().min(1).max(3).optional(),
+    status: z.enum(['pendiente', 'hecha', 'descartada']).optional(),
+    scheduled_date: z.string().regex(DATE_KEY_RE).optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => flagPartirTarea(data.estimated_tandas, ctx));
+
+export const ExecutionTaskReadSchema = z
+  .object({
+    id: z.string().optional(),
+    subject_id: z.string().optional(),
+    status: z.enum(['pendiente', 'hecha', 'descartada']).optional(),
+  })
+  .strict();
+
+export const ExecutionTaskDeleteSchema = z
+  .object({
+    id: z.string().min(1),
   })
   .strict();
 
@@ -633,5 +676,22 @@ export const IntentionsSetSchema = z
   .object({
     program_week_id: z.string().min(1),
     items: z.array(IntentionItemSchema).min(1),
+  })
+  .strict();
+
+// --- Planeación de la semana (plan_week, US8-US9) ---
+
+export const PlanWeekPreviewSchema = z
+  .object({
+    program_week_id: z.string().optional(),
+  })
+  .strict();
+
+// FR-037: libre las primeras 2 veces por semana; desde la 3.ª, reason vacío/ausente -> RAZON_REQUERIDA.
+// La cuenta de "es esta la 3.ª apertura" depende de plan_views (estado en base), así que aquí solo
+// se valida la forma; lib/execution/planning.ts decide cuándo aplica el RAZON_REQUERIDA real.
+export const PlanWeekOpenViewSchema = z
+  .object({
+    reason: z.string().optional(),
   })
   .strict();

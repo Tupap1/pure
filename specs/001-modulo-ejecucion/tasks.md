@@ -448,7 +448,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Tests for User Story 8 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T065 [P] [US8] TEST US8-AS1…US8-AS5 en __tests__/mcp/execution-planning.test.ts (pg-mem):
+- [X] T065 [P] [US8] TEST US8-AS1…US8-AS5 en __tests__/mcp/execution-planning.test.ts (pg-mem):
   - intención < 6 sin razón → `RAZON_REQUERIDA`; con razón, la materia no recibe disparadores sugeridos;
   - `estimated_tandas` 4 → `PARTIR_TAREA`;
   - `manage_tasks today` no arrastra las tareas de ayer;
@@ -456,7 +456,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Implementation for User Story 8
 
-- [ ] T066 [US8] IMPL db/migrations/011_execution_planning.sql, lib/execution/planning.ts y el registro de las tools:
+- [X] T066 [US8] IMPL db/migrations/011_execution_planning.sql, lib/execution/planning.ts y el registro de las tools:
   - `intentions` y `plan_views` según data-model.md, y las tablas en `reset()` de __tests__/helpers/test-db.ts;
   - `handleManageTasks` y `handlePlanWeek` en lib/execution/handlers.ts;
   - registro de `manage_tasks` y `plan_week` en mcp-server/index.ts, y conteo de `TOOLS_LIST` +2 (total 30).

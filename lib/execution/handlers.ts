@@ -31,6 +31,13 @@ import {
   WeeklyReportSendSchema,
   WeeklyReportReadSchema,
   ComplianceReportReadSchema,
+  ExecutionTaskSchema,
+  ExecutionTaskUpdateSchema,
+  ExecutionTaskReadSchema,
+  ExecutionTaskDeleteSchema,
+  IntentionsSetSchema,
+  PlanWeekPreviewSchema,
+  PlanWeekOpenViewSchema,
   zodErrorToExecutionResult,
   type ExecutionResult,
 } from '../validations/schemas';
@@ -51,6 +58,17 @@ import { buildReportPayload, deriveRiskSection, renderReportText, type BuildRepo
 import { runExecutionTick, attemptSend } from './tick';
 import { createZeptoMailer } from './mailer';
 import { addDays, localParts } from './time';
+import {
+  createTask,
+  readTasks,
+  updateTask,
+  deleteTask,
+  getTodayTasks,
+  setIntentions,
+  previewPlanWeek,
+  openPlanView,
+  countGatedPlanOpenings,
+} from './planning';
 import {
   fetchProgramWeeksFromDb,
   fetchWeeklyReportsFromDb,
@@ -333,9 +351,10 @@ async function assembleReportInput(
   const from = week.starts_on;
   const to = addDays(week.starts_on, 6);
 
-  const [compliance, projections] = await Promise.all([
+  const [compliance, projections, planOpenings] = await Promise.all([
     getCompliance({ from, to, cutoff }),
     computeGradeProjections(cutoff),
+    countGatedPlanOpenings(week.id),
   ]);
   const enRiesgo = deriveRiskSection(projections.materias, projections.alertas);
 
@@ -362,6 +381,10 @@ async function assembleReportInput(
     // Un preview no anticipa "segunda semana fallida seguida": ese veredicto todavía puede
     // cambiar mientras la semana en curso no se congele de verdad.
     second_consecutive_failure: false,
+    // US9: aperturas de la vista de semana que pasaron por la compuerta esta semana. El
+    // congelamiento real (lib/execution/tick.ts) no pasa por aquí y no conoce este campo; lo
+    // completa por su cuenta lib/db/execution-pg.ts:insertWeeklyReportIfAbsentInDb.
+    plan_openings: planOpenings,
   };
 }
 
@@ -565,6 +588,106 @@ export async function handleGetComplianceReport(data?: unknown, now: Date = new 
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: error?.message || 'Error inesperado en get_compliance_report',
+    };
+  }
+}
+
+export type ManageTasksAction = 'create' | 'read' | 'update' | 'delete' | 'today';
+
+/**
+ * `manage_tasks` (US8): unidad de trabajo de 1 a 3 tandas. `create`/`update` rechazan más de 3
+ * tandas con PARTIR_TAREA (ExecutionTaskSchema/ExecutionTaskUpdateSchema). `today` no arrastra
+ * deuda: solo lo programado exactamente para hoy y todavía pendiente (FR-035).
+ */
+export async function handleManageTasks(
+  action: ManageTasksAction,
+  data?: unknown,
+  now: Date = new Date()
+): Promise<ExecutionResult> {
+  try {
+    switch (action) {
+      case 'create': {
+        const parsed = ExecutionTaskSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await createTask(parsed.data);
+      }
+      case 'read': {
+        const parsed = ExecutionTaskReadSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await readTasks(parsed.data);
+      }
+      case 'update': {
+        const parsed = ExecutionTaskUpdateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await updateTask(parsed.data);
+      }
+      case 'delete': {
+        const parsed = ExecutionTaskDeleteSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await deleteTask(parsed.data.id);
+      }
+      case 'today': {
+        return await getTodayTasks(now);
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para manage_tasks: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: error?.message || 'Error inesperado en manage_tasks',
+    };
+  }
+}
+
+export type ManagePlanWeekAction = 'preview' | 'set_intentions' | 'open_view';
+
+/**
+ * `plan_week` (US8-US9): el asistente del domingo (`preview`, `set_intentions`) y la compuerta de
+ * la vista de semana (`open_view`, FR-037). `preview` sin `program_week_id` resuelve la semana en
+ * curso, o la siguiente si hoy es domingo (mismo criterio que `manage_routine_slots:rehearse`,
+ * lib/execution/routine.ts:resolveRehearsalWeekId); `open_view` siempre mira la semana en curso,
+ * nunca la que se está planeando.
+ */
+export async function handlePlanWeek(
+  action: ManagePlanWeekAction,
+  data?: unknown,
+  now: Date = new Date()
+): Promise<ExecutionResult> {
+  try {
+    switch (action) {
+      case 'preview': {
+        const parsed = PlanWeekPreviewSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await previewPlanWeek(parsed.data, now);
+      }
+      case 'set_intentions': {
+        const parsed = IntentionsSetSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await setIntentions(parsed.data);
+      }
+      case 'open_view': {
+        const parsed = PlanWeekOpenViewSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await openPlanView(parsed.data, now);
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para plan_week: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: error?.message || 'Error inesperado en plan_week',
     };
   }
 }

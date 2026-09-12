@@ -9,6 +9,8 @@ import {
   handleGetGradeProjection,
   handleManageWeeklyReport,
   handleGetComplianceReport,
+  handleManageTasks,
+  handlePlanWeek,
 } from '../lib/execution/handlers';
 
 // Módulo de Ejecución: los handlers viven en lib/execution/handlers.ts (Principio I, una sola
@@ -23,6 +25,8 @@ export {
   handleGetGradeProjection,
   handleManageWeeklyReport,
   handleGetComplianceReport,
+  handleManageTasks,
+  handlePlanWeek,
 };
 import {
   fetchAcademicOverviewFromDb,

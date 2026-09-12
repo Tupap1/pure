@@ -618,6 +618,21 @@ export async function insertWeeklyReportIfAbsentInDb(input: {
   frozen_at: string;
   note_deadline: string;
 }): Promise<WeeklyReportRecord | null> {
+  // US9: quien arma el payload (lib/execution/tick.ts:freezeOneWeek, para el congelamiento real
+  // del domingo) todavía no sabe de "Aperturas del plan" — esa historia es posterior a la suya.
+  // En vez de tocar ese archivo, se completa aquí mismo, justo antes de guardar, contando las
+  // filas de plan_views de esta semana que pasaron por la compuerta (was_gated=true): así el
+  // reporte realmente congelado lleva la misma cifra que manage_weekly_report:preview ya calcula
+  // en lib/execution/handlers.ts. Si el caller ya trae `plan_openings` (el preview sí lo hace),
+  // se respeta tal cual.
+  const payload: Record<string, unknown> = { ...(input.payload as Record<string, unknown>) };
+  if (payload.plan_openings == null) {
+    const gatedRes = await pgPool.query('SELECT was_gated FROM plan_views WHERE program_week_id = $1', [
+      input.program_week_id,
+    ]);
+    payload.plan_openings = gatedRes.rows.filter((r: { was_gated: boolean }) => r.was_gated).length;
+  }
+
   const res = await pgPool.query(
     `INSERT INTO weekly_reports (id, program_week_id, partner_id, payload, verdict, frozen_at, note_deadline, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, 'congelado')
@@ -627,7 +642,7 @@ export async function insertWeeklyReportIfAbsentInDb(input: {
       input.id,
       input.program_week_id,
       input.partner_id,
-      JSON.stringify(input.payload),
+      JSON.stringify(payload),
       input.verdict,
       input.frozen_at,
       input.note_deadline,
@@ -790,4 +805,87 @@ export async function deletePushSubscriptionFromDb(id: string): Promise<void> {
 
 export async function markPushSubscriptionSuccessInDb(id: string, now: Date): Promise<void> {
   await pgPool.query('UPDATE push_subscriptions SET last_success_at = $2 WHERE id = $1', [id, now.toISOString()]);
+}
+
+// --- intentions (US8) ---
+
+export interface IntentionRecord {
+  id: string;
+  program_week_id: string;
+  subject_id: string;
+  strength: number;
+  reason?: string | null;
+  captured_at?: string;
+}
+
+export async function fetchIntentionsFromDb(programWeekId?: string): Promise<IntentionRecord[]> {
+  if (programWeekId) {
+    const res = await pgPool.query('SELECT * FROM intentions WHERE program_week_id = $1 ORDER BY captured_at ASC', [
+      programWeekId,
+    ]);
+    return res.rows;
+  }
+  const res = await pgPool.query('SELECT * FROM intentions ORDER BY captured_at ASC');
+  return res.rows;
+}
+
+/** `id` determinista `${program_week_id}:${subject_id}` (data-model.md): registrar de nuevo la
+ * intención de una materia en la misma semana reemplaza la anterior en vez de duplicarla. */
+export async function saveIntentionToDb(intention: {
+  program_week_id: string;
+  subject_id: string;
+  strength: number;
+  reason?: string | null;
+}): Promise<IntentionRecord> {
+  const id = `${intention.program_week_id}:${intention.subject_id}`;
+  const res = await pgPool.query(
+    `INSERT INTO intentions (id, program_week_id, subject_id, strength, reason)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (id) DO UPDATE SET strength = EXCLUDED.strength, reason = EXCLUDED.reason
+     RETURNING *`,
+    [id, intention.program_week_id, intention.subject_id, intention.strength, intention.reason ?? null]
+  );
+  return res.rows[0];
+}
+
+// --- plan_views (US9) ---
+
+export interface PlanViewRecord {
+  id: string;
+  program_week_id: string;
+  viewed_at: string;
+  surface: string;
+  was_gated: boolean;
+  reason?: string | null;
+}
+
+export async function fetchPlanViewsFromDb(programWeekId: string, surface?: string): Promise<PlanViewRecord[]> {
+  if (surface) {
+    const res = await pgPool.query(
+      'SELECT * FROM plan_views WHERE program_week_id = $1 AND surface = $2 ORDER BY viewed_at ASC',
+      [programWeekId, surface]
+    );
+    return res.rows;
+  }
+  const res = await pgPool.query('SELECT * FROM plan_views WHERE program_week_id = $1 ORDER BY viewed_at ASC', [
+    programWeekId,
+  ]);
+  return res.rows;
+}
+
+export async function savePlanViewToDb(view: {
+  id: string;
+  program_week_id: string;
+  viewed_at: string;
+  surface: string;
+  was_gated: boolean;
+  reason?: string | null;
+}): Promise<PlanViewRecord> {
+  const res = await pgPool.query(
+    `INSERT INTO plan_views (id, program_week_id, viewed_at, surface, was_gated, reason)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING *`,
+    [view.id, view.program_week_id, view.viewed_at, view.surface, view.was_gated, view.reason ?? null]
+  );
+  return res.rows[0];
 }

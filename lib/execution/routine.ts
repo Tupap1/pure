@@ -167,8 +167,11 @@ export interface RoutineSlotRehearseInput {
 }
 
 /** Semana en curso; si hoy es domingo, la siguiente (contracts/mcp-tools.md: "la semana en
- * curso, o la siguiente si es domingo" — el domingo es el día de planear la semana que viene). */
-async function resolveRehearsalWeekId(now: Date): Promise<string | null> {
+ * curso, o la siguiente si es domingo" — el domingo es el día de planear la semana que viene).
+ * Exportada porque lib/execution/planning.ts (US8) reusa exactamente esta misma resolución para
+ * decidir qué semana previsualiza plan_week:preview (Principio I: una sola función decide "cuál
+ * es la semana que se está planeando"). */
+export async function resolveRehearsalWeekId(now: Date): Promise<string | null> {
   const local = localParts(now);
   const targetDateKey = local.dayOfWeek === 7 ? addDays(local.dateKey, 1) : local.dateKey;
 

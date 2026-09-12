@@ -38,6 +38,8 @@ import {
   handleGetGradeProjection,
   handleManageWeeklyReport,
   handleGetComplianceReport,
+  handleManageTasks,
+  handlePlanWeek,
 } from './tools-handler';
 import { runExecutionTick } from '../lib/execution/tick';
 import { createZeptoMailer } from '../lib/execution/mailer';
@@ -430,6 +432,48 @@ export const TOOLS_LIST = [
       required: ['action'],
     },
   },
+  {
+    name: 'manage_tasks',
+    description:
+      'Módulo de Ejecución: tarea de 1 a 3 tandas, ligada a una materia (US8). ' +
+      '"create"/"update" rechazan estimated_tandas > 3 con PARTIR_TAREA: la tarea hay que partirla, nunca aceptarla grande. ' +
+      '"today" devuelve solo las tareas con scheduled_date = hoy y status="pendiente"; las de ayer sin hacer NO se arrastran (no hay deuda acumulada de tareas en este sistema).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'delete', 'today'] },
+        data: {
+          type: 'object',
+          description:
+            'create: { id?, title (3-120), subject_id, deliverable_id?, topic_id?, estimated_tandas (1-3), status? (pendiente/hecha/descartada), scheduled_date? (YYYY-MM-DD) }. ' +
+            'read: { id?, subject_id?, status? }. update: { id, ...campos de create, todos opcionales }. delete: { id }. today: sin data.',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'plan_week',
+    description:
+      'Módulo de Ejecución: planeación del domingo y la vista de semana (US8-US9). ' +
+      '"preview" arma el asistente del domingo: la semana pasada (cumplimiento), las entregas de los próximos 14 días con sus alertas, las intenciones y disparadores de la semana que viene con su ensayo, y el reparto sugerido de tandas por materia (de la norma de créditos, 48h/crédito/semestre, con la urgencia y la proyección de nota en columnas aparte) — excluye de ese reparto una materia con intención declarada menor a 6. ' +
+      '"set_intentions" registra, por materia y semana, una intención de 0 a 10; menor a 6 exige razón (RAZON_REQUERIDA si falta) y esa materia deja de recibir reparto sugerido. ' +
+      '"open_view" es la compuerta de la vista de semana (FR-037): libre 2 veces por semana; desde la 3.ª exige reason (RAZON_REQUERIDA si falta) y esa apertura queda contada en el reporte semanal ("Aperturas del plan"). Devuelve la rejilla de la semana en curso: cada disparador con su resultado por día y las tandas por día, sin gráficas.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['preview', 'set_intentions', 'open_view'] },
+        data: {
+          type: 'object',
+          description:
+            'preview: { program_week_id? } (la semana en curso, o la siguiente si hoy es domingo, si se omite). ' +
+            'set_intentions: { program_week_id, items: [{ subject_id, strength (0-10), reason? }] }. ' +
+            'open_view: { reason? } (obligatorio desde la 3.ª apertura de la semana en curso).',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -726,6 +770,32 @@ export function createMcpServerInstance() {
     },
     async ({ action, data }) => {
       const res = await handleManageWeeklyReport(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_tasks',
+    'Módulo de Ejecución: tarea de 1 a 3 tandas ligada a una materia (US8). create/read/update/delete/today. Más de 3 tandas se rechaza con PARTIR_TAREA; today nunca arrastra las de ayer.',
+    {
+      action: z.enum(['create', 'read', 'update', 'delete', 'today']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageTasks(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'plan_week',
+    'Módulo de Ejecución: planeación del domingo y vista de semana (US8-US9). preview/set_intentions/open_view. El reparto sugerido sale de la norma de créditos (urgencia y proyección aparte) y excluye materias con intención < 6; open_view es la compuerta de la semana (2 aperturas libres, desde la 3.ª pide razón) y devuelve la rejilla de disparadores y tandas por día, sin gráficas.',
+    {
+      action: z.enum(['preview', 'set_intentions', 'open_view']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handlePlanWeek(action, data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );
