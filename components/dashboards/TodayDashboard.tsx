@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import type { TodayRunningTanda } from '@/lib/execution/today';
 import { buildTodayFooterView } from '@/lib/execution/today-view';
+import { SundayPlanning } from '@/components/dashboards/SundayPlanning';
+import { isoDayOfWeekForDateKey } from '@/lib/domain/execution';
 
 /** "Lunes 14 sep · Semana 1 de 10" (o sin el segmento de semana si el programa no está creado). */
 function formatDayLine(dateKey: string, week: { number: number; total: number } | null): string {
@@ -52,6 +54,7 @@ export const TodayDashboard: React.FC = () => {
   const prevRunningRef = useRef<TodayRunningTanda | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
   const [noteJustSaved, setNoteJustSaved] = useState(false);
+  const [showSundayPlanning, setShowSundayPlanning] = useState(false);
 
   // FR-008: la materia se puede asignar al terminar. Cuando la tanda en curso desaparece del
   // payload (se completó o se interrumpió) y no tenía materia, se ofrece etiquetarla.
@@ -87,6 +90,8 @@ export const TodayDashboard: React.FC = () => {
   const running = today.running_tanda;
   const minutesLeft = running && secondsLeft != null ? Math.ceil(secondsLeft / 60) : null;
   const footer = buildTodayFooterView(today);
+  // US8 (T067): el asistente del domingo (SundayPlanning.tsx) solo se ofrece ese día de la semana.
+  const isSunday = isoDayOfWeekForDateKey(today.date) === 7;
 
   const handleStart = async (routine_slot_id?: string) => {
     setIsStarting(true);
@@ -122,6 +127,17 @@ export const TodayDashboard: React.FC = () => {
       <p className="text-center text-sm text-slate-500 dark:text-slate-400">
         {formatDayLine(today.date, today.week)}
       </p>
+
+      {isSunday && (
+        <div className="text-center">
+          <button
+            onClick={() => setShowSundayPlanning(true)}
+            className="min-h-[44px] px-2 text-sm text-slate-600 dark:text-slate-300 underline underline-offset-2 hover:text-slate-900 dark:hover:text-slate-100"
+          >
+            Planear la semana →
+          </button>
+        </div>
+      )}
 
       <Card className="flex flex-col items-center gap-4 py-10 text-center">
         {running ? (
@@ -364,6 +380,8 @@ export const TodayDashboard: React.FC = () => {
           )}
         </Card>
       )}
+
+      {showSundayPlanning && <SundayPlanning onClose={() => setShowSundayPlanning(false)} />}
     </div>
   );
 };

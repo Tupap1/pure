@@ -460,11 +460,11 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - `intentions` y `plan_views` según data-model.md, y las tablas en `reset()` de __tests__/helpers/test-db.ts;
   - `handleManageTasks` y `handlePlanWeek` en lib/execution/handlers.ts;
   - registro de `manage_tasks` y `plan_week` en mcp-server/index.ts, y conteo de `TOOLS_LIST` +2 (total 30).
-- [ ] T067 [US8] IMPL components/dashboards/SundayPlanning.tsx y components/ui/SubjectEvaluation.tsx:
+- [X] T067 [US8] IMPL components/dashboards/SundayPlanning.tsx y components/ui/SubjectEvaluation.tsx:
   - asistente de 4 pasos al que se entra desde Hoy los domingos;
   - tareas dentro del hub de asignatura;
   - tabla de proyección: promedio evaluado, aporte, peso restante, necesaria para aprobar y para la meta, techo; flags como texto; `STATUS_LABELS` con el estado normalizado; `SubjectHub` pasa la universidad.
-  - **Parcialmente pendiente**: `SundayPlanning.tsx` está completo y funcional (4 pasos, `usePlanWeekPreview`), pero `TodayDashboard.tsx` es del otro agente (US7) en esta rama y no se tocó, así que el asistente todavía no tiene el enlace desde Hoy los domingos. Falta agregar ahí: `import { SundayPlanning } from '@/components/dashboards/SundayPlanning'`, un estado `showSundayPlanning`, un enlace visible solo si `isoDayOfWeekForDateKey(today.date) === 7` (de `@/lib/domain/execution`) que hace `setShowSundayPlanning(true)`, y `{showSundayPlanning && <SundayPlanning onClose={() => setShowSundayPlanning(false)} />}`.
+  - **Empalme cerrado**: `components/dashboards/TodayDashboard.tsx` ya importa `SundayPlanning` e `isoDayOfWeekForDateKey` (`@/lib/domain/execution`), guarda `showSundayPlanning` en estado y muestra "Planear la semana →" solo cuando `isoDayOfWeekForDateKey(today.date) === 7`, que abre `<SundayPlanning onClose={...} />`.
 - [ ] T068 [US8] VERIFY quickstart US8 en specs/001-modulo-ejecucion/quickstart.md: recorrer la planeación del domingo en el navegador y comprobar intenciones, disparadores sugeridos, tareas y la tabla de proyección del hub.
 
 ---
