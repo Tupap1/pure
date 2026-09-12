@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import type { TodayRunningTanda } from '@/lib/execution/today';
+import { buildTodayFooterView } from '@/lib/execution/today-view';
 
 /** "Lunes 14 sep · Semana 1 de 10" (o sin el segmento de semana si el programa no está creado). */
 function formatDayLine(dateKey: string, week: { number: number; total: number } | null): string {
@@ -24,8 +25,20 @@ function formatClock(iso: string): string {
  * el pie "N tandas hoy · Día cumplido" (US3).
  */
 export const TodayDashboard: React.FC = () => {
-  const { today, isLoading, isOffline, secondsLeft, countdown, refresh, start, finish, interrupt, tagSubject, respondTrigger } =
-    useToday();
+  const {
+    today,
+    isLoading,
+    isOffline,
+    secondsLeft,
+    countdown,
+    refresh,
+    start,
+    finish,
+    interrupt,
+    tagSubject,
+    respondTrigger,
+    setCheck,
+  } = useToday();
   const { subjects } = usePureData();
 
   const [isStarting, setIsStarting] = useState(false);
@@ -67,6 +80,7 @@ export const TodayDashboard: React.FC = () => {
 
   const running = today.running_tanda;
   const minutesLeft = running && secondsLeft != null ? Math.ceil(secondsLeft / 60) : null;
+  const footer = buildTodayFooterView(today);
 
   const handleStart = async (routine_slot_id?: string) => {
     setIsStarting(true);
@@ -192,6 +206,34 @@ export const TodayDashboard: React.FC = () => {
         </Card>
       )}
 
+      {footer.checks.length > 0 && (
+        <Card className="space-y-3">
+          {footer.checks.map((check) => (
+            <div key={check.habit_id} className="flex items-center justify-between gap-3">
+              <span className="text-sm text-slate-700 dark:text-slate-300">{check.label}</span>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCheck(check.habit_id, 'cumplido')}
+                  className="min-h-[44px]"
+                >
+                  Sí
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCheck(check.habit_id, 'fallado')}
+                  className="min-h-[44px]"
+                >
+                  No
+                </Button>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+
       {justFinished && (
         <Card>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">¿De qué materia fue esa tanda?</p>
@@ -224,11 +266,11 @@ export const TodayDashboard: React.FC = () => {
         </Card>
       )}
 
-      {(today.tandas_today > 0 || today.day_fulfilled) && (
+      {(footer.tandasLine || footer.dayFulfilledLine) && (
         <p className="text-center text-xs font-mono text-slate-500 dark:text-slate-400">
-          {today.tandas_today > 0 && `${today.tandas_today} tanda${today.tandas_today === 1 ? '' : 's'} hoy`}
-          {today.tandas_today > 0 && today.day_fulfilled ? ' · ' : ''}
-          {today.day_fulfilled ? 'Día cumplido' : ''}
+          {footer.tandasLine}
+          {footer.tandasLine && footer.dayFulfilledLine ? ' · ' : ''}
+          {footer.dayFulfilledLine}
         </p>
       )}
     </div>

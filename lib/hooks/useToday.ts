@@ -90,6 +90,13 @@ export function useToday() {
     [callAction]
   );
 
+  // US3: registrar un hábito del día (fila Sí/No de Hoy). "Sí" -> cumplido, "No" -> fallado.
+  const setCheck = useCallback(
+    (habit_id: string, status: 'cumplido' | 'fallado' | 'na') =>
+      callAction('manage_daily_checks', 'set', { habit_id, status }),
+    [callAction]
+  );
+
   const running = today?.running_tanda ?? null;
   const secLeft = running ? secondsLeft(running.ends_at, offsetRef.current, Date.now()) : null;
 
@@ -105,5 +112,6 @@ export function useToday() {
     interrupt,
     tagSubject,
     respondTrigger,
+    setCheck,
   };
 }

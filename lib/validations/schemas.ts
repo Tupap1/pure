@@ -365,6 +365,13 @@ export const DailyCheckSetSchema = z
   })
   .strict();
 
+export const DailyChecksReadSchema = z
+  .object({
+    from: z.string().regex(DATE_KEY_RE).optional(),
+    to: z.string().regex(DATE_KEY_RE).optional(),
+  })
+  .strict();
+
 // --- Disparador (routine_slots, slot_outcomes, plan_rehearsals) ---
 
 export const RoutineSlotSchema = z

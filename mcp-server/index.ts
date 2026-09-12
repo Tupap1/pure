@@ -34,6 +34,7 @@ import {
   handleManageTandas,
   handleGetToday,
   handleManageRoutineSlots,
+  handleManageDailyChecks,
 } from './tools-handler';
 
 export const TOOLS_LIST = [
@@ -356,6 +357,26 @@ export const TOOLS_LIST = [
       required: ['action'],
     },
   },
+  {
+    name: 'manage_daily_checks',
+    description:
+      'Módulo de Ejecución: registro diario de hábitos y evaluación de "día cumplido" (US3), sin deuda acumulada entre días. ' +
+      '"set" acepta hasta las 03:00 del día siguiente a la fecha registrada (después, DIA_CERRADO), rechaza fechas futuras (FECHA_FUTURA) y hábitos que no están activos ese día (HABITO_INACTIVO); es upsert idempotente por fecha y hábito. ' +
+      '"read" devuelve, por día, sus checks y la evaluación (tandas completadas ≥ mínimo de la semana y todo hábito activo cumplido o na; null si el día cae fuera del programa).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['set', 'read'] },
+        data: {
+          type: 'object',
+          description:
+            'set: { habit_id, status (cumplido/fallado/na), date? (YYYY-MM-DD, hoy por defecto), value?, note? (≤200) }. ' +
+            'read: { from?, to? (YYYY-MM-DD) }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -602,6 +623,19 @@ export function createMcpServerInstance() {
     },
     async ({ action, data }) => {
       const res = await handleManageRoutineSlots(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_daily_checks',
+    'Módulo de Ejecución: registro diario de hábitos y "día cumplido" (US3). set/read. set acepta hasta las 03:00 del día siguiente, rechaza fechas futuras y hábitos inactivos ese día; es upsert idempotente por fecha+hábito.',
+    {
+      action: z.enum(['set', 'read']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageDailyChecks(action, data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );

@@ -40,3 +40,32 @@ export function formatCountdown(totalSeconds: number): string {
 export function resolveConnectionState(payload: unknown): 'offline' | 'online' {
   return payload === null || payload === undefined ? 'offline' : 'online';
 }
+
+export interface TodayFooterInput {
+  pending_checks: { habit_id: string; label: string }[];
+  tandas_today: number;
+  day_fulfilled: boolean | null;
+}
+
+export interface TodayFooterView {
+  /** Hábitos de hoy sin responder: TodayDashboard los pinta como filas Sí/No que desaparecen al
+   * responder (desaparecen porque get_today deja de devolverlos, no por estado local). */
+  checks: { habit_id: string; label: string }[];
+  /** "N tandas hoy", o null si todavía no hay ninguna (FR-018: nunca "0 tandas"). */
+  tandasLine: string | null;
+  /** "Día cumplido", o null si no aplica. */
+  dayFulfilledLine: string | null;
+}
+
+/**
+ * Modelo de vista del pie de Hoy (US3-AS8, FR-008/FR-018): a propósito solo expone estas tres
+ * claves — nunca minutos totales, tandas faltantes, proyecciones de nota ni un selector de modo
+ * de trabajo, aunque el backend los tuviera, porque este modelo nunca los recibe ni los calcula.
+ */
+export function buildTodayFooterView(input: TodayFooterInput): TodayFooterView {
+  return {
+    checks: input.pending_checks,
+    tandasLine: input.tandas_today > 0 ? `${input.tandas_today} tanda${input.tandas_today === 1 ? '' : 's'} hoy` : null,
+    dayFulfilledLine: input.day_fulfilled ? 'Día cumplido' : null,
+  };
+}

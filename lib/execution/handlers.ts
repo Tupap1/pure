@@ -22,6 +22,8 @@ import {
   RoutineSlotDeleteSchema,
   RoutineSlotRespondSchema,
   RoutineSlotRehearseSchema,
+  DailyCheckSetSchema,
+  DailyChecksReadSchema,
   zodErrorToExecutionResult,
   type ExecutionResult,
 } from '../validations/schemas';
@@ -35,6 +37,7 @@ import {
   respondToRoutineSlot,
   rehearseRoutineSlot,
 } from './routine';
+import { setDailyCheck, readDailyChecks } from './checks';
 
 export type ManageProgramAction = 'init' | 'read' | 'update_week' | 'upsert_habit' | 'retire_habit';
 
@@ -219,6 +222,47 @@ export async function handleManageRoutineSlots(
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: error?.message || 'Error inesperado en manage_routine_slots',
+    };
+  }
+}
+
+export type ManageDailyChecksAction = 'set' | 'read';
+
+/**
+ * `manage_daily_checks` (US3): registro diario de hábitos. `set` valida la forma con
+ * DailyCheckSetSchema y delega en lib/execution/checks.ts las reglas que necesitan la base
+ * (DIA_CERRADO, FECHA_FUTURA, HABITO_INACTIVO). `read` devuelve, por día, sus checks y la
+ * evaluación de "día cumplido" (evaluateDay).
+ */
+export async function handleManageDailyChecks(
+  action: ManageDailyChecksAction,
+  data?: unknown,
+  now: Date = new Date()
+): Promise<ExecutionResult> {
+  try {
+    switch (action) {
+      case 'set': {
+        const parsed = DailyCheckSetSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await setDailyCheck(parsed.data, now);
+      }
+      case 'read': {
+        const parsed = DailyChecksReadSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await readDailyChecks(parsed.data, now);
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para manage_daily_checks: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: error?.message || 'Error inesperado en manage_daily_checks',
     };
   }
 }

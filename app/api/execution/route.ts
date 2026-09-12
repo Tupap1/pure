@@ -4,6 +4,8 @@ import {
   type ManageTandasAction,
   handleManageRoutineSlots,
   type ManageRoutineSlotsAction,
+  handleManageDailyChecks,
+  type ManageDailyChecksAction,
 } from '@/lib/execution/handlers';
 
 // Ruta delgada del Módulo de Ejecución (contracts/web-api.md): valida contra una lista blanca y
@@ -13,12 +15,12 @@ import {
 // contra una acción que la web no debería poder disparar por sí sola — por ejemplo,
 // manage_program:init, reservado al asistente de IA conectado (FR-040).
 //
-// Cada historia agrega aquí solo su propia entrada cuando su handler exista (US3 sumará
-// manage_daily_checks:set, etc.): una combinación que no está en este mapa se rechaza sin
-// necesidad de que su handler exista todavía.
+// Cada historia agrega aquí solo su propia entrada cuando su handler exista: una combinación
+// que no está en este mapa se rechaza sin necesidad de que su handler exista todavía.
 const ALLOWED_ACTIONS: Record<string, readonly string[]> = {
   manage_tandas: ['start', 'finish', 'interrupt', 'current', 'update'],
   manage_routine_slots: ['respond'],
+  manage_daily_checks: ['set'],
 };
 
 async function dispatch(tool: string, action: string, data: unknown) {
@@ -27,6 +29,8 @@ async function dispatch(tool: string, action: string, data: unknown) {
       return handleManageTandas(action as ManageTandasAction, data);
     case 'manage_routine_slots':
       return handleManageRoutineSlots(action as ManageRoutineSlotsAction, data);
+    case 'manage_daily_checks':
+      return handleManageDailyChecks(action as ManageDailyChecksAction, data);
     default:
       // No debería alcanzarse: `tool` ya pasó el filtro de ALLOWED_ACTIONS.
       throw new Error(`Herramienta no soportada: ${tool}`);
