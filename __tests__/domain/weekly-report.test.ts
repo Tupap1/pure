@@ -37,7 +37,12 @@ describe('[001] ZeptoMail adapter', () => {
     } as Response);
 
     const mailer = createZeptoMailer();
-    await mailer.send('recipient@example.com', 'Recipient Name', 'Test Subject', 'Test body');
+    await mailer.send({
+      to: 'recipient@example.com',
+      toName: 'Recipient Name',
+      subject: 'Test Subject',
+      text: 'Test body',
+    });
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const call = fetchMock.mock.calls[0];
@@ -88,7 +93,12 @@ describe('[001] ZeptoMail adapter', () => {
 
     const mailer = createZeptoMailer();
     await expect(
-      mailer.send('recipient@example.com', 'Recipient', 'Subject', 'Body')
+      mailer.send({
+        to: 'recipient@example.com',
+        toName: 'Recipient',
+        subject: 'Subject',
+        text: 'Body',
+      })
     ).resolves.not.toThrow();
   });
 
@@ -112,7 +122,12 @@ describe('[001] ZeptoMail adapter', () => {
 
     const mailer = createZeptoMailer();
     await expect(
-      mailer.send('bad-email', 'Recipient', 'Subject', 'Body')
+      mailer.send({
+        to: 'bad-email',
+        toName: 'Recipient',
+        subject: 'Subject',
+        text: 'Body',
+      })
     ).rejects.toThrow(/400.*INVALID_EMAIL.*Invalid email address/);
   });
 
@@ -127,7 +142,12 @@ describe('[001] ZeptoMail adapter', () => {
 
     const mailer = createZeptoMailer();
     await expect(
-      mailer.send('recipient@example.com', 'Recipient', 'Subject', 'Body')
+      mailer.send({
+        to: 'recipient@example.com',
+        toName: 'Recipient',
+        subject: 'Subject',
+        text: 'Body',
+      })
     ).rejects.toThrow(/Network error|fetch failed/i);
   });
 
@@ -138,9 +158,96 @@ describe('[001] ZeptoMail adapter', () => {
     process.env.REPORT_FROM_NAME = 'Pure';
     process.env.REPORT_REPLY_TO = 'andres@example.com';
 
+    fetchMock.mockResolvedValueOnce({
+      status: 201,
+      ok: true,
+    } as Response);
+
     const mailer = createZeptoMailer();
     await expect(
-      mailer.send('recipient@example.com', 'Recipient', 'Subject', 'Body')
+      mailer.send({
+        to: 'recipient@example.com',
+        toName: 'Recipient',
+        subject: 'Subject',
+        text: 'Body',
+      })
     ).rejects.toThrow(/ZEPTOMAIL_TOKEN|token|configured/i);
+  });
+
+  it('falla sin REPORT_FROM configurado', async () => {
+    delete process.env.REPORT_FROM;
+    process.env.ZEPTOMAIL_TOKEN = 'token-de-prueba';
+    process.env.ZEPTOMAIL_URL = 'https://api.zeptomail.com/v1.1/email';
+    process.env.REPORT_FROM_NAME = 'Pure';
+    process.env.REPORT_REPLY_TO = 'andres@example.com';
+
+    fetchMock.mockResolvedValueOnce({
+      status: 201,
+      ok: true,
+    } as Response);
+
+    const mailer = createZeptoMailer();
+    await expect(
+      mailer.send({
+        to: 'recipient@example.com',
+        toName: 'Recipient',
+        subject: 'Subject',
+        text: 'Body',
+      })
+    ).rejects.toThrow(/REPORT_FROM|from|configured/i);
+  });
+
+  it('falla sin REPORT_REPLY_TO configurado', async () => {
+    delete process.env.REPORT_REPLY_TO;
+    process.env.ZEPTOMAIL_TOKEN = 'token-de-prueba';
+    process.env.ZEPTOMAIL_URL = 'https://api.zeptomail.com/v1.1/email';
+    process.env.REPORT_FROM = 'report@btw-one.com';
+    process.env.REPORT_FROM_NAME = 'Pure';
+
+    fetchMock.mockResolvedValueOnce({
+      status: 201,
+      ok: true,
+    } as Response);
+
+    const mailer = createZeptoMailer();
+    await expect(
+      mailer.send({
+        to: 'recipient@example.com',
+        toName: 'Recipient',
+        subject: 'Subject',
+        text: 'Body',
+      })
+    ).rejects.toThrow(/REPORT_REPLY_TO|reply_to|configured/i);
+  });
+
+  it('lee variables de entorno en el momento del envío, no al crear el mailer', async () => {
+    process.env.ZEPTOMAIL_TOKEN = 'token-de-prueba';
+    process.env.ZEPTOMAIL_URL = 'https://api.zeptomail.com/v1.1/email';
+    process.env.REPORT_FROM = 'original@btw-one.com';
+    process.env.REPORT_FROM_NAME = 'Pure';
+    process.env.REPORT_REPLY_TO = 'andres@example.com';
+
+    fetchMock.mockResolvedValueOnce({
+      status: 201,
+      ok: true,
+    } as Response);
+
+    const mailer = createZeptoMailer();
+
+    // Cambiar REPORT_FROM después de crear el mailer
+    process.env.REPORT_FROM = 'updated@btw-one.com';
+
+    await mailer.send({
+      to: 'recipient@example.com',
+      toName: 'Recipient',
+      subject: 'Subject',
+      text: 'Body',
+    });
+
+    // Verificar que se usó el valor actualizado
+    const call = fetchMock.mock.calls[0];
+    const options = call[1] as RequestInit;
+    const body = JSON.parse(options.body as string);
+    expect(body.from.address).toBe('updated@btw-one.com');
   });
 });
