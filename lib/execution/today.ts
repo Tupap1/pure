@@ -59,8 +59,11 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
       }
     : null;
 
+  // FR-018 ("tandas hechas hoy") y evaluateDay coinciden en qué cuenta como "hecha": solo
+  // status='completada'. Una tanda interrumpida o todavía en curso no se acredita como estudiada
+  // (auditoría US2/US3): antes, tandas_today contaba las tres, así que el pie podía decir "1
+  // tanda hoy" apenas se tocaba "Empezar tanda", sin haber estudiado un minuto.
   const readRes = await readTandas({ from: dateKey, to: dateKey }, now);
-  const tandasToday = readRes.status === 'success' ? readRes.data!.tandas.length : 0;
   const completedToday =
     readRes.status === 'success' ? readRes.data!.tandas.filter((t) => t.status === 'completada').length : 0;
 
@@ -95,7 +98,7 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
       running_tanda,
       trigger,
       pending_checks,
-      tandas_today: tandasToday,
+      tandas_today: completedToday,
       day_fulfilled: evaluation ? evaluation.fulfilled : null,
     },
   };
