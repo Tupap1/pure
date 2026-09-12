@@ -203,13 +203,13 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Tests for User Story 2 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T027 [P] [US2] TEST US2-AS1…US2-AS5 y US2-AS10 en __tests__/domain/execution-trigger.test.ts (función pura `resolveCurrentTrigger`):
+- [X] T027 [P] [US2] TEST US2-AS1…US2-AS5 y US2-AS10 en __tests__/domain/execution-trigger.test.ts (función pura `resolveCurrentTrigger`):
   - devuelve un solo disparador;
   - gana el ancla más reciente ≤ ahora;
   - excluye los futuros, los ya respondidos hoy y los de más de 240 min;
   - `tras_clase` usa el `end_time` del horario;
   - con ancla `2026-08-01`, un slot `sabado_b` no aparece en sábado A.
-- [ ] T028 [P] [US2] TEST US2-AS6…US2-AS9 en __tests__/mcp/execution-routine.test.ts (pg-mem):
+- [X] T028 [P] [US2] TEST US2-AS6…US2-AS9 en __tests__/mcp/execution-routine.test.ts (pg-mem):
   - `create` con `default_tandas` → `SOBRE_ESPECIFICACION`;
   - `tras_clase` copia `days_of_week` y `periodicity` del horario;
   - `start` con `routine_slot_id` registra el outcome `hecho`, liga la tanda y hereda `subject_id`;
@@ -220,17 +220,17 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Implementation for User Story 2
 
-- [ ] T029 [US2] IMPL `resolveCurrentTrigger` en lib/domain/execution.ts:
+- [X] T029 [US2] IMPL `resolveCurrentTrigger` en lib/domain/execution.ts:
   - paridad con `occursOnSabadoVariant` y `getSabadoTypeForDate` (lib/algorithms/conflict-detector.ts:31,73);
   - ancla de la universidad de la materia; si no hay, la primera con alternancia; si no, `DEFAULT_SABADO_A_ANCHOR`;
   - ventana de `TRIGGER_WINDOW_MINUTES`.
-- [ ] T030 [US2] IMPL lib/execution/routine.ts y el registro de `manage_routine_slots`:
+- [X] T030 [US2] IMPL lib/execution/routine.ts y el registro de `manage_routine_slots`:
   - create y update estrictos;
   - `respond` idempotente por día;
   - `rehearse` idempotente por semana;
   - efectos sobre checks y tandas;
   - `handleManageRoutineSlots`, registro en mcp-server/index.ts y conteo de `TOOLS_LIST` +1.
-- [ ] T031 [US2] IMPL Disparador en components/dashboards/TodayDashboard.tsx, lib/execution/today.ts y app/api/execution/route.ts:
+- [X] T031 [US2] IMPL Disparador en components/dashboards/TodayDashboard.tsx, lib/execution/today.ts y app/api/execution/route.ts:
   - el disparador vigente en `getToday`;
   - bloque en Hoy: "Si {cue_text}," / "entonces {action_text}."; [Empezar tanda] + [No] para estudio; [Hecho] + [No] para hábito u otro; "Empezar tanda" siempre a un toque;
   - `manage_routine_slots:respond` en la lista blanca.
@@ -248,32 +248,32 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Tests for User Story 3 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T033 [P] [US3] TEST US3-AS1…US3-AS4 y US3-AS6 en __tests__/domain/execution-day.test.ts (funciones puras `evaluateDay` e `isHabitActive`):
+- [X] T033 [P] [US3] TEST US3-AS1…US3-AS4 y US3-AS6 en __tests__/domain/execution-day.test.ts (funciones puras `evaluateDay` e `isHabitActive`):
   - día cumplido;
   - un check ausente → no cumplido;
   - `na` no rompe el día;
   - mínimo sin deuda;
   - un hábito antes de su `started_on` no se exige;
   - fuera del programa → `null`.
-- [ ] T034 [P] [US3] TEST US3-AS5 en __tests__/mcp/execution-checks.test.ts (pg-mem):
+- [X] T034 [P] [US3] TEST US3-AS5 en __tests__/mcp/execution-checks.test.ts (pg-mem):
   - un check de ayer después de las 03:00 → `DIA_CERRADO`;
   - una fecha futura → `FECHA_FUTURA`;
   - un hábito inactivo → `HABITO_INACTIVO`;
   - upsert idempotente por `${date}:${habit_id}`.
-- [ ] T035 [P] [US3] TEST US3-AS8 en __tests__/domain/today-view.test.ts:
+- [X] T035 [P] [US3] TEST US3-AS8 en __tests__/domain/today-view.test.ts:
   - el modelo de vista lista solo los hábitos sin responder;
   - el pie "N tandas hoy" aparece solo con ≥ 1 tanda, y "Día cumplido" cuando aplica;
   - nunca expone el mínimo faltante, los minutos totales, proyecciones ni un selector de modo de trabajo (FR-008, FR-018).
 
 ### Implementation for User Story 3
 
-- [ ] T036 [US3] IMPL `isHabitActive` y `evaluateDay` en lib/domain/execution.ts.
-- [ ] T037 [US3] IMPL lib/execution/checks.ts y el registro de `manage_daily_checks`:
+- [X] T036 [US3] IMPL `isHabitActive` y `evaluateDay` en lib/domain/execution.ts.
+- [X] T037 [US3] IMPL lib/execution/checks.ts y el registro de `manage_daily_checks`:
   - `setDailyCheck`: se acepta hasta las 03:00 del día siguiente, exige un hábito activo, "`note` ≤ 200";
   - `handleManageDailyChecks`: `set`, y `read` con la evaluación de cada día;
   - registro en mcp-server/index.ts y conteo de `TOOLS_LIST` +1 (total 25);
   - checks pendientes y `day_fulfilled` en `getToday` (lib/execution/today.ts).
-- [ ] T038 [US3] IMPL Hábitos en components/dashboards/TodayDashboard.tsx y app/api/execution/route.ts:
+- [X] T038 [US3] IMPL Hábitos en components/dashboards/TodayDashboard.tsx y app/api/execution/route.ts:
   - filas de checks Sí/No que desaparecen al responder, y el pie de la pantalla;
   - `manage_daily_checks:set` en la lista blanca.
 - [ ] T039 [US3] VERIFY quickstart US3 en specs/001-modulo-ejecucion/quickstart.md.
