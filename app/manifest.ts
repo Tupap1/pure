@@ -17,19 +17,19 @@ export default function manifest(): ManifestWithId {
     theme_color: '#191919',
     icons: [
       {
-        src: '/icons/192',
+        src: '/icons/icon-192.png',
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any',
       },
       {
-        src: '/icons/192-maskable',
+        src: '/icons/icon-192-maskable.png',
         sizes: '192x192',
         type: 'image/png',
         purpose: 'maskable',
       },
       {
-        src: '/icons/512',
+        src: '/icons/icon-512.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any',

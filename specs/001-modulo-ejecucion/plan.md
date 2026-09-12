@@ -157,7 +157,7 @@ mcp-server/
 
 app/
 ├── page.tsx · layout.tsx          # case 'hoy' / default; manifest y themeColor
-├── manifest.ts · apple-icon.tsx · icons/[size]/route.tsx   # US4
+├── manifest.ts · apple-icon.png   # US4
 └── api/
     ├── execution/route.ts · execution/today/route.ts · execution/report/route.ts
     └── push/public-key/route.ts · push/subscribe/route.ts · push/test/route.ts
@@ -171,6 +171,7 @@ components/
 └── ui/SubjectEvaluation.tsx       # tabla de proyección (US8)
 
 public/sw.js                       # push + notificationclick, sin caché (US7)
+public/icons/icon-*.png            # íconos PWA 192/512/maskable, generados por scripts/generate-icons.js (US4)
 
 __tests__/                         # según la matriz de quickstart.md
 ├── build/   domain/   db/   validations/   mcp/   api/
