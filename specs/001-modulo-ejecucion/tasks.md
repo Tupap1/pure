@@ -298,6 +298,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - manifest e íconos de 180, 192 y 512 con `ImageResponse` de `next/og`, monocromos según DESIGN.md;
   - en app/layout.tsx, quitar `manifest: '/manifest.json'` y cambiar `viewport.themeColor` de `'#05080e'` a `'#191919'`;
   - borrar public/manifest.json.
+  - **Nota posterior**: los íconos se reemplazaron después por PNG estáticos (`app/apple-icon.png` y `public/icons/icon-192.png`, `icon-512.png`, `icon-192-maskable.png`, generados por `scripts/generate-icons.js`) porque `ImageResponse` de `next/og` revienta en Windows con `TypeError: Invalid URL` al usar `path.join` con barras invertidas en una URL `file://`.
 - [ ] T042 [US4] MANUAL Andres, en este orden, para el hostname que apunta al servicio `pure-web` de docker-compose.yml:
   - crear la aplicación de Cloudflare Access para pure.btw-one.com (política con su correo, sesión de 30 días);
   - después, crear el hostname del túnel hacia `pure-web:3000`;
