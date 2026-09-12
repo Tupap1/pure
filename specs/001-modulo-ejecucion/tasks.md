@@ -131,7 +131,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 > Convertir los `it.todo` de US1 en tests reales, correr `npx vitest run <archivo>` y confirmar
 > que fallan por la razón esperada. Commit: `test(001): US1 escenarios en rojo`.
 
-- [ ] T015 [P] [US1] TEST US1-AS1…US1-AS7 en __tests__/mcp/execution-tandas.test.ts (`createTestDb()` + `vi.setSystemTime`):
+- [X] T015 [P] [US1] TEST US1-AS1…US1-AS7 en __tests__/mcp/execution-tandas.test.ts (`createTestDb()` + `vi.setSystemTime`):
   - `start` fija `started_at` con el reloj del servidor y `ends_at` a +10 min;
   - un segundo `start` → `TANDA_EN_CURSO`;
   - a +10 min, cualquier operación deja la tanda `completada` con `actual_minutes=10` y `running_lock` NULL;
@@ -141,44 +141,44 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - un inicio a las 04:55Z tiene `local_date` del día anterior;
   - `start` con `started_at` en `data` → `DATOS_INVALIDOS`;
   - `finish` o `interrupt` con un `id` inexistente → `NO_ENCONTRADO`.
-- [ ] T016 [P] [US1] TEST US1-AS8 en __tests__/domain/today-view.test.ts:
+- [X] T016 [P] [US1] TEST US1-AS8 en __tests__/domain/today-view.test.ts:
   - `secondsLeft` usa `server_now` y el offset `server_now − Date.now()` aunque el reloj local esté desfasado ±5 min;
   - `formatCountdown` devuelve `mm:ss`;
   - sin datos del servidor, el modelo expone el estado "sin conexión" con acción de reintento (caso borde de spec.md).
-- [ ] T017 [P] [US1] TEST US1-AS9 en __tests__/domain/navigation.test.ts:
+- [X] T017 [P] [US1] TEST US1-AS9 en __tests__/domain/navigation.test.ts:
   - `HOME_TAB === 'hoy'`;
   - `'hoy'` es el primer elemento de `NAV_ITEMS`;
   - los ítems móviles (`mobile !== false`) no incluyen `'config'` (FR-041).
-- [ ] T018 [P] [US1] TEST Rutas en __tests__/api/execution-routes.test.ts:
+- [X] T018 [P] [US1] TEST Rutas en __tests__/api/execution-routes.test.ts:
   - `POST /api/execution` rechaza con 400 `DATOS_INVALIDOS` lo que está fuera de la lista blanca (por ejemplo `manage_program:init` o `manage_weekly_report:set_partner`);
   - un error del handler devuelve 400 conservando `code`;
   - `GET /api/execution/today` exporta `dynamic = 'force-dynamic'` y devuelve el payload de `get_today`.
 
 ### Implementation for User Story 1
 
-- [ ] T019 [US1] IMPL lib/execution/tandas.ts: `finalizeElapsed(now)`, `startTanda`, `finishTanda`, `interruptTanda`, `updateTanda`, `readTandas` y `currentTanda`, según las reglas US1 de specs/001-modulo-ejecucion/plan.md:
+- [X] T019 [US1] IMPL lib/execution/tandas.ts: `finalizeElapsed(now)`, `startTanda`, `finishTanda`, `interruptTanda`, `updateTanda`, `readTandas` y `currentTanda`, según las reglas US1 de specs/001-modulo-ejecucion/plan.md:
   - `running_lock='running'` al iniciar y NULL al cerrar;
   - `locked_at` = 03:00 local del día siguiente;
   - `finish` exige transcurrido ≥ planeado − 30 s;
   - `interrupt_reason` 1–140.
-- [ ] T020 [US1] IMPL `handleManageTandas` en lib/execution/handlers.ts y su registro:
+- [X] T020 [US1] IMPL `handleManageTandas` en lib/execution/handlers.ts y su registro:
   - `manage_tandas` en mcp-server/index.ts (`TOOLS_LIST` + `mcpServer.tool`);
   - re-export en mcp-server/tools-handler.ts;
   - conteo de `TOOLS_LIST` +1 en los dos tests.
-- [ ] T021 [US1] IMPL lib/execution/today.ts:
+- [X] T021 [US1] IMPL lib/execution/today.ts:
   - `getToday(now)`, en su parte de tanda: `server_now`, `date`, `week`, `running_tanda`, `tandas_today`;
   - `handleGetToday` y registro de `get_today` en mcp-server/index.ts;
   - conteo de `TOOLS_LIST` +1.
-- [ ] T022 [P] [US1] IMPL lib/execution/today-view.ts: modelo de vista puro (`secondsLeft`, `formatCountdown`, `clockOffset`, estado sin conexión) según specs/001-modulo-ejecucion/contracts/mcp-tools.md (get_today).
-- [ ] T023 [US1] IMPL Rutas app/api/execution/route.ts y app/api/execution/today/route.ts:
+- [X] T022 [P] [US1] IMPL lib/execution/today-view.ts: modelo de vista puro (`secondsLeft`, `formatCountdown`, `clockOffset`, estado sin conexión) según specs/001-modulo-ejecucion/contracts/mcp-tools.md (get_today).
+- [X] T023 [US1] IMPL Rutas app/api/execution/route.ts y app/api/execution/today/route.ts:
   - POST con la lista blanca de specs/001-modulo-ejecucion/contracts/web-api.md, try/catch y 400/500;
   - GET con `export const dynamic = 'force-dynamic'`.
-- [ ] T024 [P] [US1] IMPL Navegación (FR-041) en lib/navigation.ts, lib/hooks/useNavigation.tsx, components/layout/BottomNav.tsx y components/layout/Header.tsx:
+- [X] T024 [P] [US1] IMPL Navegación (FR-041) en lib/navigation.ts, lib/hooks/useNavigation.tsx, components/layout/BottomNav.tsx y components/layout/Header.tsx:
   - lib/navigation.ts: `'hoy'` como primer `DashboardTab`, con un ícono lucide monocromo; `HOME_TAB`; flag `mobile?: boolean` con `mobile: false` en `config`;
   - lib/hooks/useNavigation.tsx: vista inicial y fallback de `goBack` → `HOME_TAB` (líneas 38 y 48);
   - components/layout/BottomNav.tsx: filtrar por `mobile !== false`; estado activo en gris sutil según DESIGN.md, en lugar del cian de las líneas 30–34;
   - components/layout/Header.tsx: engranaje `md:hidden` de 44 px → `selectTab('config')`.
-- [ ] T025 [US1] IMPL lib/hooks/useToday.ts, components/dashboards/TodayDashboard.tsx y app/page.tsx:
+- [X] T025 [US1] IMPL lib/hooks/useToday.ts, components/dashboards/TodayDashboard.tsx y app/page.tsx:
   - useToday.ts: fetch a /api/execution/today; offset de reloj con `server_now`; refresco en `visibilitychange` y cada 30 s; acciones start, finish, interrupt y tagSubject vía `POST /api/execution`;
   - TodayDashboard.tsx con tanda en curso: timer `mm:ss` en IBM Plex Mono con `tabular-nums`; "hasta las HH:MM"; botón ghost "Interrumpir" con input de razón ≤ 140;
   - TodayDashboard.tsx sin tanda: "Empezar tanda" primario, a un toque;
