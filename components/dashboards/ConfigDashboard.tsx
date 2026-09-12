@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usePureData } from '@/lib/hooks/usePureData';
+import { usePushNotifications, type PushState } from '@/lib/hooks/usePushNotifications';
 import { UniversityEntity, ProfessorEntity, SubjectEntity, ScheduleEntity } from '@/lib/db/dexie-schema';
 import {
   saveUniversity, deleteUniversity,
@@ -30,11 +31,22 @@ import {
   GraduationCap,
   BookOpen,
   Calendar,
-  RotateCcw
+  RotateCcw,
+  Bell
 } from 'lucide-react';
+
+const PUSH_STATE_LABELS: Record<PushState, string> = {
+  no_soportado: 'Este navegador no admite avisos push.',
+  instalar_en_inicio: 'Para recibir avisos en iPhone, agrega Pure a la pantalla de inicio y ábrelo desde ahí.',
+  denegado: 'Los avisos están bloqueados. Actívalos desde los ajustes del sistema para este sitio.',
+  activable: 'Los avisos están apagados.',
+  activo: 'Los avisos están activos.',
+};
 
 export const ConfigDashboard: React.FC = () => {
   const { isLoaded, universities, professors, subjects, schedules } = usePureData();
+  const { state: pushState, isBusy: pushBusy, subscribe: subscribeToPush, unsubscribe: unsubscribeFromPush, sendTest: sendTestPush } =
+    usePushNotifications();
 
   // Add Modal States
   const [isAddUniOpen, setIsAddUniOpen] = useState(false);
@@ -676,6 +688,34 @@ export const ConfigDashboard: React.FC = () => {
             })}
           </div>
         )}
+      </div>
+
+      {/* 5. Notificaciones Section (US7) */}
+      <div className="space-y-4">
+        <h3 className="text-base font-heading font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <Bell className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0" />
+          Notificaciones
+        </h3>
+        <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-sm text-slate-700 dark:text-slate-300">{PUSH_STATE_LABELS[pushState]}</p>
+          <div className="flex gap-2 shrink-0">
+            {pushState === 'activable' && (
+              <Button variant="primary" size="sm" onClick={() => subscribeToPush()} disabled={pushBusy} className="min-h-[44px]">
+                Activar avisos
+              </Button>
+            )}
+            {pushState === 'activo' && (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => sendTestPush()} disabled={pushBusy} className="min-h-[44px]">
+                  Enviar prueba
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => unsubscribeFromPush()} disabled={pushBusy} className="min-h-[44px]">
+                  Desactivar
+                </Button>
+              </>
+            )}
+          </div>
+        </Card>
       </div>
 
       {/* Modal Add / Edit University */}

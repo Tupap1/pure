@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useToday } from '@/lib/hooks/useToday';
 import { usePureData } from '@/lib/hooks/usePureData';
 import { useWeeklyReport } from '@/lib/hooks/useWeeklyReport';
+import { usePushNotifications } from '@/lib/hooks/usePushNotifications';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -42,6 +43,7 @@ export const TodayDashboard: React.FC = () => {
   } = useToday();
   const { subjects } = usePureData();
   const { report, setNote } = useWeeklyReport();
+  const { state: pushState, subscribe: subscribeToPush } = usePushNotifications();
 
   const [isStarting, setIsStarting] = useState(false);
   const [interruptOpen, setInterruptOpen] = useState(false);
@@ -135,6 +137,15 @@ export const TodayDashboard: React.FC = () => {
             <span className="sr-only" aria-live="polite">
               {minutesLeft != null ? `Quedan ${minutesLeft} minuto${minutesLeft === 1 ? '' : 's'} de la tanda.` : ''}
             </span>
+
+            {pushState === 'activable' && (
+              <button
+                onClick={() => subscribeToPush()}
+                className="text-xs text-slate-500 dark:text-slate-400 underline underline-offset-2 hover:text-slate-700 dark:hover:text-slate-200 min-h-[44px]"
+              >
+                Avísame al terminar
+              </button>
+            )}
 
             {!interruptOpen ? (
               <Button variant="ghost" size="sm" onClick={() => setInterruptOpen(true)} className="min-h-[44px]">
