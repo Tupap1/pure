@@ -61,12 +61,12 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 **⚠️ CRITICAL**: ninguna historia empieza antes de terminar esta fase
 
-- [ ] T004 TEST Test de trazabilidad en __tests__/build/spec-traceability.test.ts:
+- [X] T004 TEST Test de trazabilidad en __tests__/build/spec-traceability.test.ts:
   - leer specs/001-modulo-ejecucion/spec.md y extraer los IDs `US\d+-AS\d+`, excluyendo los marcados `[manual]` (US4-AS1 y US4-AS2);
   - exigir que cada ID aparezca en algún `it(` o `it.todo(` bajo __tests__/;
   - exigir que ningún test cite un ID que no exista en la spec;
   - confirmar que falla (RED) porque todavía no hay tests.
-- [ ] T005 Crear los placeholders `it.todo('USn-ASm · <resumen>')` para los 59 escenarios no manuales en los archivos de __tests__/ que lista la matriz de specs/001-modulo-ejecucion/quickstart.md:
+- [X] T005 Crear los placeholders `it.todo('USn-ASm · <resumen>')` para los 59 escenarios no manuales en los archivos de __tests__/ que lista la matriz de specs/001-modulo-ejecucion/quickstart.md:
   - un archivo por fila de la matriz;
   - cada archivo con `describe('[001] USn — <historia>')`;
   - T004 debe quedar en verde sin romper `npm run test:all`.
