@@ -57,6 +57,7 @@ import { getCompliance } from './compliance';
 import { buildReportPayload, deriveRiskSection, renderReportText, type BuildReportPayloadInput } from './report';
 import { runExecutionTick, attemptSend } from './tick';
 import { createZeptoMailer } from './mailer';
+import { createWebPusher } from './push';
 import { addDays, localParts } from './time';
 import {
   createTask,
@@ -447,7 +448,10 @@ async function sendWeeklyReportManually(programWeekId: string, now: Date): Promi
     return { status: 'error', code: 'YA_ENVIADO', message: 'Este reporte ya se envió.' };
   }
 
-  const outcome = await attemptSend(report, now, createZeptoMailer());
+  // El mismo Pusher real que usa el tick (lib/execution/tick.ts:runExecutionTick): un envío
+  // forzado a mano que agota los 3 intentos también es "un reporte que pasa a fallido"
+  // (contracts/notifications.md), y debe avisar igual que si lo hubiera agotado el tick.
+  const outcome = await attemptSend(report, now, createZeptoMailer(), createWebPusher());
   if (outcome === 'skipped') {
     return {
       status: 'error',
