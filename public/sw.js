@@ -1,14 +1,26 @@
 // Service worker para avisos push de PURE OS
 //
-// Este worker maneja dos eventos únicamente:
-// 1. Push: recibe el aviso y lo muestra como notificación del sistema.
-// 2. Notificationclick: maneja el clic en la notificación.
+// Este worker maneja cuatro eventos:
+// 1. Install: se activa inmediatamente sin esperar a que se cierren pestañas.
+// 2. Activate: toma control de todas las ventanas abiertas.
+// 3. Push: recibe el aviso y lo muestra como notificación del sistema.
+// 4. Notificationclick: maneja el clic en la notificación.
 //
 // IMPORTANTE: El evento push SIEMPRE llama a showNotification, incluso si el
 // payload es vacío, inválido o no es JSON. Esto es crítico en iOS: si un evento
 // push no genera notificación visible, el sistema de Apple revoca la suscripción
 // automáticamente, y Andres dejaría de recibir avisos sin enterarse. Usamos valores
 // de respaldo para el título y el cuerpo cuando faltan o el JSON no es válido.
+
+// Evento install: activarse inmediatamente sin esperar a que las otras instancias se cierren.
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+// Evento activate: tomar el control de todas las ventanas, incluso las abiertas con versiones anteriores.
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
+});
 
 self.addEventListener('push', (event) => {
   // Intentar extraer el payload JSON del evento push.
@@ -64,11 +76,12 @@ self.addEventListener('notificationclick', (event) => {
         if (windowClients.length > 0) {
           const client = windowClients[0];
           // Intentar navegar; si la ventana está en otro origen, navigate() falla,
-          // pero seguimos adelante enfocando la ventana.
+          // pero seguimos adelante enfocando la ventana. Encadenar la promesa y atrapar errores.
+          let navigatePromise = Promise.resolve();
           if (client.navigate && typeof client.navigate === 'function') {
-            client.navigate(url);
+            navigatePromise = client.navigate(url).catch(() => {});
           }
-          return client.focus();
+          return navigatePromise.then(() => client.focus());
         }
         // No hay ventana abierta; abrir una nueva en la URL especificada.
         return clients.openWindow(url);
