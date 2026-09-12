@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { createTestDb, TestDbHarness } from '../helpers/test-db';
-import { handleManageTandas } from '../../lib/execution/handlers';
+import { handleManageTandas, handleGetToday } from '../../lib/execution/handlers';
 import { handleManageUniversities, handleManageSubjects } from '../../mcp-server/tools-handler';
 
 // US1 — Tanda de 10 minutos en un toque (FR-001..FR-008). manage_tandas es la herramienta MCP
@@ -155,5 +155,35 @@ describe('[001] US1 — Tanda de 10 minutos en un toque', () => {
     const interruptRes = await handleManageTandas('interrupt', { id: 'no-existe', interrupt_reason: 'motivo' });
     expect(interruptRes.status).toBe('error');
     if (interruptRes.status === 'error') expect(interruptRes.code).toBe('NO_ENCONTRADO');
+  });
+
+  it('get_today: tandas_today solo cuenta las tandas completadas, no las interrumpidas ni la que está en curso', async () => {
+    vi.setSystemTime(new Date('2026-09-14T15:00:00.000Z')); // 10:00 Bogotá
+    const a = await handleManageTandas('start', {});
+    expect(a.status).toBe('success');
+
+    // Pasado el tiempo planeado de A: al pedir otra, finalizeElapsed la cierra completada y esta
+    // arranca como la nueva tanda en curso.
+    vi.setSystemTime(new Date('2026-09-14T15:10:01.000Z'));
+    const b = await handleManageTandas('start', {});
+    expect(b.status).toBe('success');
+    if (b.status !== 'success') return;
+    const tandaB = (b.data as any).tanda.id;
+
+    vi.setSystemTime(new Date('2026-09-14T15:13:00.000Z')); // ~3 min después de empezar B
+    const interrupted = await handleManageTandas('interrupt', { id: tandaB, interrupt_reason: 'me llamaron' });
+    expect(interrupted.status).toBe('success');
+
+    const c = await handleManageTandas('start', {}); // queda en curso
+    expect(c.status).toBe('success');
+
+    vi.setSystemTime(new Date('2026-09-14T15:15:00.000Z')); // C todavía no cumple sus 10 minutos
+    const today = await handleGetToday({}, new Date('2026-09-14T15:15:00.000Z'));
+    expect(today.status).toBe('success');
+    if (today.status === 'success') {
+      // Del día quedan 3 tandas (completada, interrumpida, en_curso); "N tandas hoy" solo debe
+      // contar la que de verdad se hizo, para no acreditar trabajo que no ocurrió.
+      expect((today.data as any).tandas_today).toBe(1);
+    }
   });
 });
