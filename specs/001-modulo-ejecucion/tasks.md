@@ -477,7 +477,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Tests for User Story 9 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T069 [P] [US9] TEST US9-AS1…US9-AS3 en __tests__/mcp/plan-views.test.ts (pg-mem):
+- [X] T069 [P] [US9] TEST US9-AS1…US9-AS3 en __tests__/mcp/plan-views.test.ts (pg-mem):
   - `plan_week open_view` es libre 2 veces por semana;
   - la 3.ª apertura sin razón → `RAZON_REQUERIDA`; con razón queda registrada (`was_gated=true`) y contada en el payload del reporte ("Aperturas del plan: N");
   - la vista de semana devuelve los disparadores con su resultado y las tandas por día;
@@ -485,7 +485,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Implementation for User Story 9
 
-- [ ] T070 [US9] IMPL components/dashboards/WeekView.tsx, components/dashboards/DeliverablesDashboard.tsx y lib/execution/report.ts:
+- [X] T070 [US9] IMPL components/dashboards/WeekView.tsx, components/dashboards/DeliverablesDashboard.tsx y lib/execution/report.ts:
   - WeekView: rejilla sin gráficas con los disparadores (hecho/no) y las tandas por día, detrás de la compuerta `open_view`;
   - `plan_week:open_view` en la lista blanca de app/api/execution/route.ts;
   - alertas en Agenda;

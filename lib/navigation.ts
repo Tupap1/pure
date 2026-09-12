@@ -6,6 +6,7 @@ import {
   CheckSquare,
   Video,
   Settings,
+  CalendarRange,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -16,6 +17,7 @@ export type DashboardTab =
   | 'schedule'
   | 'deliverables'
   | 'sessions'
+  | 'semana'
   | 'config';
 
 /** FR-041: Hoy es la primera pantalla al abrir Pure y el primer destino de la navegación. */
@@ -48,6 +50,10 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'schedule', label: 'Horarios', icon: Calendar },
   { id: 'deliverables', label: 'Agenda', icon: CheckSquare },
   { id: 'sessions', label: 'Clases', icon: Video },
+  // US9: consulta deliberada (2 aperturas libres por semana, FR-037), no algo que se abra a
+  // diario — igual que Configuración, sale de la barra inferior (que ya tenía 6 destinos) y se
+  // abre en su lugar desde un enlace en Agenda (components/dashboards/DeliverablesDashboard.tsx).
+  { id: 'semana', label: 'Semana', icon: CalendarRange, mobile: false },
   { id: 'config', label: 'Configuración', icon: Settings, mobile: false },
 ];
 
