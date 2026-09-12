@@ -1,0 +1,506 @@
+// Repositorio Postgres del Módulo de Ejecución. Todas las tablas de este archivo son
+// solo-Postgres (no pasan por Dexie ni por /api/sync): los handlers de lib/execution/* son su
+// única vía de lectura/escritura, igual que el resto de entidades de lib/db/repository-pg.ts.
+//
+// Mismo patrón que lib/db/repository-pg.ts: INSERT ... ON CONFLICT (id) DO UPDATE para el
+// upsert, fetch por id o colección completa, delete por id. La generación de `id` por defecto
+// (`prefijo-${Date.now()}`) es un respaldo: los servicios de lib/execution/* casi siempre
+// calculan un id determinista ellos mismos (p.ej. `${date}:${habit_id}`) antes de llamar aquí.
+
+import { PoolClient } from 'pg';
+import { pgPool } from './pg-client';
+
+/** BEGIN/COMMIT con ROLLBACK automático si `fn` lanza. Para escrituras que deben ser atómicas,
+ * como crear las 10 semanas del programa en un solo `init`. */
+export async function withExecutionTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// --- program_weeks ---
+
+export interface ProgramWeekRecord {
+  id: string;
+  week_number: number;
+  starts_on: string;
+  phase: string;
+  min_tandas_dia: number;
+  created_at?: string;
+}
+
+export async function fetchProgramWeeksFromDb(id?: string): Promise<ProgramWeekRecord | ProgramWeekRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM program_weeks WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM program_weeks ORDER BY week_number ASC');
+  return res.rows;
+}
+
+export async function saveProgramWeekToDb(week: Partial<ProgramWeekRecord>, client?: PoolClient): Promise<ProgramWeekRecord> {
+  const runner = client ?? pgPool;
+  const record: ProgramWeekRecord = {
+    id: week.id || `pw-${Date.now()}`,
+    week_number: week.week_number!,
+    starts_on: week.starts_on!,
+    phase: week.phase || 'arranque',
+    min_tandas_dia: week.min_tandas_dia ?? 1,
+  };
+  const res = await runner.query(
+    `INSERT INTO program_weeks (id, week_number, starts_on, phase, min_tandas_dia)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (id) DO UPDATE SET
+       week_number = EXCLUDED.week_number,
+       starts_on = EXCLUDED.starts_on,
+       phase = EXCLUDED.phase,
+       min_tandas_dia = EXCLUDED.min_tandas_dia
+     RETURNING *`,
+    [record.id, record.week_number, record.starts_on, record.phase, record.min_tandas_dia]
+  );
+  return res.rows[0];
+}
+
+export async function deleteProgramWeekFromDb(id: string): Promise<void> {
+  await pgPool.query('DELETE FROM program_weeks WHERE id = $1', [id]);
+}
+
+// --- habits ---
+
+export interface HabitRecord {
+  id: string;
+  label: string;
+  started_on: string;
+  retired_on?: string | null;
+  days_of_week?: number[] | null;
+  target_days: number;
+  created_at?: string;
+}
+
+export async function fetchHabitsFromDb(id?: string): Promise<HabitRecord | HabitRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM habits WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM habits ORDER BY started_on ASC');
+  return res.rows;
+}
+
+export async function saveHabitToDb(habit: Partial<HabitRecord>): Promise<HabitRecord> {
+  const record: HabitRecord = {
+    id: habit.id || `habit-${Date.now()}`,
+    label: habit.label!,
+    started_on: habit.started_on!,
+    retired_on: habit.retired_on ?? null,
+    days_of_week: habit.days_of_week ?? null,
+    target_days: habit.target_days ?? 66,
+  };
+  const res = await pgPool.query(
+    `INSERT INTO habits (id, label, started_on, retired_on, days_of_week, target_days)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (id) DO UPDATE SET
+       label = EXCLUDED.label,
+       started_on = EXCLUDED.started_on,
+       retired_on = EXCLUDED.retired_on,
+       days_of_week = EXCLUDED.days_of_week,
+       target_days = EXCLUDED.target_days
+     RETURNING *`,
+    [record.id, record.label, record.started_on, record.retired_on, record.days_of_week, record.target_days]
+  );
+  return res.rows[0];
+}
+
+export async function deleteHabitFromDb(id: string): Promise<void> {
+  await pgPool.query('DELETE FROM habits WHERE id = $1', [id]);
+}
+
+// --- daily_checks ---
+
+export interface DailyCheckRecord {
+  id: string;
+  date: string;
+  habit_id: string;
+  status: string;
+  value?: number | null;
+  note?: string | null;
+  logged_at?: string;
+}
+
+export async function fetchDailyChecksFromDb(id?: string): Promise<DailyCheckRecord | DailyCheckRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM daily_checks WHERE id = $1', [id]);
+    if (!res.rows[0]) return null;
+    return { ...res.rows[0], value: res.rows[0].value === null ? null : Number(res.rows[0].value) };
+  }
+  const res = await pgPool.query('SELECT * FROM daily_checks ORDER BY date ASC');
+  return res.rows.map((r) => ({ ...r, value: r.value === null ? null : Number(r.value) }));
+}
+
+export async function saveDailyCheckToDb(check: Partial<DailyCheckRecord>): Promise<DailyCheckRecord> {
+  const record: DailyCheckRecord = {
+    id: check.id || `check-${Date.now()}`,
+    date: check.date!,
+    habit_id: check.habit_id!,
+    status: check.status!,
+    value: check.value ?? null,
+    note: check.note ?? null,
+  };
+  const res = await pgPool.query(
+    `INSERT INTO daily_checks (id, date, habit_id, status, value, note)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (id) DO UPDATE SET
+       status = EXCLUDED.status,
+       value = EXCLUDED.value,
+       note = EXCLUDED.note
+     RETURNING *`,
+    [record.id, record.date, record.habit_id, record.status, record.value, record.note]
+  );
+  return { ...res.rows[0], value: res.rows[0].value === null ? null : Number(res.rows[0].value) };
+}
+
+export async function deleteDailyCheckFromDb(id: string): Promise<void> {
+  await pgPool.query('DELETE FROM daily_checks WHERE id = $1', [id]);
+}
+
+// --- routine_slots ---
+
+export interface RoutineSlotRecord {
+  id: string;
+  days_of_week: number[];
+  cue_kind: string;
+  cue_text: string;
+  action_text: string;
+  anchor_time?: string | null;
+  schedule_id?: string | null;
+  subject_id?: string | null;
+  habit_id?: string | null;
+  kind: string;
+  periodicity: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export async function fetchRoutineSlotsFromDb(id?: string): Promise<RoutineSlotRecord | RoutineSlotRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM routine_slots WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM routine_slots ORDER BY created_at ASC');
+  return res.rows;
+}
+
+export async function saveRoutineSlotToDb(slot: Partial<RoutineSlotRecord>): Promise<RoutineSlotRecord> {
+  const record: RoutineSlotRecord = {
+    id: slot.id || `slot-${Date.now()}`,
+    days_of_week: slot.days_of_week!,
+    cue_kind: slot.cue_kind!,
+    cue_text: slot.cue_text!,
+    action_text: slot.action_text!,
+    anchor_time: slot.anchor_time ?? null,
+    schedule_id: slot.schedule_id ?? null,
+    subject_id: slot.subject_id ?? null,
+    habit_id: slot.habit_id ?? null,
+    kind: slot.kind || 'estudio',
+    periodicity: slot.periodicity || 'semanal',
+    is_active: slot.is_active ?? true,
+  };
+  const res = await pgPool.query(
+    `INSERT INTO routine_slots
+       (id, days_of_week, cue_kind, cue_text, action_text, anchor_time, schedule_id, subject_id, habit_id, kind, periodicity, is_active)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+     ON CONFLICT (id) DO UPDATE SET
+       days_of_week = EXCLUDED.days_of_week,
+       cue_kind = EXCLUDED.cue_kind,
+       cue_text = EXCLUDED.cue_text,
+       action_text = EXCLUDED.action_text,
+       anchor_time = EXCLUDED.anchor_time,
+       schedule_id = EXCLUDED.schedule_id,
+       subject_id = EXCLUDED.subject_id,
+       habit_id = EXCLUDED.habit_id,
+       kind = EXCLUDED.kind,
+       periodicity = EXCLUDED.periodicity,
+       is_active = EXCLUDED.is_active
+     RETURNING *`,
+    [
+      record.id,
+      record.days_of_week,
+      record.cue_kind,
+      record.cue_text,
+      record.action_text,
+      record.anchor_time,
+      record.schedule_id,
+      record.subject_id,
+      record.habit_id,
+      record.kind,
+      record.periodicity,
+      record.is_active,
+    ]
+  );
+  return res.rows[0];
+}
+
+export async function deleteRoutineSlotFromDb(id: string): Promise<void> {
+  await pgPool.query('DELETE FROM routine_slots WHERE id = $1', [id]);
+}
+
+// --- slot_outcomes ---
+
+export interface SlotOutcomeRecord {
+  id: string;
+  date: string;
+  routine_slot_id: string;
+  outcome: string;
+  responded_at?: string;
+}
+
+export async function fetchSlotOutcomesFromDb(id?: string): Promise<SlotOutcomeRecord | SlotOutcomeRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM slot_outcomes WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM slot_outcomes ORDER BY date ASC');
+  return res.rows;
+}
+
+export async function saveSlotOutcomeToDb(outcome: Partial<SlotOutcomeRecord>): Promise<SlotOutcomeRecord> {
+  const record: SlotOutcomeRecord = {
+    id: outcome.id || `outcome-${Date.now()}`,
+    date: outcome.date!,
+    routine_slot_id: outcome.routine_slot_id!,
+    outcome: outcome.outcome!,
+  };
+  const res = await pgPool.query(
+    `INSERT INTO slot_outcomes (id, date, routine_slot_id, outcome)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (id) DO UPDATE SET outcome = EXCLUDED.outcome
+     RETURNING *`,
+    [record.id, record.date, record.routine_slot_id, record.outcome]
+  );
+  return res.rows[0];
+}
+
+export async function deleteSlotOutcomeFromDb(id: string): Promise<void> {
+  await pgPool.query('DELETE FROM slot_outcomes WHERE id = $1', [id]);
+}
+
+// --- plan_rehearsals ---
+
+export interface PlanRehearsalRecord {
+  id: string;
+  program_week_id: string;
+  routine_slot_id: string;
+  rehearsed_at?: string;
+}
+
+export async function fetchPlanRehearsalsFromDb(id?: string): Promise<PlanRehearsalRecord | PlanRehearsalRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM plan_rehearsals WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM plan_rehearsals ORDER BY rehearsed_at ASC');
+  return res.rows;
+}
+
+export async function savePlanRehearsalToDb(rehearsal: Partial<PlanRehearsalRecord>): Promise<PlanRehearsalRecord> {
+  const record: PlanRehearsalRecord = {
+    id: rehearsal.id || `rehearsal-${Date.now()}`,
+    program_week_id: rehearsal.program_week_id!,
+    routine_slot_id: rehearsal.routine_slot_id!,
+  };
+  const res = await pgPool.query(
+    `INSERT INTO plan_rehearsals (id, program_week_id, routine_slot_id)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (id) DO UPDATE SET program_week_id = EXCLUDED.program_week_id, routine_slot_id = EXCLUDED.routine_slot_id
+     RETURNING *`,
+    [record.id, record.program_week_id, record.routine_slot_id]
+  );
+  return res.rows[0];
+}
+
+export async function deletePlanRehearsalFromDb(id: string): Promise<void> {
+  await pgPool.query('DELETE FROM plan_rehearsals WHERE id = $1', [id]);
+}
+
+// --- tasks ---
+
+export interface ExecutionTaskRecord {
+  id: string;
+  title: string;
+  subject_id: string;
+  deliverable_id?: string | null;
+  topic_id?: string | null;
+  estimated_tandas: number;
+  status: string;
+  scheduled_date?: string | null;
+  completed_at?: string | null;
+  source: string;
+  created_at?: string;
+}
+
+export async function fetchExecutionTasksFromDb(id?: string): Promise<ExecutionTaskRecord | ExecutionTaskRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM tasks WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM tasks ORDER BY created_at ASC');
+  return res.rows;
+}
+
+export async function saveExecutionTaskToDb(task: Partial<ExecutionTaskRecord>): Promise<ExecutionTaskRecord> {
+  const record: ExecutionTaskRecord = {
+    id: task.id || `task-${Date.now()}`,
+    title: task.title!,
+    subject_id: task.subject_id!,
+    deliverable_id: task.deliverable_id ?? null,
+    topic_id: task.topic_id ?? null,
+    estimated_tandas: task.estimated_tandas ?? 1,
+    status: task.status || 'pendiente',
+    scheduled_date: task.scheduled_date ?? null,
+    completed_at: task.completed_at ?? null,
+    source: task.source || 'manual',
+  };
+  const res = await pgPool.query(
+    `INSERT INTO tasks (id, title, subject_id, deliverable_id, topic_id, estimated_tandas, status, scheduled_date, completed_at, source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (id) DO UPDATE SET
+       title = EXCLUDED.title,
+       subject_id = EXCLUDED.subject_id,
+       deliverable_id = EXCLUDED.deliverable_id,
+       topic_id = EXCLUDED.topic_id,
+       estimated_tandas = EXCLUDED.estimated_tandas,
+       status = EXCLUDED.status,
+       scheduled_date = EXCLUDED.scheduled_date,
+       completed_at = EXCLUDED.completed_at,
+       source = EXCLUDED.source
+     RETURNING *`,
+    [
+      record.id,
+      record.title,
+      record.subject_id,
+      record.deliverable_id,
+      record.topic_id,
+      record.estimated_tandas,
+      record.status,
+      record.scheduled_date,
+      record.completed_at,
+      record.source,
+    ]
+  );
+  return res.rows[0];
+}
+
+export async function deleteExecutionTaskFromDb(id: string): Promise<void> {
+  await pgPool.query('DELETE FROM tasks WHERE id = $1', [id]);
+}
+
+// --- tandas ---
+
+export interface TandaRecord {
+  id: string;
+  subject_id?: string | null;
+  topic_id?: string | null;
+  deliverable_id?: string | null;
+  task_id?: string | null;
+  routine_slot_id?: string | null;
+  study_block_id?: string | null;
+  local_date: string;
+  started_at: string;
+  ended_at?: string | null;
+  planned_minutes: number;
+  actual_minutes?: number | null;
+  status: string;
+  running_lock?: string | null;
+  interrupt_reason?: string | null;
+  mode?: string | null;
+  locked_at: string;
+  edited_after_lock: boolean;
+  created_at?: string;
+}
+
+export async function fetchTandasFromDb(id?: string): Promise<TandaRecord | TandaRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM tandas WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM tandas ORDER BY started_at ASC');
+  return res.rows;
+}
+
+export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaRecord> {
+  const record: TandaRecord = {
+    id: tanda.id || `tanda-${Date.now()}`,
+    subject_id: tanda.subject_id ?? null,
+    topic_id: tanda.topic_id ?? null,
+    deliverable_id: tanda.deliverable_id ?? null,
+    task_id: tanda.task_id ?? null,
+    routine_slot_id: tanda.routine_slot_id ?? null,
+    study_block_id: tanda.study_block_id ?? null,
+    local_date: tanda.local_date!,
+    started_at: tanda.started_at!,
+    ended_at: tanda.ended_at ?? null,
+    planned_minutes: tanda.planned_minutes ?? 10,
+    actual_minutes: tanda.actual_minutes ?? null,
+    status: tanda.status || 'en_curso',
+    running_lock: tanda.running_lock ?? null,
+    interrupt_reason: tanda.interrupt_reason ?? null,
+    mode: tanda.mode ?? null,
+    locked_at: tanda.locked_at!,
+    edited_after_lock: tanda.edited_after_lock ?? false,
+  };
+  const res = await pgPool.query(
+    `INSERT INTO tandas
+       (id, subject_id, topic_id, deliverable_id, task_id, routine_slot_id, study_block_id,
+        local_date, started_at, ended_at, planned_minutes, actual_minutes, status, running_lock,
+        interrupt_reason, mode, locked_at, edited_after_lock)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+     ON CONFLICT (id) DO UPDATE SET
+       subject_id = EXCLUDED.subject_id,
+       topic_id = EXCLUDED.topic_id,
+       deliverable_id = EXCLUDED.deliverable_id,
+       task_id = EXCLUDED.task_id,
+       routine_slot_id = EXCLUDED.routine_slot_id,
+       study_block_id = EXCLUDED.study_block_id,
+       ended_at = EXCLUDED.ended_at,
+       actual_minutes = EXCLUDED.actual_minutes,
+       status = EXCLUDED.status,
+       running_lock = EXCLUDED.running_lock,
+       interrupt_reason = EXCLUDED.interrupt_reason,
+       mode = EXCLUDED.mode,
+       edited_after_lock = EXCLUDED.edited_after_lock
+     RETURNING *`,
+    [
+      record.id,
+      record.subject_id,
+      record.topic_id,
+      record.deliverable_id,
+      record.task_id,
+      record.routine_slot_id,
+      record.study_block_id,
+      record.local_date,
+      record.started_at,
+      record.ended_at,
+      record.planned_minutes,
+      record.actual_minutes,
+      record.status,
+      record.running_lock,
+      record.interrupt_reason,
+      record.mode,
+      record.locked_at,
+      record.edited_after_lock,
+    ]
+  );
+  return res.rows[0];
+}
+
+export async function deleteTandaFromDb(id: string): Promise<void> {
+  await pgPool.query('DELETE FROM tandas WHERE id = $1', [id]);
+}

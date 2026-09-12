@@ -97,17 +97,17 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 - [X] T011 IMPL Sección "Módulo de Ejecución" en lib/validations/schemas.ts:
   - esquemas Zod estrictos (`.strict()`) para programa, hábito, check, disparador, respuesta, ensayo, tanda (start, interrupt y update sin campos de tiempo), destinatario (`consented_at` obligatorio), nota de reporte, tarea e intención, con las reglas de T010;
   - un helper que traduzca los errores de Zod a `{ status: 'error', code, message }`.
-- [ ] T012 TEST `manage_program` en __tests__/mcp/execution-program.test.ts (pg-mem):
+- [X] T012 TEST `manage_program` en __tests__/mcp/execution-program.test.ts (pg-mem):
   - `init` crea `pw-01…pw-10` desde un lunes;
   - rechaza un día que no es lunes (`NO_ES_LUNES`) y un segundo `init` (`PROGRAMA_EXISTENTE`);
   - `update_week` sobre la semana en curso → `SEMANA_EN_CURSO`, y sobre una futura → OK (US3-AS7);
   - `upsert_habit` y `retire_habit`;
   - ninguna migración inserta datos (FR-040).
-- [ ] T013 IMPL Repositorio lib/db/execution-pg.ts sobre `pgPool` de lib/db/pg-client.ts:
+- [X] T013 IMPL Repositorio lib/db/execution-pg.ts sobre `pgPool` de lib/db/pg-client.ts:
   - patrón `INSERT … ON CONFLICT (id) DO UPDATE` de lib/db/repository-pg.ts;
   - fetch, save y delete de `program_weeks`, `habits`, `daily_checks`, `routine_slots`, `slot_outcomes`, `plan_rehearsals`, `tasks` y `tandas`;
   - transacciones con `pgPool.connect()` + BEGIN/COMMIT.
-- [ ] T014 IMPL lib/execution/program.ts y el registro de `manage_program`:
+- [X] T014 IMPL lib/execution/program.ts y el registro de `manage_program`:
   - lib/execution/handlers.ts: esqueleto con el contrato `{ status, code?, message?, data? }` y `handleManageProgram`;
   - re-export en mcp-server/tools-handler.ts;
   - registro en mcp-server/index.ts: `TOOLS_LIST` + `mcpServer.tool(...)` con `action: z.enum([...])` y `data: z.any().optional()`, como manage_study_blocks (:430);

@@ -30,6 +30,7 @@ import {
   handleManageStudyBlocks,
   handleManageFlashcards,
   handleGetClassContext,
+  handleManageProgram,
 } from './tools-handler';
 
 export const TOOLS_LIST = [
@@ -268,6 +269,30 @@ export const TOOLS_LIST = [
       },
     },
   },
+  {
+    name: 'manage_program',
+    description:
+      'Módulo de Ejecución: programa de semanas (arranque/consolidación/automatización) y hábitos diarios. ' +
+      '"init" crea el programa una sola vez, con las semanas numeradas desde un lunes (rechaza otro día y un segundo init). ' +
+      '"update_week" solo edita semanas cuyo inicio todavía no llegó (la semana en curso o pasada se rechaza). ' +
+      '"upsert_habit"/"retire_habit" dan de alta o retiran un hábito diario, con days_of_week 1=lunes..7=domingo. ' +
+      'El programa, sus semanas y los hábitos se cargan exclusivamente por esta herramienta: nunca se siembran por migración ni por la UI.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['init', 'read', 'update_week', 'upsert_habit', 'retire_habit'] },
+        data: {
+          type: 'object',
+          description:
+            'init: { starts_on (YYYY-MM-DD, lunes), weeks: [{ min_tandas_dia, phase }] }. ' +
+            'update_week: { id, min_tandas_dia?, phase? }. ' +
+            'upsert_habit: { id, label, started_on, days_of_week? (1=lunes..7=domingo), target_days? }. ' +
+            'retire_habit: { id, retired_on }. read: sin data.',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -463,6 +488,19 @@ export function createMcpServerInstance() {
     },
     async ({ session_id, subject_id, date }) => {
       const res = await handleGetClassContext({ session_id, subject_id, date });
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_program',
+    'Módulo de Ejecución: programa de semanas y hábitos diarios. init/read/update_week/upsert_habit/retire_habit. Datos cargados solo por esta herramienta (nunca sembrados por migración ni por la UI); days_of_week de los hábitos usa 1=lunes..7=domingo.',
+    {
+      action: z.enum(['init', 'read', 'update_week', 'upsert_habit', 'retire_habit']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageProgram(action, data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );
