@@ -37,4 +37,17 @@ describe('REQ-02: Dominio de Asignaturas y Cálculo de Notas Ponderadas', () => 
     const required = calculateRequiredGradeForRemaining(deliverables, 4.5);
     expect(required).toBeNull();
   });
+
+  it('US5-AS7 · una entrega "entregada" con nota cuenta como calificada en calculateWeightedGrade', () => {
+    const deliverables = [
+      { weight_percentage: 20, grade: 4.5, status: 'entregado' as const },
+      { weight_percentage: 30, grade: 3.5, status: 'calificado' as const },
+      { weight_percentage: 50, grade: 0.0, status: 'pendiente' as const },
+    ];
+
+    // (4.5 * 20 + 3.5 * 30) / (20 + 30) = (90 + 105) / 50 = 3.9
+    const result = calculateWeightedGrade(deliverables);
+    expect(result.currentGrade).toBe(3.9);
+    expect(result.evaluatedWeightPercentage).toBe(50);
+  });
 });
