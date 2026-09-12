@@ -33,6 +33,7 @@ import {
   handleManageProgram,
   handleManageTandas,
   handleGetToday,
+  handleManageRoutineSlots,
 } from './tools-handler';
 
 export const TOOLS_LIST = [
@@ -330,6 +331,31 @@ export const TOOLS_LIST = [
       },
     },
   },
+  {
+    name: 'manage_routine_slots',
+    description:
+      'Módulo de Ejecución: disparador "Si <señal>, entonces <acción>" (US2). ' +
+      '"create"/"update" son estrictos: una clave de duración, número de tandas o método de estudio se rechaza (SOBRE_ESPECIFICACION), porque un disparador solo dice cuándo y qué. ' +
+      'Un cue_kind="tras_clase" exige schedule_id y SIEMPRE hereda de ese horario days_of_week y la alternancia de sábados (nunca se declaran a mano). ' +
+      '"read" marca huerfano:true un tras_clase cuyo horario ya no existe. ' +
+      '"respond" (outcome hecho/no) es idempotente por día; en un disparador de hábito también fija el check de ese hábito hoy. ' +
+      'El "hecho" real de un disparador de estudio ocurre iniciando la tanda (manage_tandas con action="start" y routine_slot_id en data), que liga la tanda al disparador y hereda su materia — no hay un "respond hecho" separado para ese caso. ' +
+      '"rehearse" es idempotente por semana del programa (como máximo un ensayo). days_of_week usa 1=lunes..7=domingo.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'update', 'read', 'delete', 'respond', 'rehearse'] },
+        data: {
+          type: 'object',
+          description:
+            'create/update: { id? (update), days_of_week (1-7), cue_kind (hora/tras_clase/tras_habito/lugar), cue_text (5-80), action_text (5-90), anchor_time? (HH:MM, obligatorio salvo tras_clase), schedule_id? (obligatorio en tras_clase), subject_id?, habit_id? (obligatorio si kind=habito), kind? (estudio/habito/otro), periodicity? (semanal/sabado_a/sabado_b, solo con days_of_week=[6]), is_active? }. ' +
+            'read: { id? }. delete: { id }. ' +
+            'respond: { routine_slot_id, outcome (hecho/no) }. rehearse: { routine_slot_id, program_week_id? }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -563,6 +589,19 @@ export function createMcpServerInstance() {
     },
     async ({ data }) => {
       const res = await handleGetToday(data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_routine_slots',
+    'Módulo de Ejecución: disparador "Si <señal>, entonces <acción>" (US2). create/update/read/delete/respond/rehearse. Un tras_clase hereda día y alternancia de sábados de su horario; respond es idempotente por día y rehearse por semana del programa.',
+    {
+      action: z.enum(['create', 'update', 'read', 'delete', 'respond', 'rehearse']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageRoutineSlots(action, data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );

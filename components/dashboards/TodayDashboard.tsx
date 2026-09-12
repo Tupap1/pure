@@ -19,13 +19,12 @@ function formatClock(iso: string): string {
 }
 
 /**
- * Pantalla Hoy (US1-US3, FR-041): primera pantalla de Pure. En esta fase (US1) solo cubre la
- * tanda de 10 minutos en un toque; el disparador vigente (US2) y los checks de hábitos (US3)
- * llegan en fases siguientes sin cambiar esta estructura (getToday ya expone `trigger` y
- * `pending_checks`, hoy siempre vacíos).
+ * Pantalla Hoy (US1-US3, FR-041): primera pantalla de Pure. Cubre la tanda de 10 minutos en un
+ * toque (US1), el único disparador si-entonces vigente (US2) y los checks de hábitos del día con
+ * el pie "N tandas hoy · Día cumplido" (US3).
  */
 export const TodayDashboard: React.FC = () => {
-  const { today, isLoading, isOffline, secondsLeft, countdown, refresh, start, finish, interrupt, tagSubject } =
+  const { today, isLoading, isOffline, secondsLeft, countdown, refresh, start, finish, interrupt, tagSubject, respondTrigger } =
     useToday();
   const { subjects } = usePureData();
 
@@ -69,10 +68,10 @@ export const TodayDashboard: React.FC = () => {
   const running = today.running_tanda;
   const minutesLeft = running && secondsLeft != null ? Math.ceil(secondsLeft / 60) : null;
 
-  const handleStart = async () => {
+  const handleStart = async (routine_slot_id?: string) => {
     setIsStarting(true);
     try {
-      await start();
+      await start(routine_slot_id ? { routine_slot_id } : undefined);
     } finally {
       setIsStarting(false);
     }
@@ -148,11 +147,50 @@ export const TodayDashboard: React.FC = () => {
             )}
           </>
         ) : (
-          <Button variant="primary" size="lg" onClick={handleStart} disabled={isStarting} className="min-h-[44px] px-10">
+          <Button variant="primary" size="lg" onClick={() => handleStart()} disabled={isStarting} className="min-h-[44px] px-10">
             Empezar tanda
           </Button>
         )}
       </Card>
+
+      {today.trigger && (
+        <Card className="space-y-4 text-center">
+          <p className="text-sm text-slate-700 dark:text-slate-300">
+            <span className="block">Si {today.trigger.cue_text},</span>
+            <span className="block">entonces {today.trigger.action_text}.</span>
+          </p>
+          <div className="flex gap-2 justify-center">
+            {today.trigger.kind === 'estudio' ? (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleStart(today.trigger!.id)}
+                disabled={isStarting}
+                className="min-h-[44px]"
+              >
+                Empezar tanda
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => respondTrigger(today.trigger!.id, 'hecho')}
+                className="min-h-[44px]"
+              >
+                Hecho
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => respondTrigger(today.trigger!.id, 'no')}
+              className="min-h-[44px]"
+            >
+              No
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {justFinished && (
         <Card>

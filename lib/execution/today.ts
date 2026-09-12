@@ -1,13 +1,13 @@
 // Servicio de Hoy (US1-US3). getToday agrega el estado del día para una sola pantalla: la hora
-// del servidor, la semana del programa, la tanda en curso y cuántas tandas van hoy. El
-// disparador vigente (US2) y los checks pendientes / día cumplido (US3) todavía no tienen
-// servicio propio en esta fase, así que se exponen con su forma final pero en su valor neutro
-// (null / []) para que el contrato de get_today (contracts/mcp-tools.md) no cambie de forma
-// cuando esas historias lleguen — solo dejan de estar vacíos.
+// del servidor, la semana del programa, la tanda en curso, cuántas tandas van hoy, el disparador
+// vigente (US2) y los checks pendientes junto con si el día quedó cumplido (US3).
 
 import { localParts } from './time';
 import { readProgram } from './program';
 import { currentTanda, readTandas } from './tandas';
+import { resolveTodayTrigger } from './routine';
+import { fetchHabitsFromDb, fetchDailyChecksFromDb, HabitRecord, DailyCheckRecord } from '../db/execution-pg';
+import { isHabitActive, evaluateDay, CurrentTrigger } from '../domain/execution';
 import type { ExecutionResult } from '../validations/schemas';
 
 export interface TodayRunningTanda {
@@ -18,13 +18,18 @@ export interface TodayRunningTanda {
   seconds_left: number;
 }
 
+export interface TodayPendingCheck {
+  habit_id: string;
+  label: string;
+}
+
 export interface TodayPayload {
   server_now: string;
   date: string;
   week: { number: number; total: number; phase: string } | null;
   running_tanda: TodayRunningTanda | null;
-  trigger: null;
-  pending_checks: { habit_id: string; label: string }[];
+  trigger: CurrentTrigger | null;
+  pending_checks: TodayPendingCheck[];
   tandas_today: number;
   day_fulfilled: boolean | null;
 }
@@ -56,6 +61,30 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
 
   const readRes = await readTandas({ from: dateKey, to: dateKey }, now);
   const tandasToday = readRes.status === 'success' ? readRes.data!.tandas.length : 0;
+  const completedToday =
+    readRes.status === 'success' ? readRes.data!.tandas.filter((t) => t.status === 'completada').length : 0;
+
+  const trigger = await resolveTodayTrigger(now);
+
+  const habitsRaw = await fetchHabitsFromDb();
+  const habits = (Array.isArray(habitsRaw) ? habitsRaw : []) as HabitRecord[];
+  const checksRaw = await fetchDailyChecksFromDb();
+  const checksToday = ((Array.isArray(checksRaw) ? checksRaw : []) as DailyCheckRecord[]).filter(
+    (c) => c.date === dateKey
+  );
+
+  const respondedHabitIds = new Set(checksToday.map((c) => c.habit_id));
+  const pending_checks: TodayPendingCheck[] = habits
+    .filter((h) => isHabitActive(h, dateKey) && !respondedHabitIds.has(h.id))
+    .map((h) => ({ habit_id: h.id, label: h.label }));
+
+  const evaluation = evaluateDay({
+    dateKey,
+    minTandasDia: currentWeek ? currentWeek.min_tandas_dia : null,
+    completedTandas: completedToday,
+    habits,
+    checks: checksToday.map((c) => ({ habit_id: c.habit_id, status: c.status })),
+  });
 
   return {
     status: 'success',
@@ -64,10 +93,10 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
       date: dateKey,
       week,
       running_tanda,
-      trigger: null,
-      pending_checks: [],
+      trigger,
+      pending_checks,
       tandas_today: tandasToday,
-      day_fulfilled: null,
+      day_fulfilled: evaluation ? evaluation.fulfilled : null,
     },
   };
 }

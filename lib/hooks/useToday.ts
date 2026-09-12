@@ -52,12 +52,12 @@ export function useToday() {
     return () => clearInterval(tick);
   }, [today?.running_tanda?.id]);
 
-  const callTandas = useCallback(
-    async (action: 'start' | 'finish' | 'interrupt' | 'update', data?: unknown) => {
+  const callAction = useCallback(
+    async (tool: string, action: string, data?: unknown) => {
       const res = await fetch('/api/execution', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool: 'manage_tandas', action, data: data ?? {} }),
+        body: JSON.stringify({ tool, action, data: data ?? {} }),
       });
       const json = await res.json();
       await fetchToday();
@@ -66,13 +66,29 @@ export function useToday() {
     [fetchToday]
   );
 
-  const start = useCallback((data?: { subject_id?: string }) => callTandas('start', data), [callTandas]);
+  const callTandas = useCallback(
+    (action: 'start' | 'finish' | 'interrupt' | 'update', data?: unknown) => callAction('manage_tandas', action, data),
+    [callAction]
+  );
+
+  const start = useCallback(
+    (data?: { subject_id?: string; routine_slot_id?: string }) => callTandas('start', data),
+    [callTandas]
+  );
   const finish = useCallback((id: string) => callTandas('finish', { id }), [callTandas]);
   const interrupt = useCallback(
     (id: string, interrupt_reason: string) => callTandas('interrupt', { id, interrupt_reason }),
     [callTandas]
   );
   const tagSubject = useCallback((id: string, subject_id: string) => callTandas('update', { id, subject_id }), [callTandas]);
+
+  // US2: responder un disparador (solo "no" desde la web — el "hecho" de un disparador de
+  // estudio pasa siempre por start() arriba, que liga la tanda y hereda la materia).
+  const respondTrigger = useCallback(
+    (routine_slot_id: string, outcome: 'hecho' | 'no') =>
+      callAction('manage_routine_slots', 'respond', { routine_slot_id, outcome }),
+    [callAction]
+  );
 
   const running = today?.running_tanda ?? null;
   const secLeft = running ? secondsLeft(running.ends_at, offsetRef.current, Date.now()) : null;
@@ -88,5 +104,6 @@ export function useToday() {
     finish,
     interrupt,
     tagSubject,
+    respondTrigger,
   };
 }

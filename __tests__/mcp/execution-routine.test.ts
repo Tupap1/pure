@@ -81,6 +81,7 @@ describe('[001] US2 — Un solo disparador vigente', () => {
       kind: 'estudio',
     });
     expect(slot.status).toBe('success');
+    if (slot.status !== 'success') return;
     const slotId = (slot.data as any).id;
 
     vi.setSystemTime(new Date('2026-09-14T15:00:00.000Z')); // 10:00 Bogotá, lunes: el disparador ya está vigente
@@ -115,6 +116,7 @@ describe('[001] US2 — Un solo disparador vigente', () => {
       habit_id: 'levantada_0600',
     });
     expect(slot.status).toBe('success');
+    if (slot.status !== 'success') return;
     const slotId = (slot.data as any).id;
 
     vi.setSystemTime(new Date('2026-09-14T11:10:00.000Z')); // 06:10 Bogotá
@@ -135,6 +137,7 @@ describe('[001] US2 — Un solo disparador vigente', () => {
       action_text: 'me levanto',
       anchor_time: '06:00',
     });
+    if (slot.status !== 'success') return;
     const slotId = (slot.data as any).id;
 
     const first = await handleManageRoutineSlots('rehearse', { routine_slot_id: slotId, program_week_id: 'pw-01' });
@@ -165,6 +168,7 @@ describe('[001] US2 — Un solo disparador vigente', () => {
       subject_id: 'sub-fisica',
     });
     expect(slot.status).toBe('success');
+    if (slot.status !== 'success') return;
     const slotId = (slot.data as any).id;
 
     await handleManageSchedules('delete', { id: 'sch-fisica' });
@@ -175,16 +179,16 @@ describe('[001] US2 — Un solo disparador vigente', () => {
   });
 
   it('get_today devuelve el disparador vigente y solo uno', async () => {
-    await handleManageRoutineSlots('create', { days_of_week: [1], cue_kind: 'hora', cue_text: 'a', action_text: 'b', anchor_time: '07:00' });
-    await handleManageRoutineSlots('create', { days_of_week: [1], cue_kind: 'hora', cue_text: 'c', action_text: 'd', anchor_time: '09:30' });
-    await handleManageRoutineSlots('create', { days_of_week: [1], cue_kind: 'hora', cue_text: 'e', action_text: 'f', anchor_time: '18:00' });
+    await handleManageRoutineSlots('create', { days_of_week: [1], cue_kind: 'hora', cue_text: 'son las 07', action_text: 'desayuno', anchor_time: '07:00' });
+    await handleManageRoutineSlots('create', { days_of_week: [1], cue_kind: 'hora', cue_text: 'son las 09:30', action_text: 'estudio 10 min', anchor_time: '09:30' });
+    await handleManageRoutineSlots('create', { days_of_week: [1], cue_kind: 'hora', cue_text: 'son las 18', action_text: 'reviso el dia', anchor_time: '18:00' });
 
     const today = await handleGetToday({}, new Date('2026-09-14T15:00:00.000Z')); // 10:00 Bogotá
     expect(today.status).toBe('success');
     if (today.status === 'success') {
       const trigger = (today.data as any).trigger;
       expect(trigger).not.toBeNull();
-      expect(trigger.action_text).toBe('d'); // 09:30 es el ancla más reciente ya pasada
+      expect(trigger.action_text).toBe('estudio 10 min'); // 09:30 es el ancla más reciente ya pasada
     }
   });
 });

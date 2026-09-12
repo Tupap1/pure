@@ -15,7 +15,14 @@ import crypto from 'crypto';
 import { localParts, localDateTimeToInstant, addDays } from './time';
 import { TANDA_MINUTES_DEFAULT, DAY_LOCK_TIME } from './constants';
 import type { ExecutionResult } from '../validations/schemas';
-import { fetchTandasFromDb, saveTandaToDb, TandaRecord } from '../db/execution-pg';
+import {
+  fetchTandasFromDb,
+  saveTandaToDb,
+  TandaRecord,
+  fetchRoutineSlotsFromDb,
+  saveSlotOutcomeToDb,
+  RoutineSlotRecord,
+} from '../db/execution-pg';
 
 /** true si `error` es la violación de la restricción UNIQUE de `running_lock` (pg y pg-mem
  * reportan el código 23505; pg-mem no rellena `error.constraint`, así que se confirma por texto
@@ -69,12 +76,24 @@ export interface TandaStartInput {
   planned_minutes?: number;
 }
 
-/** FR-001, FR-002, FR-004: empieza una tanda con la hora del servidor. */
+/**
+ * FR-001, FR-002, FR-004: empieza una tanda con la hora del servidor. US2-AS7/FR-012: si viene
+ * de un disparador (`routine_slot_id`), hereda su materia cuando no se indicó una explícita y
+ * dispara el mismo efecto que "responder hecho" (slot_outcomes de hoy) — el botón "Empezar
+ * tanda" de un disparador de estudio en Hoy llama a esta misma acción, así que aquí es donde debe
+ * quedar hecho, no en manage_routine_slots:respond (que no arranca tandas).
+ */
 export async function startTanda(
   input: TandaStartInput,
   now: Date = new Date()
 ): Promise<ExecutionResult<{ tanda: TandaRecord; ends_at: string }>> {
   await finalizeElapsed(now);
+
+  let subjectId = input.subject_id;
+  if (input.routine_slot_id && !subjectId) {
+    const slot = (await fetchRoutineSlotsFromDb(input.routine_slot_id)) as RoutineSlotRecord | null;
+    if (slot?.subject_id) subjectId = slot.subject_id;
+  }
 
   const plannedMinutes = input.planned_minutes ?? TANDA_MINUTES_DEFAULT;
   const local = localParts(now);
@@ -84,7 +103,7 @@ export async function startTanda(
   try {
     const tanda = await saveTandaToDb({
       id: `tanda-${crypto.randomUUID()}`,
-      subject_id: input.subject_id,
+      subject_id: subjectId,
       topic_id: input.topic_id,
       deliverable_id: input.deliverable_id,
       task_id: input.task_id,
@@ -96,6 +115,18 @@ export async function startTanda(
       running_lock: 'running',
       locked_at: lockedAt.toISOString(),
     });
+
+    if (input.routine_slot_id) {
+      // Idempotente por diseño (mismo id que manage_routine_slots:respond usaría hoy): si ya
+      // había una respuesta, esto simplemente la deja en 'hecho' sin duplicar filas.
+      await saveSlotOutcomeToDb({
+        id: `${local.dateKey}:${input.routine_slot_id}`,
+        date: local.dateKey,
+        routine_slot_id: input.routine_slot_id,
+        outcome: 'hecho',
+      });
+    }
+
     return { status: 'success', data: { tanda, ends_at: endsAt.toISOString() } };
   } catch (error) {
     if (isRunningLockViolation(error)) {

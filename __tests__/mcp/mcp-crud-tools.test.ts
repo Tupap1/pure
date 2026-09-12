@@ -23,8 +23,8 @@ describe('MCP Server - Suite de Herramientas CRUD y Parsing Dinámico (con pg-me
     await harness.reset();
   });
 
-  it('debe listar las 23 herramientas registradas en el catálogo de herramientas', () => {
-    expect(TOOLS_LIST.length).toBe(23);
+  it('debe listar las 24 herramientas registradas en el catálogo de herramientas', () => {
+    expect(TOOLS_LIST.length).toBe(24);
     const names = TOOLS_LIST.map((t) => t.name);
     expect(names).toContain('manage_universities');
     expect(names).toContain('manage_professors');

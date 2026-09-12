@@ -1,11 +1,11 @@
 import { computeAcademicLoad } from '../lib/algorithms/academic-load';
 import { findSynergiesBetweenTopics, SyllabusTopic } from '../lib/domain/syllabus';
-import { handleManageProgram, handleManageTandas, handleGetToday } from '../lib/execution/handlers';
+import { handleManageProgram, handleManageTandas, handleGetToday, handleManageRoutineSlots } from '../lib/execution/handlers';
 
 // Módulo de Ejecución: los handlers viven en lib/execution/handlers.ts (Principio I, una sola
 // vía de datos entre la web y el MCP); este archivo solo los re-exporta, igual que
 // mcp-server/db-repository.ts re-exporta lib/db/repository-pg.ts.
-export { handleManageProgram, handleManageTandas, handleGetToday };
+export { handleManageProgram, handleManageTandas, handleGetToday, handleManageRoutineSlots };
 import {
   fetchAcademicOverviewFromDb,
   fetchAcademicLoadInputsFromDb,

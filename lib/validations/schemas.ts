@@ -417,6 +417,18 @@ export const RoutineSlotSchema = z
     }
   });
 
+export const RoutineSlotReadSchema = z
+  .object({
+    id: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const RoutineSlotDeleteSchema = z
+  .object({
+    id: z.string().min(1),
+  })
+  .strict();
+
 export const RoutineSlotRespondSchema = z
   .object({
     routine_slot_id: z.string().min(1),

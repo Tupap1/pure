@@ -17,12 +17,24 @@ import {
   TandaInterruptSchema,
   TandaReadSchema,
   TandaUpdateSchema,
+  RoutineSlotSchema,
+  RoutineSlotReadSchema,
+  RoutineSlotDeleteSchema,
+  RoutineSlotRespondSchema,
+  RoutineSlotRehearseSchema,
   zodErrorToExecutionResult,
   type ExecutionResult,
 } from '../validations/schemas';
 import { initProgram, readProgram, updateProgramWeek, upsertHabit, retireHabit } from './program';
 import { startTanda, finishTanda, interruptTanda, currentTanda, readTandas, updateTanda } from './tandas';
 import { getToday } from './today';
+import {
+  upsertRoutineSlot,
+  readRoutineSlots,
+  deleteRoutineSlot,
+  respondToRoutineSlot,
+  rehearseRoutineSlot,
+} from './routine';
 
 export type ManageProgramAction = 'init' | 'read' | 'update_week' | 'upsert_habit' | 'retire_habit';
 
@@ -150,6 +162,63 @@ export async function handleGetToday(data?: unknown, now: Date = new Date()): Pr
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: error?.message || 'Error inesperado en get_today',
+    };
+  }
+}
+
+export type ManageRoutineSlotsAction = 'create' | 'update' | 'read' | 'delete' | 'respond' | 'rehearse';
+
+/**
+ * `manage_routine_slots` (US2): el disparador si-entonces. `create`/`update` usan el mismo
+ * esquema estricto (una clave de duración, tandas o método de estudio cae en SOBRE_ESPECIFICACION,
+ * no en el DATOS_INVALIDOS genérico: FR-009). `respond` y `rehearse` delegan sus reglas de
+ * idempotencia en lib/execution/routine.ts.
+ */
+export async function handleManageRoutineSlots(
+  action: ManageRoutineSlotsAction,
+  data?: unknown,
+  now: Date = new Date()
+): Promise<ExecutionResult> {
+  try {
+    switch (action) {
+      case 'create':
+      case 'update': {
+        const parsed = RoutineSlotSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error, { unrecognizedKeysCode: 'SOBRE_ESPECIFICACION' });
+        return await upsertRoutineSlot(parsed.data);
+      }
+      case 'read': {
+        const parsed = RoutineSlotReadSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await readRoutineSlots(parsed.data.id);
+      }
+      case 'delete': {
+        const parsed = RoutineSlotDeleteSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await deleteRoutineSlot(parsed.data.id);
+      }
+      case 'respond': {
+        const parsed = RoutineSlotRespondSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await respondToRoutineSlot(parsed.data, now);
+      }
+      case 'rehearse': {
+        const parsed = RoutineSlotRehearseSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await rehearseRoutineSlot(parsed.data, now);
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para manage_routine_slots: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: error?.message || 'Error inesperado en manage_routine_slots',
     };
   }
 }
