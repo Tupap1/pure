@@ -125,10 +125,11 @@ export async function handleManageProgram(
         };
     }
   } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_program:', error);
     return {
       status: 'error',
       code: 'DATOS_INVALIDOS',
-      message: error?.message || 'Error inesperado en manage_program',
+      message: 'Error inesperado en manage_program',
     };
   }
 }
@@ -184,10 +185,11 @@ export async function handleManageTandas(
         };
     }
   } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_tandas:', error);
     return {
       status: 'error',
       code: 'DATOS_INVALIDOS',
-      message: error?.message || 'Error inesperado en manage_tandas',
+      message: 'Error inesperado en manage_tandas',
     };
   }
 }
@@ -202,10 +204,11 @@ export async function handleGetToday(data?: unknown, now: Date = new Date()): Pr
     const effectiveNow = at ? new Date(at) : now;
     return await getToday(effectiveNow);
   } catch (error: any) {
+    console.error('[execution] Error inesperado en get_today:', error);
     return {
       status: 'error',
       code: 'DATOS_INVALIDOS',
-      message: error?.message || 'Error inesperado en get_today',
+      message: 'Error inesperado en get_today',
     };
   }
 }
@@ -259,10 +262,11 @@ export async function handleManageRoutineSlots(
         };
     }
   } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_routine_slots:', error);
     return {
       status: 'error',
       code: 'DATOS_INVALIDOS',
-      message: error?.message || 'Error inesperado en manage_routine_slots',
+      message: 'Error inesperado en manage_routine_slots',
     };
   }
 }
@@ -300,10 +304,11 @@ export async function handleManageDailyChecks(
         };
     }
   } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_daily_checks:', error);
     return {
       status: 'error',
       code: 'DATOS_INVALIDOS',
-      message: error?.message || 'Error inesperado en manage_daily_checks',
+      message: 'Error inesperado en manage_daily_checks',
     };
   }
 }
@@ -329,10 +334,11 @@ export async function handleGetGradeProjection(data?: unknown, now: Date = new D
       },
     };
   } catch (error: any) {
+    console.error('[execution] Error inesperado en get_grade_projection:', error);
     return {
       status: 'error',
       code: 'DATOS_INVALIDOS',
-      message: error?.message || 'Error inesperado en get_grade_projection',
+      message: 'Error inesperado en get_grade_projection',
     };
   }
 }
@@ -549,10 +555,11 @@ export async function handleManageWeeklyReport(
         };
     }
   } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_weekly_report:', error);
     return {
       status: 'error',
       code: 'DATOS_INVALIDOS',
-      message: error?.message || 'Error inesperado en manage_weekly_report',
+      message: 'Error inesperado en manage_weekly_report',
     };
   }
 }
@@ -588,10 +595,11 @@ export async function handleGetComplianceReport(data?: unknown, now: Date = new 
     const compliance = await getCompliance({ from, to, cutoff: now });
     return { status: 'success', data: compliance };
   } catch (error: any) {
+    console.error('[execution] Error inesperado en get_compliance_report:', error);
     return {
       status: 'error',
       code: 'DATOS_INVALIDOS',
-      message: error?.message || 'Error inesperado en get_compliance_report',
+      message: 'Error inesperado en get_compliance_report',
     };
   }
 }
@@ -641,10 +649,11 @@ export async function handleManageTasks(
         };
     }
   } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_tasks:', error);
     return {
       status: 'error',
       code: 'DATOS_INVALIDOS',
-      message: error?.message || 'Error inesperado en manage_tasks',
+      message: 'Error inesperado en manage_tasks',
     };
   }
 }
@@ -688,10 +697,11 @@ export async function handlePlanWeek(
         };
     }
   } catch (error: any) {
+    console.error('[execution] Error inesperado en plan_week:', error);
     return {
       status: 'error',
       code: 'DATOS_INVALIDOS',
-      message: error?.message || 'Error inesperado en plan_week',
+      message: 'Error inesperado en plan_week',
     };
   }
 }

@@ -7,5 +7,10 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return NextResponse.json({ key: process.env.VAPID_PUBLIC_KEY || null });
+  try {
+    return NextResponse.json({ key: process.env.VAPID_PUBLIC_KEY || null });
+  } catch (error: any) {
+    console.error('Error en GET /api/push/public-key:', error);
+    return NextResponse.json({ status: 'error', message: 'Error interno del servidor' }, { status: 500 });
+  }
 }

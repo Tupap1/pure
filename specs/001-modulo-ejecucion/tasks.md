@@ -505,10 +505,17 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - docs/README.md: enlaces a specs/ y a .specify/memory/constitution.md.
 - [X] T073 Limpieza y refactor con los tests en verde; revisar el diff que `/speckit-implement` agregue a .gitignore y .dockerignore.
 - [ ] T074 [P] Tests de regresión en __tests__/ para cada bug que aparezca durante la implementación.
-- [ ] T075 Endurecimiento de seguridad (Principio VI) en app/api/execution/ y app/api/push/:
+- [X] T075 Endurecimiento de seguridad (Principio VI) en app/api/execution/ y app/api/push/:
   - rutas nuevas con try/catch y sin detalles internos en los errores;
   - ningún secreto en código ni en artefactos;
   - el correo del destinatario no aparece en ninguna respuesta web.
+  - **Auditoría**: `app/api/push/public-key/route.ts` no tenía try/catch (única ruta sin él); ya
+    lo tiene. Los catch-all de los 10 handlers de `lib/execution/handlers.ts` devolvían
+    `error?.message` crudo, que `app/api/execution/*` reenvía tal cual en su 400 — un fallo
+    inesperado (por ejemplo, de Postgres) podía filtrar mensajes internos; ahora cada uno registra
+    el error con `console.error` y responde un mensaje neutro fijo, con test de regresión en
+    `__tests__/api/execution-routes.test.ts`. FR-025 (correo del destinatario) y ausencia de
+    secretos ya cumplían: verificado con `git grep` sobre `app/` y sobre las dos carpetas de rutas.
 - [ ] T076 VERIFY cierre con specs/001-modulo-ejecucion/quickstart.md:
   - quickstart completo y `npm run test:all`;
   - despliegue: `docker compose up -d --build pure-web pure-mcp` y luego `docker compose exec pure-mcp npm run db:migrate`;
