@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clockOffset, secondsLeft, formatCountdown, resolveConnectionState } from '../../lib/execution/today-view';
+import { clockOffset, secondsLeft, formatCountdown, resolveConnectionState, buildTodayFooterView } from '../../lib/execution/today-view';
 
 describe('[001] US1 — Tanda de 10 minutos en un toque', () => {
   it('US1-AS8 · el tiempo restante se calcula con la hora del sistema, no con la del teléfono desfasado', () => {
@@ -35,5 +35,23 @@ describe('[001] US1 — Tanda de 10 minutos en un toque', () => {
 });
 
 describe('[001] US3 — Hábitos del día y día cumplido', () => {
-  it.todo('US3-AS8 · los hábitos de hoy sin responder aparecen como filas Sí/No, sin minutos totales ni proyecciones de nota');
+  it('US3-AS8 · los hábitos de hoy sin responder aparecen como filas Sí/No, sin minutos totales ni proyecciones de nota', () => {
+    const withPending = buildTodayFooterView({
+      pending_checks: [{ habit_id: 'levantada', label: 'Levantarme a las 6:00' }],
+      tandas_today: 0,
+      day_fulfilled: null,
+    });
+    expect(withPending.checks).toEqual([{ habit_id: 'levantada', label: 'Levantarme a las 6:00' }]);
+    expect(withPending.tandasLine).toBeNull(); // sin tandas hoy: FR-018 no muestra "0 tandas"
+    expect(withPending.dayFulfilledLine).toBeNull();
+
+    const dayDone = buildTodayFooterView({ pending_checks: [], tandas_today: 3, day_fulfilled: true });
+    expect(dayDone.checks).toEqual([]);
+    expect(dayDone.tandasLine).toBe('3 tandas hoy');
+    expect(dayDone.dayFulfilledLine).toBe('Día cumplido');
+
+    // FR-018/FR-008: el modelo nunca expone minutos totales, mínimo faltante, proyecciones de
+    // nota ni un selector de modo de trabajo — solo trae estas tres claves.
+    expect(Object.keys(dayDone).sort()).toEqual(['checks', 'dayFulfilledLine', 'tandasLine']);
+  });
 });
