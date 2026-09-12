@@ -24,6 +24,7 @@ import {
   RoutineSlotRehearseSchema,
   DailyCheckSetSchema,
   DailyChecksReadSchema,
+  GradeProjectionReadSchema,
   zodErrorToExecutionResult,
   type ExecutionResult,
 } from '../validations/schemas';
@@ -38,6 +39,7 @@ import {
   rehearseRoutineSlot,
 } from './routine';
 import { setDailyCheck, readDailyChecks } from './checks';
+import { computeGradeProjections } from './grade-projection';
 
 export type ManageProgramAction = 'init' | 'read' | 'update_week' | 'upsert_habit' | 'retire_habit';
 
@@ -263,6 +265,35 @@ export async function handleManageDailyChecks(
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: error?.message || 'Error inesperado en manage_daily_checks',
+    };
+  }
+}
+
+/**
+ * `get_grade_projection` (US5): por materia, la proyección de nota (lib/domain/subject.ts) y las
+ * alertas "ciega"/"abandonada" (lib/domain/execution.ts:computeAlerts). Es de solo lectura;
+ * `data?.subject_id` filtra a una sola materia. El cálculo en sí vive en
+ * lib/execution/grade-projection.ts, compartido con la sección "En riesgo" del reporte semanal
+ * (US6), para no repetirlo (Principio I).
+ */
+export async function handleGetGradeProjection(data?: unknown, now: Date = new Date()): Promise<ExecutionResult> {
+  try {
+    const parsed = GradeProjectionReadSchema.safeParse(data ?? {});
+    if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+
+    const { materias, alertas } = await computeGradeProjections(now, parsed.data.subject_id);
+    return {
+      status: 'success',
+      data: {
+        materias: materias.map(({ subject_id, name, projection, flags }) => ({ subject_id, name, projection, flags })),
+        alertas,
+      },
+    };
+  } catch (error: any) {
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: error?.message || 'Error inesperado en get_grade_projection',
     };
   }
 }

@@ -6,12 +6,20 @@ import {
   handleGetToday,
   handleManageRoutineSlots,
   handleManageDailyChecks,
+  handleGetGradeProjection,
 } from '../lib/execution/handlers';
 
 // Módulo de Ejecución: los handlers viven en lib/execution/handlers.ts (Principio I, una sola
 // vía de datos entre la web y el MCP); este archivo solo los re-exporta, igual que
 // mcp-server/db-repository.ts re-exporta lib/db/repository-pg.ts.
-export { handleManageProgram, handleManageTandas, handleGetToday, handleManageRoutineSlots, handleManageDailyChecks };
+export {
+  handleManageProgram,
+  handleManageTandas,
+  handleGetToday,
+  handleManageRoutineSlots,
+  handleManageDailyChecks,
+  handleGetGradeProjection,
+};
 import {
   fetchAcademicOverviewFromDb,
   fetchAcademicLoadInputsFromDb,

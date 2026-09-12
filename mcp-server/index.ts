@@ -35,6 +35,7 @@ import {
   handleGetToday,
   handleManageRoutineSlots,
   handleManageDailyChecks,
+  handleGetGradeProjection,
 } from './tools-handler';
 
 export const TOOLS_LIST = [
@@ -377,6 +378,19 @@ export const TOOLS_LIST = [
       required: ['action'],
     },
   },
+  {
+    name: 'get_grade_projection',
+    description:
+      'Módulo de Ejecución: proyección de nota por materia (US5), de solo lectura. Por materia, con la escala y la aprobatoria de su universidad: aporte acumulado, promedio evaluado, peso restante, la nota necesaria para aprobar y para la meta (redondeadas hacia arriba) y el techo alcanzable (redondeado hacia abajo). ' +
+      'Marca "ciega" una materia sin evaluaciones registradas, "pesos_inconsistentes" si los pesos declarados no suman 100% (en ese caso no calcula necesaria ni techo), "entregado_sin_nota", "vencido_sin_registrar", "meta_inalcanzable" y "materia_perdida". ' +
+      'Además eleva a alerta (para el reporte semanal y la agenda) las materias "ciega" y las "abandonada" (una evaluación pendiente en menos de 7 días y ninguna tanda en los últimos 7 días).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: { type: 'object', description: '{ subject_id? }: sin subject_id, calcula todas las materias.' },
+      },
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -636,6 +650,18 @@ export function createMcpServerInstance() {
     },
     async ({ action, data }) => {
       const res = await handleManageDailyChecks(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'get_grade_projection',
+    'Módulo de Ejecución: proyección de nota por materia (US5), de solo lectura. Necesaria para aprobar/meta y techo, con las alertas ciega/pesos_inconsistentes/entregado_sin_nota/vencido_sin_registrar/meta_inalcanzable/materia_perdida, y las alertas elevadas ciega/abandonada.',
+    {
+      data: z.any().optional(),
+    },
+    async ({ data }) => {
+      const res = await handleGetGradeProjection(data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );

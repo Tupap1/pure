@@ -8,7 +8,8 @@
 
 import { localParts, localDateTimeToInstant } from '../execution/time';
 import { occursOnSabadoVariant, getSabadoTypeForDate, DEFAULT_SABADO_A_ANCHOR } from '../algorithms/conflict-detector';
-import { TRIGGER_WINDOW_MINUTES } from '../execution/constants';
+import { TRIGGER_WINDOW_MINUTES, VERDICT_CUMPLIDA_MIN_DAYS, VERDICT_FALLIDA_MAX_DAYS } from '../execution/constants';
+import type { GradeProjectionFlag } from './subject';
 
 // --- US2: resolveCurrentTrigger -------------------------------------------------------------
 
@@ -160,7 +161,7 @@ export interface HabitActiveInput {
 /** Día de la semana ISO (1=lunes..7=domingo) de una fecha de calendario, sin zona horaria: una
  * 'YYYY-MM-DD' ya es un día local, así que esto es aritmética de calendario pura (mismo patrón
  * que lib/execution/time.ts:mondayOf). */
-function isoDayOfWeekForDateKey(dateKey: string): number {
+export function isoDayOfWeekForDateKey(dateKey: string): number {
   const [year, month, day] = dateKey.split('-').map(Number);
   const sundayIsZero = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
   return sundayIsZero === 0 ? 7 : sundayIsZero;
@@ -232,4 +233,82 @@ export function evaluateDay(input: EvaluateDayInput): DayEvaluation | null {
   });
 
   return { tandasOk, habitsOk, fulfilled: tandasOk && habitsOk };
+}
+
+// --- US5: computeAlerts ---------------------------------------------------------------------
+
+export interface AlertSubjectInput {
+  subject_id: string;
+  name: string;
+  /** Flags que ya calculó projectSubjectGrade (lib/domain/subject.ts) para esta materia. */
+  flags: GradeProjectionFlag[];
+  /** Fecha (ISO o YYYY-MM-DD) de la evaluación pendiente más próxima, o null si no hay ninguna. */
+  nextPendingDueDate?: string | null;
+  /** Tandas (de cualquier estado) registradas para esta materia en los últimos 7 días. */
+  tandasLast7Days: number;
+}
+
+export type GradeAlertKind = 'abandonada' | 'ciega';
+
+export interface GradeAlert {
+  kind: GradeAlertKind;
+  subject_id: string;
+  detalle: string;
+}
+
+const ABANDONED_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * FR-028: eleva a alerta (para el reporte semanal y la agenda) dos de los casos de FR-027:
+ * - **ciega**: la materia no tiene evaluaciones registradas (mismo `flags.includes('ciega')`
+ *   que ya decidió projectSubjectGrade — sin nombre alterno, per FR-028).
+ * - **abandonada**: tiene una evaluación pendiente en menos de 7 días y ninguna tanda en los
+ *   últimos 7 días.
+ * Pura: recibe ya calculados los flags y los conteos, y solo decide (US5-AS6).
+ */
+export function computeAlerts(subjects: AlertSubjectInput[], now: Date): GradeAlert[] {
+  const alerts: GradeAlert[] = [];
+
+  for (const subject of subjects) {
+    if (subject.flags.includes('ciega')) {
+      alerts.push({
+        kind: 'ciega',
+        subject_id: subject.subject_id,
+        detalle: `${subject.name}: sin evaluaciones registradas.`,
+      });
+    }
+
+    if (subject.nextPendingDueDate) {
+      const diffMs = new Date(subject.nextPendingDueDate).getTime() - now.getTime();
+      const dueWithinAWeek = diffMs >= 0 && diffMs < ABANDONED_WINDOW_MS;
+      if (dueWithinAWeek && subject.tandasLast7Days === 0) {
+        alerts.push({
+          kind: 'abandonada',
+          subject_id: subject.subject_id,
+          detalle: `${subject.name}: evaluación en menos de 7 días y ninguna tanda en los últimos 7 días.`,
+        });
+      }
+    }
+  }
+
+  return alerts;
+}
+
+// --- US6: veredicto semanal y corte del reporte ----------------------------------------------
+
+export type WeeklyVerdict = 'cumplida' | 'fallida' | 'parcial';
+
+/** FR-022: el veredicto semanal según los días cumplidos sobre 7 (US6-AS7/AS10). */
+export function computeVerdict(daysFulfilled: number): WeeklyVerdict {
+  if (daysFulfilled >= VERDICT_CUMPLIDA_MIN_DAYS) return 'cumplida';
+  if (daysFulfilled <= VERDICT_FALLIDA_MAX_DAYS) return 'fallida';
+  return 'parcial';
+}
+
+/**
+ * FR-019/US6-AS2: una tanda solo cuenta en un reporte semanal si empezó a más tardar en el
+ * instante de corte (el domingo 19:00 local ya congelado no vuelve a mirar lo que pase después).
+ */
+export function isTandaBeforeCutoff(startedAtIso: string, cutoff: Date): boolean {
+  return new Date(startedAtIso).getTime() <= cutoff.getTime();
 }

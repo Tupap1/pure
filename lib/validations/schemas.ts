@@ -558,6 +558,14 @@ export const ExecutionTaskSchema = z
   })
   .strict();
 
+// --- Proyección de nota (get_grade_projection, US5) ---
+
+export const GradeProjectionReadSchema = z
+  .object({
+    subject_id: z.string().optional(),
+  })
+  .strict();
+
 // --- Intención (intentions) ---
 
 export const IntentionItemSchema = z
