@@ -251,6 +251,20 @@ export interface ExecutionErrorResult {
 }
 
 /**
+ * Contrato de respuesta compartido por todos los servicios y handlers del módulo
+ * (contracts/mcp-tools.md). Vive aquí, junto a `ExecutionErrorCode`, para que tanto
+ * lib/execution/handlers.ts como los servicios que consume (program.ts, tandas.ts, ...) lo
+ * importen sin depender uno del otro.
+ */
+export interface ExecutionSuccess<T = unknown> {
+  status: 'success';
+  message?: string;
+  data?: T;
+}
+
+export type ExecutionResult<T = unknown> = ExecutionSuccess<T> | ExecutionErrorResult;
+
+/**
  * Traduce un ZodError a `{ status: 'error', code, message }`. Un `superRefine` puede fijar el
  * código exacto agregando `params: { code: '...' }` a su `issue` (así es como `starts_on` no
  * lunes se convierte en `NO_ES_LUNES`); si ningún issue trae un código explícito y hay claves no
