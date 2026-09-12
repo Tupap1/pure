@@ -269,22 +269,75 @@ describe('[001] US6 — Reporte semanal congelado por correo', () => {
     }
   });
 
-  it('US6-AS9 · sin destinatario con consentimiento el envío falla por falta de destinatario', async () => {
+  it('US6-AS9 · sin destinatario al congelar, el reporte espera en congelado sin consumir intentos, y envía en cuanto se registre uno', async () => {
     await setupProgram();
-    // Sin set_partner: no hay destinatario vigente.
+    // Sin set_partner: no hay destinatario vigente al momento de congelar.
 
-    vi.setSystemTime(new Date('2026-09-21T00:00:30.000Z')); // congela; ventana hasta ~01:00:30
+    vi.setSystemTime(new Date('2026-09-21T00:00:30.000Z')); // congela sin destinatario
     const frozen = await runExecutionTick(new Date(), { mailer: makeFakeMailer() });
     expect(frozen.frozen).toBe(1);
 
-    vi.setSystemTime(new Date('2026-09-21T01:05:00.000Z')); // ventana cerrada: se intenta enviar
-    const tick = await runExecutionTick(new Date(), { mailer: makeFakeMailer() });
-    expect(tick.failed).toBe(1);
+    // Varios ticks, cada uno pasado el backoff de 10 min: ninguno es un fallo de entrega (FR-023
+    // es para eso), así que ninguno debe consumir un intento ni acercar el reporte a 'fallido'.
+    vi.setSystemTime(new Date('2026-09-21T01:05:00.000Z'));
+    let tick = await runExecutionTick(new Date(), { mailer: makeFakeMailer() });
+    expect(tick.sent).toBe(0);
+    expect(tick.failed).toBe(0);
 
+    vi.setSystemTime(new Date('2026-09-21T01:20:00.000Z'));
+    tick = await runExecutionTick(new Date(), { mailer: makeFakeMailer() });
+    expect(tick.failed).toBe(0);
+
+    vi.setSystemTime(new Date('2026-09-21T01:35:00.000Z'));
+    tick = await runExecutionTick(new Date(), { mailer: makeFakeMailer() });
+    expect(tick.failed).toBe(0);
+
+    let read = await readReport('pw-01');
+    expect(read.status).toBe('success');
+    if (read.status === 'success') {
+      expect(read.data.status).toBe('congelado'); // nunca 'fallido' por esta causa
+      expect(read.data.attempts).toBe(0); // ningún intento consumido
+      expect(read.data.last_error).toBeFalsy();
+    }
+
+    // Se registra el destinatario: el siguiente tick debe enviar exactamente un correo.
+    const partnerResult = await setupPartner();
+    expect(partnerResult.status).toBe('success');
+    const partnerId = partnerResult.status === 'success' ? (partnerResult.data as any).id : null;
+
+    vi.setSystemTime(new Date('2026-09-21T01:50:00.000Z'));
+    const mailer = makeFakeMailer();
+    tick = await runExecutionTick(new Date(), { mailer });
+    expect(tick.sent).toBe(1);
+    expect(mailer.calls).toHaveLength(1);
+
+    read = await readReport('pw-01');
+    expect(read.status).toBe('success');
+    if (read.status === 'success') {
+      expect(read.data.status).toBe('enviado');
+      expect(read.data.partner_id).toBe(partnerId); // queda constancia de a quién se le mandó
+    }
+  });
+
+  it('manage_weekly_report:send a mano sigue devolviendo SIN_PARTNER (US6-AS9), sin marcar el reporte fallido', async () => {
+    await setupProgram();
+    // Sin set_partner: no hay destinatario vigente.
+
+    vi.setSystemTime(new Date('2026-09-21T00:00:30.000Z'));
+    await runExecutionTick(new Date(), { mailer: makeFakeMailer() }); // congela sin destinatario
+
+    vi.setSystemTime(new Date('2026-09-21T01:05:00.000Z')); // ventana ya cerrada
+    const sendResult = await handleManageWeeklyReport('send', { program_week_id: 'pw-01' });
+    expect(sendResult.status).toBe('error');
+    if (sendResult.status === 'error') expect(sendResult.code).toBe('SIN_PARTNER');
+
+    // La respuesta a quien pidió el envío es un error, pero por dentro el reporte sigue
+    // esperando intacto: ni 'fallido' ni con un intento de menos para cuando sí haya destinatario.
     const read = await readReport('pw-01');
     expect(read.status).toBe('success');
     if (read.status === 'success') {
-      expect(read.data.last_error).toContain('SIN_PARTNER');
+      expect(read.data.status).toBe('congelado');
+      expect(read.data.attempts).toBe(0);
     }
   });
 
@@ -296,7 +349,8 @@ describe('[001] US6 — Reporte semanal congelado por correo', () => {
 
   it('caso borde · si se cambia de destinatario después del congelamiento, el envío usa el vigente al congelar', async () => {
     await setupProgram();
-    await setupPartner({ name: 'Andrés', email: 'andres@example.com' });
+    const andresResult = await setupPartner({ name: 'Andrés', email: 'andres@example.com' });
+    const andresPartnerId = andresResult.status === 'success' ? (andresResult.data as any).id : null;
 
     vi.setSystemTime(new Date('2026-09-21T00:00:30.000Z'));
     await runExecutionTick(new Date(), { mailer: makeFakeMailer() }); // congela con Andrés como vigente
@@ -310,5 +364,11 @@ describe('[001] US6 — Reporte semanal congelado por correo', () => {
 
     expect(mailer.calls).toHaveLength(1);
     expect(mailer.calls[0].to).toBe('andres@example.com'); // el vigente AL CONGELAR, no el actual
+
+    const read = await readReport('pw-01');
+    expect(read.status).toBe('success');
+    if (read.status === 'success') {
+      expect(read.data.partner_id).toBe(andresPartnerId); // el guardado sigue siendo el de Andrés
+    }
   });
 });
