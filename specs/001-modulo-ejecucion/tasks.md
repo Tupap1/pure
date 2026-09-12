@@ -186,7 +186,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - TodayDashboard.tsx sin conexión: "No hay conexión con Pure" + Reintentar;
   - accesibilidad y estilo: botones ≥ 44 px, `aria-live` una vez por minuto, DESIGN.md;
   - app/page.tsx: `case 'hoy'` y `default` → `<TodayDashboard />`.
-- [ ] T026 [US1] VERIFY quickstart US1 en specs/001-modulo-ejecucion/quickstart.md:
+- [X] T026 [US1] VERIFY quickstart US1 en specs/001-modulo-ejecucion/quickstart.md:
   - `curl http://localhost:3001/health`;
   - por MCP: `manage_tandas` start, current e interrupt;
   - en el navegador (375×812 y escritorio): Hoy es la primera pantalla; un toque arranca la tanda; el conteo sobrevive a la recarga; la barra móvil no tiene Configuración y el engranaje la abre; la consola no tiene errores.
