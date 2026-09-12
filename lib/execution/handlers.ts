@@ -432,6 +432,17 @@ async function sendWeeklyReportManually(programWeekId: string, now: Date): Promi
       message: 'El reporte no está en estado congelado ahora mismo (puede estar enviándose o haber fallado ya).',
     };
   }
+  if (outcome === 'sin_partner') {
+    // US6-AS9: quien pide el envío a mano sigue recibiendo SIN_PARTNER. Por dentro, esta causa
+    // concreta no consumió un intento ni movió el reporte de 'congelado' (auditoría US6): no es
+    // un fallo de entrega, es una configuración incompleta que se resuelve sola en cuanto exista
+    // un destinatario, sin que este intento manual la haya empeorado.
+    return {
+      status: 'error',
+      code: 'SIN_PARTNER',
+      message: 'No hay un destinatario vigente para enviar este reporte.',
+    };
+  }
 
   const updated = await fetchWeeklyReportsFromDb(programWeekId);
   return { status: 'success', data: updated };

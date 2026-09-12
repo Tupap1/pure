@@ -22,9 +22,12 @@ import {
   claimWeeklyReportForSendingInDb,
   markWeeklyReportSentInDb,
   markWeeklyReportFailedAttemptInDb,
+  revertClaimForMissingPartnerInDb,
   revertStuckSendingToFrozenInDb,
   fetchActivePartnerFromDb,
   fetchAccountabilityPartnersFromDb,
+  setWeeklyReportPartnerInDb,
+  AccountabilityPartnerRecord,
   ProgramWeekRecord,
   WeeklyReportRecord,
 } from '../db/execution-pg';
@@ -143,23 +146,55 @@ async function freezeDueWeeks(now: Date): Promise<number> {
   return frozen;
 }
 
+function normalizePartner(
+  raw: AccountabilityPartnerRecord | AccountabilityPartnerRecord[] | null
+): AccountabilityPartnerRecord | null {
+  return Array.isArray(raw) ? raw[0] ?? null : raw;
+}
+
 /**
- * Envía un reporte ya claimado. Cualquier fallo (de red, o la ausencia de destinatario) se trata
- * igual: cuenta como intento fallido y aplica el mismo backoff/máximo de 3 intentos. Exportada
- * porque `manage_weekly_report:send` (el envío manual) reusa exactamente esta función — el claim
- * atómico es el mismo tanto si lo dispara el tick como si lo dispara Andrés a mano.
+ * Envía un reporte ya claimado. Exportada porque `manage_weekly_report:send` (el envío manual)
+ * reusa exactamente esta función — el claim atómico es el mismo tanto si lo dispara el tick como
+ * si lo dispara Andrés a mano.
+ *
+ * Auditoría US6: falta de destinatario NO es un fallo de entrega (FR-023 es para eso: que la API
+ * de correo responda mal o no responda), es una configuración incompleta. Por eso la resolución
+ * del destinatario ocurre ANTES del try/catch, que a partir de ahí solo cubre el envío real:
+ * - si el reporte ya tiene un `partner_id` guardado (se congeló con alguien vigente), se usa ese
+ *   y nunca se vuelve a consultar quién está activo ahora — "el vigente al congelar" (caso
+ *   borde de spec.md) se conserva exactamente.
+ * - si no tiene ninguno guardado (se congeló sin destinatario), se resuelve el vigente EN ESTE
+ *   INSTANTE; si hay uno, se deja constancia guardando su id en el reporte.
+ * - si sigue sin haber ninguno, el claim se deshace por completo (revertClaimForMissingPartnerInDb):
+ *   el intento no cuenta, el reporte vuelve a 'congelado' tal como estaba, listo para que un
+ *   tick futuro — apenas exista un destinatario — lo intente de nuevo sin haber gastado nada.
  */
-export async function attemptSend(report: WeeklyReportRecord, now: Date, mailer: Mailer): Promise<'sent' | 'failed' | 'skipped'> {
+export async function attemptSend(
+  report: WeeklyReportRecord,
+  now: Date,
+  mailer: Mailer
+): Promise<'sent' | 'sin_partner' | 'failed' | 'skipped'> {
   const claimed = await claimWeeklyReportForSendingInDb(report.id, now);
   if (!claimed) return 'skipped'; // ya no estaba 'congelado': otro proceso lo tomó, o ya se resolvió
 
-  try {
-    const partnerRaw = claimed.partner_id ? await fetchAccountabilityPartnersFromDb(claimed.partner_id) : null;
-    const partner = Array.isArray(partnerRaw) ? partnerRaw[0] : partnerRaw;
-    if (!partner) {
-      throw new Error('SIN_PARTNER: no hay un destinatario vigente para este reporte.');
-    }
+  let partner = normalizePartner(
+    claimed.partner_id ? await fetchAccountabilityPartnersFromDb(claimed.partner_id) : null
+  );
 
+  if (!partner) {
+    const active = await fetchActivePartnerFromDb();
+    if (active) {
+      await setWeeklyReportPartnerInDb(report.id, active.id);
+      partner = active;
+    }
+  }
+
+  if (!partner) {
+    await revertClaimForMissingPartnerInDb(report.id, report.last_attempt_at);
+    return 'sin_partner';
+  }
+
+  try {
     const payload = claimed.payload as ReportPayload;
     await mailer.send({
       to: partner.email,
@@ -197,6 +232,9 @@ async function sendDueReports(now: Date, mailer: Mailer): Promise<{ sent: number
     const outcome = await attemptSend(report, now, mailer);
     if (outcome === 'sent') sent++;
     if (outcome === 'failed') failed++;
+    // 'sin_partner' y 'skipped' no cuentan como envío ni como fallo de entrega: el primero
+    // vuelve a 'congelado' sin haber gastado nada (auditoría US6), y el segundo significa que
+    // otro proceso ya resolvió este reporte entre el fetch de arriba y este intento.
   }
 
   return { sent, failed };

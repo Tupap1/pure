@@ -628,6 +628,14 @@ export async function updateWeeklyReportNoteInDb(id: string, note: string): Prom
   return res.rows[0] ? normalizeWeeklyReportRow(res.rows[0]) : null;
 }
 
+/** Deja constancia, en el reporte ya congelado, de a qué destinatario se le terminó mandando —
+ * relevante sobre todo cuando se congeló sin ninguno y se resolvió el vigente al momento de
+ * enviar (auditoría US6: "guarda el partner_id en el reporte para que quede el registro"). */
+export async function setWeeklyReportPartnerInDb(id: string, partnerId: string): Promise<WeeklyReportRecord | null> {
+  const res = await pgPool.query(`UPDATE weekly_reports SET partner_id = $2 WHERE id = $1 RETURNING *`, [id, partnerId]);
+  return res.rows[0] ? normalizeWeeklyReportRow(res.rows[0]) : null;
+}
+
 /**
  * Claim atómico (US6-AS4, FR-039): entre todas las llamadas concurrentes que compitan por el
  * mismo reporte, como mucho una obtiene la fila (y por lo tanto el permiso de enviarla). Si no
@@ -665,6 +673,27 @@ export async function markWeeklyReportFailedAttemptInDb(
     status,
     error,
   ]);
+  return res.rows[0] ? normalizeWeeklyReportRow(res.rows[0]) : null;
+}
+
+/**
+ * Deshace un claim que no llegó a intentar el envío porque no hay destinatario (auditoría US6):
+ * no tener un destinatario configurado no es un fallo de entrega (FR-023 es para eso), así que
+ * el `attempts + 1` que puso el claim se revierte exactamente (`attempts - 1`) y `last_attempt_at`
+ * vuelve al valor que tenía antes de este intento — nunca queda 'fallido' ni gastando el backoff
+ * de un intento que en realidad no ocurrió.
+ */
+export async function revertClaimForMissingPartnerInDb(
+  id: string,
+  previousLastAttemptAt: string | null
+): Promise<WeeklyReportRecord | null> {
+  const res = await pgPool.query(
+    `UPDATE weekly_reports
+     SET status = 'congelado', attempts = attempts - 1, last_attempt_at = $2
+     WHERE id = $1
+     RETURNING *`,
+    [id, previousLastAttemptAt]
+  );
   return res.rows[0] ? normalizeWeeklyReportRow(res.rows[0]) : null;
 }
 
