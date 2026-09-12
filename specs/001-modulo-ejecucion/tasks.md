@@ -290,11 +290,11 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
 
 ### Tests for User Story 4 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T040 [P] [US4] TEST US4-AS3 en __tests__/build/pwa-manifest.test.ts: `app/manifest.ts` devuelve `display: 'standalone'`, `id` y `scope` `'/'`, `background_color` y `theme_color` `'#191919'`, y los íconos de 192 y 512 (+ maskable).
+- [X] T040 [P] [US4] TEST US4-AS3 en __tests__/build/pwa-manifest.test.ts: `app/manifest.ts` devuelve `display: 'standalone'`, `id` y `scope` `'/'`, `background_color` y `theme_color` `'#191919'`, y los íconos de 192 y 512 (+ maskable).
 
 ### Implementation for User Story 4
 
-- [ ] T041 [US4] IMPL app/manifest.ts, app/apple-icon.tsx, app/icons/[size]/route.tsx y app/layout.tsx:
+- [X] T041 [US4] IMPL app/manifest.ts, app/apple-icon.tsx, app/icons/[size]/route.tsx y app/layout.tsx:
   - manifest e íconos de 180, 192 y 512 con `ImageResponse` de `next/og`, monocromos según DESIGN.md;
   - en app/layout.tsx, quitar `manifest: '/manifest.json'` y cambiar `viewport.themeColor` de `'#05080e'` a `'#191919'`;
   - borrar public/manifest.json.
