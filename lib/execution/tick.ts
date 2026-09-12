@@ -6,7 +6,7 @@
 // (`manage_weekly_report:run_tick`): es la misma función en los dos casos.
 
 import { finalizeElapsed } from './tandas';
-import { addDays, localDateTimeToInstant } from './time';
+import { addDays, localDateTimeToInstant, localParts } from './time';
 import {
   REPORT_FREEZE_TIME,
   REPORT_NOTE_MINUTES,
@@ -22,6 +22,8 @@ import {
   claimWeeklyReportForSendingInDb,
   markWeeklyReportSentInDb,
   markWeeklyReportFailedAttemptInDb,
+  markWeeklyReportFreezeNotifiedInDb,
+  markTandaEndNotifiedInDb,
   revertClaimForMissingPartnerInDb,
   revertStuckSendingToFrozenInDb,
   fetchActivePartnerFromDb,
@@ -30,23 +32,40 @@ import {
   AccountabilityPartnerRecord,
   ProgramWeekRecord,
   WeeklyReportRecord,
+  TandaRecord,
 } from '../db/execution-pg';
+import { fetchSubjectsFromDb } from '../db/repository-pg';
 import { getCompliance } from './compliance';
 import { computeGradeProjections } from './grade-projection';
 import { computeVerdict } from '../domain/execution';
 import { buildReportPayload, deriveRiskSection, renderReportSubject, renderReportText, BuildReportPayloadInput, ReportPayload } from './report';
 import type { Mailer } from './mailer';
+import { createWebPusher, type Pusher } from './push';
 
-/** Interfaz mínima de avisos push (US7). Ningún tipo de aviso se envía todavía desde aquí: T060-
- * T062 conectan `pusher` cuando US7 se construya. Se declara ya (en vez de agregarla después)
- * porque el contrato de `run_tick` y la firma de runExecutionTick ya la incluyen. */
-export interface Pusher {
-  notify(payload: { title: string; body: string; url: string; tag: string }): Promise<void>;
-}
+// Reexportado por compatibilidad: antes de T061, `Pusher` se declaraba en este archivo.
+export type { Pusher };
 
 export interface TickOptions {
   mailer: Mailer;
+  /** US7: sin pasar un Pusher explícito (los tests de US6 no lo hacen), el tick usa el real
+   * (createWebPusher), que a su vez es un no-op con un warn si VAPID no está configurado — nunca
+   * lanza y nunca duplica un aviso porque cada uno se marca en la base la primera vez que sale. */
   pusher?: Pusher;
+}
+
+/** "10 minutos de {materia}" (con materia) o "10 minutos" (sin ella), como pide
+ * contracts/notifications.md para el aviso de fin de tanda. */
+async function tandaEndBody(tanda: TandaRecord): Promise<string> {
+  if (!tanda.subject_id) return '10 minutos';
+  const subjectRaw = await fetchSubjectsFromDb(tanda.subject_id);
+  const subject = Array.isArray(subjectRaw) ? subjectRaw[0] : subjectRaw;
+  return subject?.name ? `10 minutos de ${subject.name}` : '10 minutos';
+}
+
+function formatHHMM(minutesSinceMidnight: number): string {
+  const h = Math.floor(minutesSinceMidnight / 60) % 24;
+  const m = minutesSinceMidnight % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 export interface TickResult {
@@ -68,7 +87,13 @@ function weekCutoff(startsOn: string): Date {
  * siempre el corte teórico, nunca el instante real del tick (US6-AS8): si Pure estuvo apagado,
  * el reporte se congela iguial "como si" hubiera corrido a las 19:00.
  */
-async function freezeOneWeek(week: ProgramWeekRecord, allWeeks: ProgramWeekRecord[], cutoff: Date, now: Date): Promise<boolean> {
+async function freezeOneWeek(
+  week: ProgramWeekRecord,
+  allWeeks: ProgramWeekRecord[],
+  cutoff: Date,
+  now: Date,
+  pusher: Pusher
+): Promise<boolean> {
   const from = week.starts_on;
   const to = addDays(week.starts_on, 6);
 
@@ -122,10 +147,25 @@ async function freezeOneWeek(week: ProgramWeekRecord, allWeeks: ProgramWeekRecor
     note_deadline: noteDeadline.toISOString(),
   });
 
+  // US7 (FR-032): "reporte congelado" avisa con la hora límite de la nota. `inserted` solo es
+  // no-null la ÚNICA vez que este insert idempotente realmente crea la fila (T054/FR-039), así
+  // que este aviso sale exactamente una vez por semana — no hace falta una marca aparte para
+  // decidir SI avisar, pero sí se guarda freeze_notified_at para que quede constancia.
+  if (inserted) {
+    const deadlineHHMM = formatHHMM(localParts(noteDeadline).minutes);
+    await pusher.notify({
+      title: 'Reporte de la semana congelado',
+      body: `Tu nota hasta las ${deadlineHHMM}`,
+      tag: 'reporte',
+      url: '/',
+    });
+    await markWeeklyReportFreezeNotifiedInDb(inserted.id, now);
+  }
+
   return inserted !== null;
 }
 
-async function freezeDueWeeks(now: Date): Promise<number> {
+async function freezeDueWeeks(now: Date, pusher: Pusher): Promise<number> {
   const weeksRaw = await fetchProgramWeeksFromDb();
   const weeks = (Array.isArray(weeksRaw) ? weeksRaw : []) as ProgramWeekRecord[];
 
@@ -140,7 +180,7 @@ async function freezeDueWeeks(now: Date): Promise<number> {
     const cutoff = weekCutoff(week.starts_on);
     if (cutoff.getTime() > now.getTime()) continue; // el corte de esta semana todavía no llega
 
-    const didInsert = await freezeOneWeek(week, weeks, cutoff, now);
+    const didInsert = await freezeOneWeek(week, weeks, cutoff, now, pusher);
     if (didInsert) frozen++;
   }
   return frozen;
@@ -172,7 +212,8 @@ function normalizePartner(
 export async function attemptSend(
   report: WeeklyReportRecord,
   now: Date,
-  mailer: Mailer
+  mailer: Mailer,
+  pusher?: Pusher
 ): Promise<'sent' | 'sin_partner' | 'failed' | 'skipped'> {
   const claimed = await claimWeeklyReportForSendingInDb(report.id, now);
   if (!claimed) return 'skipped'; // ya no estaba 'congelado': otro proceso lo tomó, o ya se resolvió
@@ -209,16 +250,34 @@ export async function attemptSend(
     const message = String(error?.message ?? error).slice(0, 500);
     const exhausted = claimed.attempts >= REPORT_MAX_ATTEMPTS;
     await markWeeklyReportFailedAttemptInDb(report.id, message, exhausted);
+
+    // US7/FR-032: "fallo de envío" avisa solo cuando el reporte de verdad se agota y pasa a
+    // 'fallido' — ese tránsito 'congelado' -> 'fallido' ocurre como mucho una vez en la vida de
+    // un reporte (una vez 'fallido', ningún tick vuelve a intentarlo), así que este único punto
+    // ya garantiza el aviso exactamente una vez, sin necesitar una marca aparte en la base.
+    if (exhausted && pusher) {
+      await pusher.notify({
+        title: 'No se pudo enviar el reporte',
+        body: 'Revisa Configuración → Notificaciones',
+        tag: 'reporte-fallo',
+        url: '/',
+      });
+    }
     return 'failed';
   }
 }
 
-async function sendDueReports(now: Date, mailer: Mailer): Promise<{ sent: number; failed: number }> {
+async function sendDueReports(
+  now: Date,
+  mailer: Mailer,
+  pusher: Pusher
+): Promise<{ sent: number; failed: number; notified: number }> {
   const allRaw = await fetchWeeklyReportsFromDb();
   const all = (Array.isArray(allRaw) ? allRaw : []) as WeeklyReportRecord[];
 
   let sent = 0;
   let failed = 0;
+  let notified = 0;
 
   for (const report of all) {
     if (report.status !== 'congelado') continue;
@@ -229,15 +288,25 @@ async function sendDueReports(now: Date, mailer: Mailer): Promise<{ sent: number
       if (sinceLastAttemptMs < REPORT_RETRY_BACKOFF_MINUTES * 60_000) continue; // dentro del backoff
     }
 
-    const outcome = await attemptSend(report, now, mailer);
+    // Mismo cálculo que attemptSend usa por dentro (`claimed.attempts >= REPORT_MAX_ATTEMPTS`,
+    // con `claimed.attempts = report.attempts + 1`) para saber si ESTE intento, de fallar, es el
+    // que agota los reintentos y dispara el aviso de fallo — se duplica aquí solo para poder
+    // contarlo en `notified` sin cambiar la forma en que attemptSend responde a sus otros
+    // callers (lib/execution/handlers.ts hace un envío manual con ese mismo string).
+    const willExhaustOnFailure = report.attempts + 1 >= REPORT_MAX_ATTEMPTS;
+
+    const outcome = await attemptSend(report, now, mailer, pusher);
     if (outcome === 'sent') sent++;
-    if (outcome === 'failed') failed++;
+    if (outcome === 'failed') {
+      failed++;
+      if (willExhaustOnFailure) notified++;
+    }
     // 'sin_partner' y 'skipped' no cuentan como envío ni como fallo de entrega: el primero
     // vuelve a 'congelado' sin haber gastado nada (auditoría US6), y el segundo significa que
     // otro proceso ya resolvió este reporte entre el fetch de arriba y este intento.
   }
 
-  return { sent, failed };
+  return { sent, failed, notified };
 }
 
 /**
@@ -247,15 +316,39 @@ async function sendDueReports(now: Date, mailer: Mailer): Promise<{ sent: number
  * congelamientos (insert idempotente) ni envíos (claim atómico) — FR-039.
  */
 export async function runExecutionTick(now: Date, options: TickOptions): Promise<TickResult> {
-  await finalizeElapsed(now);
+  // Sin un Pusher explícito, se usa el real: es un no-op con un warn si VAPID no está
+  // configurado (nunca lanza), así que dejarlo por defecto aquí no cambia el comportamiento de
+  // los callers que todavía no pasan `pusher` (mcp-server/index.ts y manage_weekly_report:run_tick
+  // en lib/execution/handlers.ts) — en cuanto Andrés configure VAPID (T063), esos dos sitios
+  // empiezan a mandar avisos reales sin que nadie tenga que tocarlos.
+  const pusher = options.pusher ?? createWebPusher();
+  let notified = 0;
+
+  // FR-032 "fin de tanda": finalizeElapsed solo devuelve una tanda no-null la única vez que ESTA
+  // llamada es la que la cierra por tiempo cumplido (US1-AS3); una tanda ya cerrada, o ninguna en
+  // curso, devuelve null. Eso ya garantiza como mucho un aviso por tanda sin necesitar la marca
+  // end_notified_at para decidir SI avisar — pero igual se guarda, como constancia y por si un
+  // día se necesita volver a consultar si una tanda concreta ya avisó.
+  const finalizedTanda = await finalizeElapsed(now);
+  if (finalizedTanda) {
+    await pusher.notify({
+      title: 'Terminó la tanda',
+      body: await tandaEndBody(finalizedTanda),
+      tag: 'tanda',
+      url: '/',
+    });
+    await markTandaEndNotifiedInDb(finalizedTanda.id, now);
+    notified++;
+  }
+
   await revertStuckSendingToFrozenInDb(now, REPORT_STUCK_SENDING_MINUTES);
 
-  const frozen = await freezeDueWeeks(now);
-  const { sent, failed } = await sendDueReports(now, options.mailer);
+  // Cada semana recién congelada disparó exactamente un aviso (arriba, dentro de freezeOneWeek).
+  const frozen = await freezeDueWeeks(now, pusher);
+  notified += frozen;
 
-  // US7 (push) todavía no está construido (T060-T062): `pusher`, si llega, queda reservado para
-  // entonces. `notified` se reporta en 0 en vez de inventar un número.
-  void options.pusher;
+  const { sent, failed, notified: failureNotified } = await sendDueReports(now, options.mailer, pusher);
+  notified += failureNotified;
 
-  return { frozen, sent, failed, notified: 0 };
+  return { frozen, sent, failed, notified };
 }

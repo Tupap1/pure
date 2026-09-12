@@ -423,6 +423,7 @@ export interface TandaRecord {
   mode?: string | null;
   locked_at: string;
   edited_after_lock: boolean;
+  end_notified_at?: string | null;
   created_at?: string;
 }
 
@@ -505,6 +506,17 @@ export async function deleteTandaFromDb(id: string): Promise<void> {
   await pgPool.query('DELETE FROM tandas WHERE id = $1', [id]);
 }
 
+/** US7: marca el aviso "Terminó la tanda" como ya enviado, para que un tick repetido no lo
+ * reenvíe. Función dedicada (en vez de pasar por saveTandaToDb) porque es la única escritura que
+ * necesita esta columna, igual que markWeeklyReportSentInDb hace con weekly_reports más abajo. */
+export async function markTandaEndNotifiedInDb(id: string, now: Date): Promise<TandaRecord | null> {
+  const res = await pgPool.query(`UPDATE tandas SET end_notified_at = $2 WHERE id = $1 RETURNING *`, [
+    id,
+    now.toISOString(),
+  ]);
+  return res.rows[0] || null;
+}
+
 // --- accountability_partners (US6) ---
 
 export interface AccountabilityPartnerRecord {
@@ -572,6 +584,7 @@ export interface WeeklyReportRecord {
   last_attempt_at: string | null;
   last_error: string | null;
   sent_at: string | null;
+  freeze_notified_at?: string | null;
   created_at?: string;
 }
 
@@ -712,4 +725,69 @@ export async function revertStuckSendingToFrozenInDb(now: Date, staleMinutes: nu
     }
   }
   return count;
+}
+
+/** US7: marca el aviso "Reporte de la semana congelado" como ya enviado, para que congelar dos
+ * veces la misma semana (no debería pasar por el insert idempotente, pero por si acaso) o releer
+ * el estado del tick nunca lo reenvíe. */
+export async function markWeeklyReportFreezeNotifiedInDb(id: string, now: Date): Promise<WeeklyReportRecord | null> {
+  const res = await pgPool.query(`UPDATE weekly_reports SET freeze_notified_at = $2 WHERE id = $1 RETURNING *`, [
+    id,
+    now.toISOString(),
+  ]);
+  return res.rows[0] ? normalizeWeeklyReportRow(res.rows[0]) : null;
+}
+
+// --- push_subscriptions (US7) ---
+
+export interface PushSubscriptionRecord {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent?: string | null;
+  last_success_at?: string | null;
+  created_at?: string;
+}
+
+export async function fetchPushSubscriptionsFromDb(
+  id?: string
+): Promise<PushSubscriptionRecord | PushSubscriptionRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM push_subscriptions WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM push_subscriptions ORDER BY created_at ASC');
+  return res.rows;
+}
+
+/** Upsert por `id` (= sha256(endpoint), calculado por quien llama): activar los avisos dos veces
+ * desde el mismo dispositivo actualiza la misma fila en vez de duplicarla (US7-AS1). */
+export async function upsertPushSubscriptionToDb(sub: {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent?: string | null;
+}): Promise<PushSubscriptionRecord> {
+  const res = await pgPool.query(
+    `INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, user_agent)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (id) DO UPDATE SET
+       endpoint = EXCLUDED.endpoint,
+       p256dh = EXCLUDED.p256dh,
+       auth = EXCLUDED.auth,
+       user_agent = EXCLUDED.user_agent
+     RETURNING *`,
+    [sub.id, sub.endpoint, sub.p256dh, sub.auth, sub.user_agent ?? null]
+  );
+  return res.rows[0];
+}
+
+export async function deletePushSubscriptionFromDb(id: string): Promise<void> {
+  await pgPool.query('DELETE FROM push_subscriptions WHERE id = $1', [id]);
+}
+
+export async function markPushSubscriptionSuccessInDb(id: string, now: Date): Promise<void> {
+  await pgPool.query('UPDATE push_subscriptions SET last_success_at = $2 WHERE id = $1', [id, now.toISOString()]);
 }

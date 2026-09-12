@@ -569,6 +569,33 @@ export const ComplianceReportReadSchema = z
   })
   .strict();
 
+// --- Suscripción de avisos (push_subscriptions, US7) ---
+// Forma de `PushSubscription.toJSON()` del navegador. `id` nunca viaja en el body: lo calcula el
+// servidor como sha256(endpoint) (data-model.md), así que un mismo dispositivo siempre upsertea
+// la misma fila en vez de duplicarla.
+
+export const PushSubscriptionSchema = z
+  .object({
+    endpoint: z
+      .string()
+      .url()
+      .refine((value) => value.startsWith('https://'), { message: 'endpoint debe ser una URL https' }),
+    expirationTime: z.number().nullable().optional(),
+    keys: z
+      .object({
+        p256dh: z.string().min(1),
+        auth: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const PushUnsubscribeSchema = z
+  .object({
+    endpoint: z.string().min(1),
+  })
+  .strict();
+
 // --- Tarea (tasks) ---
 
 export const ExecutionTaskSchema = z
