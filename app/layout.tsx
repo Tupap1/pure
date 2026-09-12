@@ -5,7 +5,6 @@ export const metadata: Metadata = {
   title: 'PURE OS',
   description:
     'Gestión académica multi-institución: horarios, entregas y horas de estudio.',
-  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -17,7 +16,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#05080e',
+  themeColor: '#191919',
 };
 
 export default function RootLayout({

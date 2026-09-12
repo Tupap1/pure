@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import manifest from '@/app/manifest';
+import manifestFn from '@/app/manifest';
 
 describe('[001] US4 — Pure en el iPhone', () => {
   it('US4-AS3 · el manifest declara standalone, íconos y colores (FR-030)', () => {
+    const manifest = manifestFn();
+
     // Verificar display standalone
     expect(manifest.display).toBe('standalone');
 
