@@ -22,12 +22,34 @@ Solo existen tres tipos. Cualquier otro tipo de aviso viola FR-032.
 
 ## Correo del reporte (US6, FR-021/FR-022)
 
-- **Transporte**: la interfaz `Mailer`, implementada con `nodemailer` sobre SMTP.
-  - Conexión: `SMTP_HOST`, `SMTP_PORT` (465 → `secure: true`), `SMTP_USER` y `SMTP_PASS`.
-  - Remitente y respuestas: `from = REPORT_FROM || SMTP_USER`, `replyTo = SMTP_USER`, así que las
-    respuestas le llegan a Andres.
-  - Si falta configuración, el error aparece al enviar: el reporte queda en `fallido` con
-    `last_error`.
+- **Transporte**: la interfaz `Mailer`, implementada sobre la **API HTTP de ZeptoMail**
+  (`POST https://api.zeptomail.com/v1.1/email`). No se usa `nodemailer` ni SMTP.
+  - Cabeceras: `Authorization: Zoho-enczapikey {ZEPTOMAIL_TOKEN}`, `Content-Type: application/json`
+    y `Accept: application/json`. En `.env` el token va **sin** el prefijo `Zoho-enczapikey `; lo
+    antepone el código.
+  - Cuerpo:
+
+    ```json
+    {
+      "from": { "address": "{REPORT_FROM}", "name": "{REPORT_FROM_NAME}" },
+      "to": [ { "email_address": { "address": "correo del destinatario", "name": "su nombre" } } ],
+      "reply_to": [ { "address": "{REPORT_REPLY_TO}" } ],
+      "subject": "...",
+      "textbody": "...",
+      "track_clicks": false,
+      "track_opens": false
+    }
+    ```
+
+  - `reply_to` es obligatorio: el usuario de ZeptoMail es una llave de API, no un buzón, así que
+    sin él las respuestas del destinatario se pierden. Apunta al correo de Andres.
+  - El remitente tiene que ser una dirección del dominio verificado en ZeptoMail (`btw-one.com`).
+  - Sin rastreo: `track_clicks` y `track_opens` en `false`, y el cuerpo va en `textbody`.
+  - Éxito: HTTP 201. Cualquier otro código, o un fallo de red, cuenta como intento fallido y
+    `last_error` guarda `{status} {error.code} {error.message}` recortado a 500 caracteres.
+  - Variables: `ZEPTOMAIL_TOKEN`, `ZEPTOMAIL_URL` (por defecto la de arriba), `REPORT_FROM`,
+    `REPORT_FROM_NAME` y `REPORT_REPLY_TO`. Sin `ZEPTOMAIL_TOKEN` el envío falla y el reporte
+    queda en `fallido` con `last_error`; el tick nunca se cae por eso.
 - **Asunto**: `Pure — semana {N} ({dd}–{dd} {mes}): {veredicto}`.
 - **Cuerpo**: texto plano, corto (cabe en una pantalla de teléfono), con las cifras del `payload`
   congelado. Ejemplo:

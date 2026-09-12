@@ -143,12 +143,19 @@ las pruebas del repositorio el 2026-09-11. No quedan `NEEDS CLARIFICATION`.
 
 ## R-17 · Canal del reporte
 
-- **Decisión**: correo por SMTP desde el buzón de Zoho Mail de Andres, con `nodemailer` detrás de
-  la interfaz `Mailer`.
-- **Razón**: las respuestas del destinatario le llegan a Andres, sin cuentas nuevas. Si Pure migra
-  a un runtime sin SMTP, solo cambia `mailer.ts` (por ejemplo, a una API HTTP de correo).
+- **Decisión**: correo por la **API HTTP de ZeptoMail** (el servicio transaccional de Zoho), con
+  el remitente en el dominio propio `btw-one.com` y `reply_to` al buzón de Andres, detrás de la
+  interfaz `Mailer`. `nodemailer` no entra al proyecto.
+- **Razón**: Andres ya tiene ZeptoMail con el dominio verificado, así que el correo sale firmado
+  (SPF/DKIM) y no depende de la contraseña de su buzón personal. El envío es un `POST` con `fetch`,
+  que corre igual en Node, en el contenedor y en un runtime edge; el SMTP saliente por el puerto
+  465 lo bloquean varios de los hospedajes gratuitos a los que Pure va a migrar. Las respuestas del
+  destinatario llegan al buzón de Andres por `reply_to`.
 - **Alternativas consideradas**:
-  - un proveedor transaccional (el remitente no sería su buzón);
+  - el SMTP del mismo ZeptoMail (`smtp.zeptomail.com:465`, usuario `emailapikey`): idéntico
+    servicio, pero obliga a `nodemailer` y al puerto bloqueado;
+  - el SMTP del buzón personal de Zoho Mail con contraseña de aplicación (diseño anterior): ata el
+    envío a una credencial del buzón y a un puerto que no sobrevive la migración;
   - la API de WhatsApp de Meta (verificación de negocio y plantillas aprobadas: días de trámite);
   - un bot de Telegram;
   - envío manual (lo reduce a monitoreo privado).

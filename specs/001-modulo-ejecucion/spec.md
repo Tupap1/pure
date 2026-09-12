@@ -16,8 +16,8 @@
 
 ### Session 2026-09-11
 
-- Q: ¿Por qué canal sale el reporte semanal? → A: Por correo, desde el buzón de Andres (su
-  cuenta de Zoho Mail), así que las respuestas del destinatario le llegan a él.
+- Q: ¿Por qué canal sale el reporte semanal? → A: Por correo, enviado con ZeptoMail desde el
+  dominio propio `btw-one.com`; las respuestas del destinatario llegan al buzón de Andres.
 - Q: ¿Cómo se usa Pure en el iPhone y cómo llegan los avisos? → A: Como app instalada desde el
   navegador en la pantalla de inicio, con avisos del sistema. No pasa por ninguna tienda de
   aplicaciones.

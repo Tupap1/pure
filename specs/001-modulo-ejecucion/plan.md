@@ -34,8 +34,9 @@ Enfoque técnico (detalle en [research.md](./research.md)):
 para la web; servidor MCP con `@modelcontextprotocol/sdk` 1.30.
 
 **Primary Dependencies**: `pg`, `zod` 4, `@modelcontextprotocol/sdk`, `lucide-react` (existentes).
-Nuevas: `nodemailer`, para el correo por SMTP de Zoho, y `web-push`, para Web Push con VAPID.
-Ambas quedan detrás de las interfaces `Mailer` y `Pusher`.
+Nueva: `web-push`, para Web Push con VAPID. El correo sale por la API HTTP de ZeptoMail con
+`fetch`, sin dependencia nueva. Los dos canales quedan detrás de las interfaces `Mailer` y
+`Pusher`.
 
 **Storage**: PostgreSQL 16 con migraciones `008`–`011`, todas solo-Postgres. En los tests se usa
 pg-mem 3 vía `__tests__/helpers/test-db.ts`, que ejecuta las migraciones reales.
@@ -98,7 +99,7 @@ con `lib/` compartido.
 | III. Paridad pruebas/producción | SQL verificado en pg-mem (ver [research.md](./research.md) R-03, R-04). `running_lock TEXT UNIQUE` en lugar de índice parcial. TZ en `lib/execution/time.ts`. `started_at` siempre `new Date()` del servidor | PASS |
 | IV. Verificación empírica | [quickstart.md](./quickstart.md): `/health`, llamadas MCP, UI a 375 px y escritorio, instalación en el iPhone, correo real y push real | PASS |
 | V. Sobriedad y datos verificables | Hoy muestra un disparador, sin minutos, faltantes ni proyecciones (FR-018). `DESIGN.md`. Reparto normativo de 48 h/crédito con urgencia aparte (FR-036). Proyección como tabla escaneable (US8) | PASS |
-| VI. Seguridad | Access antes de publicar el hostname (paso manual previo a US4). Lista blanca de acciones en la web. Correo del destinatario nunca en la web (FR-025). `SMTP_*` y `VAPID_*` solo en `.env`. try/catch en todas las rutas | PASS (depende del paso manual de Access) |
+| VI. Seguridad | Access antes de publicar el hostname (paso manual previo a US4). Lista blanca de acciones en la web. Correo del destinatario nunca en la web (FR-025). `ZEPTOMAIL_TOKEN` y `VAPID_*` solo en `.env`. try/catch en todas las rutas | PASS (depende del paso manual de Access) |
 
 **Re-check post-diseño (tras data-model y contracts):** PASS. El diseño no introdujo plpgsql,
 índices parciales, tiempos de cliente ni datos sembrados. Las decisiones con complejidad añadida
