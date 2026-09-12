@@ -324,7 +324,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - techo < aprobatoria → `materia_perdida`;
   - materia sin evaluaciones → flag `ciega` (FR-027);
   - ampliar __tests__/domain/subject.test.ts: `entregado` con nota cuenta en `calculateWeightedGrade`, y los 3 tests actuales siguen verdes.
-- [ ] T045 [P] [US5] TEST US5-AS6 en __tests__/mcp/grade-projection-tool.test.ts (pg-mem): `get_grade_projection` eleva a alerta `ciega` la materia sin evaluaciones y marca `abandonada` la que tiene una evaluación en < 7 días y 0 tandas en 7 días.
+- [X] T045 [P] [US5] TEST US5-AS6 en __tests__/mcp/grade-projection-tool.test.ts (pg-mem): `get_grade_projection` eleva a alerta `ciega` la materia sin evaluaciones y marca `abandonada` la que tiene una evaluación en < 7 días y 0 tandas en 7 días.
 
 ### Implementation for User Story 5
 
@@ -333,7 +333,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - `isGradedDeliverable` (estado normalizado ≠ pendiente y `grade` numérico), usado en `calculateWeightedGrade` y en `calculateSubjectGradeProgress` (lib/domain/deliverable.ts:81);
   - `projectSubjectGrade(delivs, { scaleMax, passingGrade, targetGrade }, now)`: necesaria = ceil2 sobre `(puntos*100)/peso`; techo = floor2; flags de FR-027 incluyendo `ciega`;
   - nunca leer `subjects.current_grade`.
-- [ ] T047 [US5] IMPL `computeAlerts` en lib/domain/execution.ts y `handleGetGradeProjection` en lib/execution/handlers.ts:
+- [X] T047 [US5] IMPL `computeAlerts` en lib/domain/execution.ts y `handleGetGradeProjection` en lib/execution/handlers.ts:
   - escala tomada de `universities.scale_max` y `passing_grade`;
   - registro de `get_grade_projection` en mcp-server/index.ts y conteo de `TOOLS_LIST` +1.
 - [ ] T048 [US5] VERIFY quickstart US5 en specs/001-modulo-ejecucion/quickstart.md: `get_grade_projection` por MCP sobre Química devuelve 3.33, 5.20 y 4.34, y las alertas de las materias sin evaluaciones.
