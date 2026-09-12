@@ -464,6 +464,7 @@ razón esperada antes de su implementación (GREEN), y termina con una verificac
   - asistente de 4 pasos al que se entra desde Hoy los domingos;
   - tareas dentro del hub de asignatura;
   - tabla de proyección: promedio evaluado, aporte, peso restante, necesaria para aprobar y para la meta, techo; flags como texto; `STATUS_LABELS` con el estado normalizado; `SubjectHub` pasa la universidad.
+  - **Parcialmente pendiente**: `SundayPlanning.tsx` está completo y funcional (4 pasos, `usePlanWeekPreview`), pero `TodayDashboard.tsx` es del otro agente (US7) en esta rama y no se tocó, así que el asistente todavía no tiene el enlace desde Hoy los domingos. Falta agregar ahí: `import { SundayPlanning } from '@/components/dashboards/SundayPlanning'`, un estado `showSundayPlanning`, un enlace visible solo si `isoDayOfWeekForDateKey(today.date) === 7` (de `@/lib/domain/execution`) que hace `setShowSundayPlanning(true)`, y `{showSundayPlanning && <SundayPlanning onClose={() => setShowSundayPlanning(false)} />}`.
 - [ ] T068 [US8] VERIFY quickstart US8 en specs/001-modulo-ejecucion/quickstart.md: recorrer la planeación del domingo en el navegador y comprobar intenciones, disparadores sugeridos, tareas y la tabla de proyección del hub.
 
 ---
