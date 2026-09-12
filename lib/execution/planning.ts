@@ -388,10 +388,9 @@ export async function openPlanView(input: { reason?: string }, now: Date): Promi
   };
 }
 
-/** Cuántas aperturas de esta semana pasaron por la compuerta (US9-AS1): lo que
- * lib/execution/handlers.ts añade al payload del reporte semanal como "Aperturas del plan" (el
- * congelamiento real en lib/execution/tick.ts la completa por su cuenta si no la recibe, vía
- * lib/db/execution-pg.ts:insertWeeklyReportIfAbsentInDb). */
+/** Cuántas aperturas de esta semana pasaron por la compuerta (US9-AS1): lo que tanto
+ * lib/execution/handlers.ts (para `preview`) como lib/execution/tick.ts:freezeOneWeek (para el
+ * congelamiento real) añaden al payload del reporte semanal como "Aperturas del plan". */
 export async function countGatedPlanOpenings(programWeekId: string): Promise<number> {
   const views = await fetchPlanViewsFromDb(programWeekId);
   return views.filter((v) => v.was_gated).length;

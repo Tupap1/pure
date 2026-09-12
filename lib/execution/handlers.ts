@@ -383,8 +383,8 @@ async function assembleReportInput(
     // cambiar mientras la semana en curso no se congele de verdad.
     second_consecutive_failure: false,
     // US9: aperturas de la vista de semana que pasaron por la compuerta esta semana. El
-    // congelamiento real (lib/execution/tick.ts) no pasa por aquí y no conoce este campo; lo
-    // completa por su cuenta lib/db/execution-pg.ts:insertWeeklyReportIfAbsentInDb.
+    // congelamiento real (lib/execution/tick.ts:freezeOneWeek) calcula el mismo dato con la
+    // misma función (countGatedPlanOpenings), para su propia semana.
     plan_openings: planOpenings,
   };
 }

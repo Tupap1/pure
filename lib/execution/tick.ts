@@ -37,6 +37,7 @@ import {
 import { fetchSubjectsFromDb } from '../db/repository-pg';
 import { getCompliance } from './compliance';
 import { computeGradeProjections } from './grade-projection';
+import { countGatedPlanOpenings } from './planning';
 import { computeVerdict } from '../domain/execution';
 import { buildReportPayload, deriveRiskSection, renderReportSubject, renderReportText, BuildReportPayloadInput, ReportPayload } from './report';
 import type { Mailer } from './mailer';
@@ -81,8 +82,9 @@ function weekCutoff(startsOn: string): Date {
 }
 
 /**
- * Congela una semana ya vencida: junta cumplimiento (getCompliance) y proyección de nota
- * (computeGradeProjections, ambos cortados al instante `cutoff`, nunca a `now`) y guarda el
+ * Congela una semana ya vencida: junta cumplimiento (getCompliance), proyección de nota
+ * (computeGradeProjections, ambos cortados al instante `cutoff`, nunca a `now`) y las aperturas
+ * de la vista de semana que pasaron por la compuerta (countGatedPlanOpenings, US9), y guarda el
  * payload de una sola vez (`insertWeeklyReportIfAbsentInDb`, idempotente). `frozen_at` es
  * siempre el corte teórico, nunca el instante real del tick (US6-AS8): si Pure estuvo apagado,
  * el reporte se congela iguial "como si" hubiera corrido a las 19:00.
@@ -97,10 +99,11 @@ async function freezeOneWeek(
   const from = week.starts_on;
   const to = addDays(week.starts_on, 6);
 
-  const [compliance, projections, activePartner] = await Promise.all([
+  const [compliance, projections, activePartner, planOpenings] = await Promise.all([
     getCompliance({ from, to, cutoff }),
     computeGradeProjections(cutoff),
     fetchActivePartnerFromDb(),
+    countGatedPlanOpenings(week.id),
   ]);
 
   const enRiesgo = deriveRiskSection(projections.materias, projections.alertas);
@@ -134,6 +137,7 @@ async function freezeOneWeek(
     late,
     previous_report_failed: previousReportFailed,
     second_consecutive_failure: secondConsecutiveFailure,
+    plan_openings: planOpenings,
   };
   const payload = buildReportPayload(input);
 

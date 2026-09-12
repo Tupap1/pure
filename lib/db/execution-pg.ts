@@ -608,6 +608,9 @@ export async function fetchWeeklyReportsFromDb(id?: string): Promise<WeeklyRepor
  * Congela una semana (id = program_week_id) una sola vez: `ON CONFLICT (id) DO NOTHING` hace que
  * un segundo tick concurrente que intente congelar la misma semana no haga nada y no lance error
  * (FR-039). Devuelve la fila insertada, o null si ya existía (otro proceso ya la había congelado).
+ * Repositorio puro: guarda el `payload` tal como lo arma el caller (lib/execution/tick.ts:
+ * freezeOneWeek para el congelamiento real, lib/execution/handlers.ts:previewWeeklyReport para el
+ * preview) — no calcula ni completa ningún campo de negocio aquí.
  */
 export async function insertWeeklyReportIfAbsentInDb(input: {
   id: string;
@@ -618,21 +621,6 @@ export async function insertWeeklyReportIfAbsentInDb(input: {
   frozen_at: string;
   note_deadline: string;
 }): Promise<WeeklyReportRecord | null> {
-  // US9: quien arma el payload (lib/execution/tick.ts:freezeOneWeek, para el congelamiento real
-  // del domingo) todavía no sabe de "Aperturas del plan" — esa historia es posterior a la suya.
-  // En vez de tocar ese archivo, se completa aquí mismo, justo antes de guardar, contando las
-  // filas de plan_views de esta semana que pasaron por la compuerta (was_gated=true): así el
-  // reporte realmente congelado lleva la misma cifra que manage_weekly_report:preview ya calcula
-  // en lib/execution/handlers.ts. Si el caller ya trae `plan_openings` (el preview sí lo hace),
-  // se respeta tal cual.
-  const payload: Record<string, unknown> = { ...(input.payload as Record<string, unknown>) };
-  if (payload.plan_openings == null) {
-    const gatedRes = await pgPool.query('SELECT was_gated FROM plan_views WHERE program_week_id = $1', [
-      input.program_week_id,
-    ]);
-    payload.plan_openings = gatedRes.rows.filter((r: { was_gated: boolean }) => r.was_gated).length;
-  }
-
   const res = await pgPool.query(
     `INSERT INTO weekly_reports (id, program_week_id, partner_id, payload, verdict, frozen_at, note_deadline, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, 'congelado')
@@ -642,7 +630,7 @@ export async function insertWeeklyReportIfAbsentInDb(input: {
       input.id,
       input.program_week_id,
       input.partner_id,
-      JSON.stringify(payload),
+      JSON.stringify(input.payload),
       input.verdict,
       input.frozen_at,
       input.note_deadline,
