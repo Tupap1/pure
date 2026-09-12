@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useToday } from '@/lib/hooks/useToday';
 import { usePureData } from '@/lib/hooks/usePureData';
+import { useWeeklyReport } from '@/lib/hooks/useWeeklyReport';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -40,12 +41,15 @@ export const TodayDashboard: React.FC = () => {
     setCheck,
   } = useToday();
   const { subjects } = usePureData();
+  const { report, setNote } = useWeeklyReport();
 
   const [isStarting, setIsStarting] = useState(false);
   const [interruptOpen, setInterruptOpen] = useState(false);
   const [interruptReason, setInterruptReason] = useState('');
   const [justFinished, setJustFinished] = useState<TodayRunningTanda | null>(null);
   const prevRunningRef = useRef<TodayRunningTanda | null>(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [noteJustSaved, setNoteJustSaved] = useState(false);
 
   // FR-008: la materia se puede asignar al terminar. Cuando la tanda en curso desaparece del
   // payload (se completó o se interrumpió) y no tenía materia, se ofrece etiquetarla.
@@ -98,6 +102,18 @@ export const TodayDashboard: React.FC = () => {
     setInterruptOpen(false);
     setInterruptReason('');
   };
+
+  const handleSaveNote = async () => {
+    if (!report) return;
+    const result = await setNote(report.program_week_id, noteDraft.trim());
+    if (result?.status === 'success') setNoteJustSaved(true);
+  };
+
+  // US6: el domingo, entre el congelamiento y el envío, hay una hora para escribir la nota
+  // (note_deadline). server_now (si ya cargó Hoy) es más fiable que el reloj del cliente; sin él,
+  // Date.now() basta para esto — el servidor es quien de verdad hace cumplir VENTANA_CERRADA.
+  const referenceNowMs = today ? new Date(today.server_now).getTime() : Date.now();
+  const noteWindowOpen = !!report && new Date(report.note_deadline).getTime() > referenceNowMs;
 
   return (
     <div className="max-w-lg mx-auto py-8 px-4 space-y-6 pb-24">
@@ -272,6 +288,70 @@ export const TodayDashboard: React.FC = () => {
           {footer.tandasLine && footer.dayFulfilledLine ? ' · ' : ''}
           {footer.dayFulfilledLine}
         </p>
+      )}
+
+      {report && (
+        <Card className="space-y-3">
+          <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
+            Semana {report.week_number} · {report.payload_resumen.days_fulfilled} de 7 días cumplidos · {report.verdict}
+          </p>
+
+          {report.payload_resumen.habits.map((habit) => (
+            <p key={habit.label} className="text-xs font-mono text-slate-500 dark:text-slate-400">
+              {habit.label}: {habit.cumplidos}/{habit.total}
+            </p>
+          ))}
+
+          {report.payload_resumen.en_riesgo.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">En riesgo</p>
+              {report.payload_resumen.en_riesgo.map((line, index) => (
+                <p key={index} className="text-xs text-slate-500 dark:text-slate-400">
+                  · {line}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {report.status === 'congelado' && noteWindowOpen && !noteJustSaved && (
+            <div className="space-y-2">
+              <textarea
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value.slice(0, 400))}
+                maxLength={400}
+                placeholder="Tu nota para el reporte (opcional)"
+                className="w-full min-h-[80px] px-3 py-2 rounded-lg border border-surface-border bg-surface text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400"
+              />
+              {report.verdict === 'fallida' && !noteDraft.trim() && (
+                <p className="text-xs text-amber-600 dark:text-amber-500">
+                  Si no escribes nada, el reporte dirá que no diste explicación.
+                </p>
+              )}
+              <Button variant="primary" size="sm" onClick={handleSaveNote} className="min-h-[44px]">
+                Guardar nota
+              </Button>
+            </div>
+          )}
+
+          {report.status === 'congelado' && noteWindowOpen && noteJustSaved && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">Nota guardada.</p>
+          )}
+
+          {report.status === 'congelado' && !noteWindowOpen && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">La ventana de nota cerró: se envía en breve.</p>
+          )}
+          {report.status === 'enviando' && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">Enviando…</p>
+          )}
+          {report.status === 'enviado' && (
+            <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
+              Enviado{report.sent_at ? ` ${formatClock(report.sent_at)}` : ''}
+            </p>
+          )}
+          {report.status === 'fallido' && (
+            <p className="text-xs text-red-600 dark:text-red-400">No se pudo enviar</p>
+          )}
+        </Card>
       )}
     </div>
   );
