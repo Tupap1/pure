@@ -115,6 +115,7 @@ describe('[002] US-B2 — La tanda olvidada no bloquea el sistema', () => {
     expect(read.status).toBe('success');
     if (read.status === 'success') {
       const tanda = (read.data as any).tandas[0];
+      expect(tanda.status).toBe('completada');
       expect(new Date(tanda.ended_at).toISOString()).toBe('2026-09-14T15:10:00.000Z');
     }
 
@@ -125,6 +126,15 @@ describe('[002] US-B2 — La tanda olvidada no bloquea el sistema', () => {
 
     // Debe seguir habiendo un solo aviso (sin duplicados)
     expect(pusher2.calls.filter((c) => c.tag === 'tanda')).toHaveLength(0);
+
+    // Verificar que la tanda no cambió
+    const read2 = await handleManageTandas('read', {});
+    expect(read2.status).toBe('success');
+    if (read2.status === 'success') {
+      const tanda = (read2.data as any).tandas[0];
+      expect(tanda.status).toBe('completada');
+      expect(new Date(tanda.ended_at).toISOString()).toBe('2026-09-14T15:10:00.000Z');
+    }
   });
 
   it('US-B2-AS3 · una tanda a las 22:25 termina por tiempo sin cierre de hora', async () => {
@@ -139,8 +149,12 @@ describe('[002] US-B2 — La tanda olvidada no bloquea el sistema', () => {
     const start = await handleManageTandas('start', {});
     expect(start.status).toBe('success');
 
-    // A las 03:31 UTC (22:31 Bogotá), la tanda sigue en curso
+    // A las 03:31 UTC (22:31 Bogotá), corre el tick (donde viviría un cierre por hora)
     vi.setSystemTime(new Date('2026-09-15T03:31:00.000Z'));
+    const pusher3 = makeFakePusher();
+    await runExecutionTick(new Date(), { mailer: makeFakeMailer(), pusher: pusher3 });
+
+    // Después, la tanda sigue en curso
     const current = await handleManageTandas('current', {});
     expect(current.status).toBe('success');
     if (current.status === 'success') {
