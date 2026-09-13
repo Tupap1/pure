@@ -458,7 +458,7 @@ export const TOOLS_LIST = [
       'Módulo de Ejecución: planeación del domingo y la vista de semana (US8-US9-B1). ' +
       '"preview" arma el asistente del domingo: la semana pasada (cumplimiento), las entregas de los próximos 14 días con sus alertas, las intenciones y disparadores de la semana que viene con su ensayo, y el reparto sugerido de tandas por materia (de la norma de créditos, 48h/crédito/semestre, con la urgencia y la proyección de nota en columnas aparte) — excluye de ese reparto una materia con intención declarada menor a 6. ' +
       '"set_intentions" registra, por materia y semana, una intención de 0 a 10; menor a 6 exige razón (RAZON_REQUERIDA si falta) y esa materia deja de recibir reparto sugerido. ' +
-      '"open_view" abre la vista de una semana: si no existe la indicada, NO_ENCONTRADO; si es futura, apertura de planeación (surface=planeacion, sin compuerta); si es la semana en curso, compuerta normal (libre 2 veces, desde la 3.ª exige reason). Devuelve la rejilla: cada disparador con su resultado por día y las tandas por día, sin gráficas.',
+      '"open_view" abre la vista de una semana: si no existe la indicada, NO_ENCONTRADO; si es futura, apertura de planeación (surface=planeacion, desde la 3.ª apertura sin compuerta); si es la semana en curso, compuerta normal (libre 2 veces, desde la 3.ª exige reason). Devuelve la rejilla con aperturas del plan: cada disparador con su resultado por día y las tandas por día, sin gráficas.',
     inputSchema: {
       type: 'object',
       properties: {

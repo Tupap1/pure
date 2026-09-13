@@ -68,11 +68,19 @@ function findCurrentWeek(weeks: ProgramWeekRecord[], todayKey: string): ProgramW
 
 export type WeekResolution = { ok: true; week: ProgramWeekRecord } | { ok: false; reason: 'sin_programa' | 'programa_terminado' };
 
+/** Helper: la semana con menor starts_on que sea mayor que todayKey, sin importar orden. */
+function findNextWeekByStartsOn(weeks: ProgramWeekRecord[], todayKey: string): ProgramWeekRecord | null {
+  const candidates = weeks.filter((w) => w.starts_on > todayKey);
+  if (candidates.length === 0) return null;
+  // Retorna la que tiene el menor starts_on
+  return candidates.reduce((prev, curr) => (curr.starts_on < prev.starts_on ? curr : prev));
+}
+
 /**
  * Decide cuál es la semana para planear (US-B1, contracts/mcp-tools.md:plan_week:preview):
  * - si hoy es domingo y hay una semana que arranca mañana, esa;
  * - la que contiene hoy (findCurrentWeek);
- * - la más próxima con starts_on > hoy;
+ * - la más próxima con starts_on > hoy (menor starts_on);
  * - si nada aplica, `{ ok: false, reason: 'sin_programa' | 'programa_terminado' }`.
  * Exportada porque se reutiliza en lib/execution/routine.ts:rehearseRoutineSlot
  * (Principio I: una sola función decide "cuál es la semana que se está planeando").
@@ -89,8 +97,8 @@ export function resolvePlanningWeek(weeks: ProgramWeekRecord[], todayKey: string
   const currentWeek = findCurrentWeek(weeks, todayKey);
   if (currentWeek) return { ok: true, week: currentWeek };
 
-  // Paso 3: la más próxima con starts_on > hoy
-  const nextWeek = weeks.find((w) => w.starts_on > todayKey);
+  // Paso 3: la más próxima con starts_on > hoy (menor starts_on, sin importar orden del arreglo)
+  const nextWeek = findNextWeekByStartsOn(weeks, todayKey);
   if (nextWeek) return { ok: true, week: nextWeek };
 
   // Paso 4: sin semana disponible
@@ -106,8 +114,8 @@ export function resolveViewWeek(weeks: ProgramWeekRecord[], todayKey: string): W
   const currentWeek = findCurrentWeek(weeks, todayKey);
   if (currentWeek) return { ok: true, week: currentWeek };
 
-  // Paso 3: la más próxima con starts_on > hoy
-  const nextWeek = weeks.find((w) => w.starts_on > todayKey);
+  // Paso 3: la más próxima con starts_on > hoy (menor starts_on, sin importar orden del arreglo)
+  const nextWeek = findNextWeekByStartsOn(weeks, todayKey);
   if (nextWeek) return { ok: true, week: nextWeek };
 
   // Paso 4: sin semana disponible

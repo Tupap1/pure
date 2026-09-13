@@ -429,11 +429,16 @@ export async function openPlanView(input: { reason?: string; program_week_id?: s
 
     const grid = await buildWeekGrid(week.starts_on, addDays(week.starts_on, 6), now);
 
+    // Contar aperturas surface='semana' de esa semana para opens_this_week
+    const semanaViews = await fetchPlanViewsFromDb(week.id, 'semana');
+    const opensThisWeek = semanaViews.length;
+
     return {
       status: 'success',
       data: {
         allowed: true,
         needs_reason: false,
+        opens_this_week: opensThisWeek,
         program_week_id: week.id,
         surface: 'planeacion',
         ...grid,
