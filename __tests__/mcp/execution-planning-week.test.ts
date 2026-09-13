@@ -330,4 +330,48 @@ describe('[002] US-B1 — Planear la semana que todavía no empieza', () => {
       expect(afterViewResult.reason).toBe('programa_terminado');
     }
   });
+
+  it('dos aperturas simultáneas de la vista cuentan como una y ninguna falla', async () => {
+    await setupProgram();
+    vi.setSystemTime(new Date('2026-09-15T15:00:00.000Z')); // martes 15, dentro de la semana 1
+
+    const [a, b] = await Promise.all([handlePlanWeek('open_view', {}), handlePlanWeek('open_view', {})]);
+
+    expect(a.status).toBe('success');
+    if (a.status === 'success') {
+      expect((a.data as any).opens_this_week).toBe(1);
+    }
+
+    expect(b.status).toBe('success');
+    if (b.status === 'success') {
+      expect((b.data as any).opens_this_week).toBe(1);
+    }
+
+    // Tercera apertura en serie: debe contar como 2
+    const c = await handlePlanWeek('open_view', {});
+    expect(c.status).toBe('success');
+    if (c.status === 'success') {
+      expect((c.data as any).opens_this_week).toBe(2);
+    }
+  });
+
+  it('dos aperturas de planeación simultáneas no fallan', async () => {
+    await setupProgram();
+    vi.setSystemTime(new Date('2026-09-13T20:00:00.000Z')); // domingo 13
+
+    const [a, b] = await Promise.all([
+      handlePlanWeek('open_view', { program_week_id: 'pw-01' }),
+      handlePlanWeek('open_view', { program_week_id: 'pw-01' }),
+    ]);
+
+    expect(a.status).toBe('success');
+    if (a.status === 'success') {
+      expect((a.data as any).surface).toBe('planeacion');
+    }
+
+    expect(b.status).toBe('success');
+    if (b.status === 'success') {
+      expect((b.data as any).surface).toBe('planeacion');
+    }
+  });
 });
