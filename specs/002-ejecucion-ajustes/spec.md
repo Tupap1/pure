@@ -251,6 +251,9 @@ semanas seguidas con 7 u 8, correr el proceso programado dos veces y congelar el
   programado lo vuelve a evaluar y retira si corresponde.
 - ¿Un reporte congelado antes de desplegar esta feature? Conserva su forma original, incluida su
   línea de aperturas.
+- ¿Dos aperturas simultáneas de la vista de la semana (un doble toque, dos dispositivos, o la doble
+  ejecución de efectos de React en desarrollo)? Cuentan como una sola apertura y ninguna de las dos
+  falla. Lo encontró la verificación en el navegador del 2026-09-13: la segunda respondía 400.
 
 ## Requirements *(mandatory)*
 

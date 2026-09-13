@@ -131,6 +131,16 @@ martes 15, domingo 20 y después de la última semana, y comprobar la semana que
   - GREEN: `npx vitest run __tests__/mcp/execution-planning-week.test.ts __tests__/mcp/execution-planning.test.ts __tests__/mcp/plan-views.test.ts __tests__/mcp/execution-routine.test.ts` y después `npm run test:all` en verde. Commit: `feat(002): US-B1 resolución de semana para planear y aperturas de planeación`.
 - [ ] T011 [US-B1] VERIFY Lo hace el orquestador: `npm run mcp:start:http` en local, `curl http://localhost:3001/health`, y las llamadas 1, 3, 4 y 5 de quickstart.md (US-B1). Luego la vista de la semana en la web (`npm run dev`) a 375 px y en escritorio, sin errores de consola (specs/002-ejecucion-ajustes/quickstart.md)
 
+### Correcciones que salieron de la verificación de US-B1 (T011)
+
+La vista de la semana llama a `open_view` dos veces al montar en desarrollo (`useWeekView` en
+lib/hooks/usePlanWeek.ts, con React StrictMode). Las dos llamadas calculan el mismo id ordinal y la
+segunda choca con la clave primaria de `plan_views`, así que responde 400. Pasa igual con las
+aperturas `semana` de la 001 y con las de planeación.
+
+- [ ] T043 [US-B1] TEST En __tests__/mcp/execution-planning-week.test.ts, un test sin ID de escenario: dos `open_view {}` simultáneos (`Promise.all`) sobre la semana en curso (`2026-09-15T15:00:00Z`) devuelven `success` los dos con `opens_this_week: 1`, y una tercera apertura, ya en serie, devuelve `opens_this_week: 2`. Lo mismo con dos `open_view { program_week_id: 'pw-01' }` simultáneos el domingo 13, que devuelven `success` y `surface: 'planeacion'`. Hoy la segunda llamada falla con `DATOS_INVALIDOS` (RED).
+- [ ] T044 [US-B1] IMPL `savePlanViewToDb` en lib/db/execution-pg.ts con `ON CONFLICT (id) DO NOTHING RETURNING *`, que devuelve la fila o `null`. `openPlanView` en lib/execution/planning.ts trata `null` como la misma apertura hecha en simultáneo: responde éxito con los mismos valores calculados, sin error y sin volver a contar.
+
 **Checkpoint**: US-B1 funciona sola.
 
 ---
