@@ -240,7 +240,8 @@ el tick (FR-B20), la mención en el reporte (FR-B21) y sin bloquear nada (FR-B23
 
 - [ ] T027 [P] [US-B5] TEST Migración en __tests__/db/friction-schema.test.ts (pg-mem):
   - `012_friction.sql` corre y crea `friction_measures` y `friction_ratings`;
-  - `enabled_slot` admite varias filas con `NULL` y rechaza una segunda fila con `'a'` (código `23505`, con `enabled_slot` en el mensaje);
+  - `enabled_slot` admite varias filas con `NULL` y rechaza, con un `INSERT` simple de una fila nueva, una segunda fila con `'a'` (código `23505`, con `enabled_slot` en el mensaje). Esa violación no se provoca con `INSERT … ON CONFLICT … DO UPDATE`, que corrompe el índice de pg-mem (research.md, R-B08);
+  - el reclamo condicionado (`UPDATE … WHERE id = $1 AND enabled_slot IS NULL AND NOT EXISTS (SELECT 1 FROM friction_measures f2 WHERE f2.enabled_slot = $slot) RETURNING *`) devuelve 0 filas, sin error, cuando el slot está ocupado, y 1 fila cuando está libre;
   - `score` rechaza 11 por el CHECK, y la FK de `friction_ratings.program_week_id` rechaza una semana inexistente;
   - `reset()` deja las dos tablas vacías.
 - [ ] T028 [P] [US-B5] TEST Esquemas en __tests__/validations/friction-schemas.test.ts:
@@ -267,14 +268,19 @@ el tick (FR-B20), la mención en el reporte (FR-B21) y sin bloquear nada (FR-B23
 - [ ] T033 [US-B5] IMPL Repositorio en lib/db/execution-pg.ts:
   - tipos `FrictionMeasureRecord` y `FrictionRatingRecord`;
   - `fetchFrictionMeasuresFromDb(id?)`;
-  - `enableFrictionMeasureInDb(id, slot, startedOn, now)`: `INSERT … ON CONFLICT (id) DO UPDATE SET enabled_slot = EXCLUDED.enabled_slot, started_on = EXCLUDED.started_on, enabled_at = EXCLUDED.enabled_at, verified_at = NULL, disabled_at = NULL, drop_reason = NULL RETURNING *`;
+  - `ensureFrictionMeasureRowInDb(id)`: `INSERT INTO friction_measures (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`. Nunca toca `enabled_slot`;
+  - `claimFrictionSlotInDb(id, slot, startedOn, now)`: `UPDATE friction_measures SET enabled_slot = $2, started_on = $3, enabled_at = $4, verified_at = NULL, disabled_at = NULL, drop_reason = NULL WHERE id = $1 AND enabled_slot IS NULL AND NOT EXISTS (SELECT 1 FROM friction_measures f2 WHERE f2.enabled_slot = $2) RETURNING *`; devuelve la fila o `null`. **Prohibido** habilitar con `INSERT … ON CONFLICT (id) DO UPDATE SET enabled_slot = …`: si choca con `enabled_slot`, corrompe el índice de pg-mem (research.md, R-B08);
   - `disableFrictionMeasureInDb(id, reason, now, client?)`: `UPDATE … SET enabled_slot = NULL, disabled_at = $, drop_reason = $ WHERE id = $1 AND enabled_slot IS NOT NULL RETURNING *`;
   - `verifyFrictionMeasureInDb(id, now)`: `UPDATE … SET verified_at = $ WHERE id = $1 AND enabled_slot IS NOT NULL RETURNING *`;
   - `fetchFrictionRatingsFromDb(id?)`;
   - `saveFrictionRatingToDb({ program_week_id, score, rated_at })`: `ON CONFLICT (id) DO UPDATE SET score = EXCLUDED.score, rated_at = EXCLUDED.rated_at`, conservando `drop_applied_at` y `dropped_measure_id`;
   - `claimIrritationDropInDb(ratingId, measureId | null, now, client)`: `UPDATE … SET drop_applied_at = $, dropped_measure_id = $ WHERE id = $1 AND drop_applied_at IS NULL RETURNING *`.
 - [ ] T034 [US-B5] IMPL Servicio lib/execution/friction.ts:
-  - `enableFriction(key, now)`: si ya está habilitada, éxito con `ya_habilitada: true`. Si no, intenta `enableFrictionMeasureInDb` con `'a'` y, ante la violación de UNIQUE de `enabled_slot` (código `23505` y `enabled_slot` en el mensaje, igual que `isRunningLockViolation` en lib/execution/tandas.ts), con `'b'`. Si las dos fallan → `LIMITE_FRICCION` con `FRICTION_LIMIT_MESSAGE`. `started_on = localParts(now).dateKey`;
+  - `enableFriction(key, now)`, en cuatro pasos:
+    1. `ensureFrictionMeasureRowInDb(key)`;
+    2. si la fila ya tiene `enabled_slot`, éxito con `ya_habilitada: true` y sin cambios;
+    3. para cada slot de `FRICTION_SLOTS` (`'a'` y luego `'b'`), `claimFrictionSlotInDb(key, slot, localParts(now).dateKey, now)`. Si devuelve fila, éxito con `ya_habilitada: false`. Si lanza una violación de UNIQUE sobre `enabled_slot` (código `23505` con `enabled_slot` en el mensaje o el detalle, que solo pasa con dos habilitaciones simultáneas en Postgres real), se trata como slot ocupado y se sigue con el siguiente. Cualquier otro error se relanza;
+    4. si no quedó ningún slot, `LIMITE_FRICCION` con `FRICTION_LIMIT_MESSAGE`;
   - `disableFriction(key, now)`: si no estaba habilitada, éxito con `ya_deshabilitada: true`;
   - `verifyFriction(key, now)`: `NO_ENCONTRADO` si no está habilitada;
   - `rateFriction({ score, program_week_id }, now)`: la semana sale del id o de la que contiene hoy; `NO_ENCONTRADO` si no hay; `FECHA_FUTURA` si `starts_on > hoy`;

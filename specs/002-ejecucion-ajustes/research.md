@@ -119,15 +119,28 @@ lecturas del servidor MCP de producción que no escriben datos.
 ## R-B08 · Límite de 2 medidas de fricción
 
 - **Decisión**: `friction_measures.enabled_slot TEXT UNIQUE` vale `'a'` o `'b'` mientras la medida
-  está habilitada y `NULL` si no. `enable` intenta el upsert con `'a'`; ante la violación de UNIQUE
-  sobre `enabled_slot`, lo intenta con `'b'`; y si las dos fallan, responde `LIMITE_FRICCION`. No hay
-  un SELECT previo que decida.
-- **Razón**: es el mismo patrón que `running_lock` en la 001 y lo que pide el Principio III para
-  las unicidades condicionales (columna nula + `UNIQUE`). La base de datos arbitra dos
-  habilitaciones simultáneas.
-- **Alternativas consideradas**: contar las habilitadas y después insertar, que deja una carrera
-  entre dispositivos; un índice único parcial, que está prohibido; un CHECK con subconsulta, que ni
-  Postgres ni pg-mem soportan.
+  está habilitada y `NULL` si no. `enable` hace dos pasos:
+  1. asegura la fila de la medida con `INSERT … ON CONFLICT (id) DO NOTHING`, que nunca toca
+     `enabled_slot`;
+  2. reclama un slot con un UPDATE condicionado, primero `'a'` y después `'b'`:
+     `UPDATE … SET enabled_slot = $slot, … WHERE id = $1 AND enabled_slot IS NULL AND NOT EXISTS
+     (SELECT 1 FROM friction_measures f2 WHERE f2.enabled_slot = $slot) RETURNING *`.
+
+  Si ninguno de los dos devuelve fila, responde `LIMITE_FRICCION`. Una violación de UNIQUE (`23505`
+  sobre `enabled_slot`) en el paso 2 solo puede venir de dos habilitaciones simultáneas en Postgres
+  real, y se trata como slot ocupado.
+- **Evidencia (sonda en pg-mem, 2026-09-12)**: un `INSERT … ON CONFLICT (id) DO UPDATE` sobre una
+  medida nueva que choca con `enabled_slot` falla con `23505`, pero deja corrupto el índice de
+  pg-mem: después, `UPDATE … WHERE enabled_slot IS NOT NULL` no encuentra la fila y el slot queda
+  ocupado para siempre. En cambio, el UPDATE condicionado con `NOT EXISTS`, el `DO NOTHING` y los
+  INSERT o UPDATE simples que fallan dejan el estado intacto.
+- **Razón**: la unicidad sigue en la base (columna nula + `UNIQUE`, Principio III, igual que
+  `running_lock`), así que la base arbitra la concurrencia real, y el camino normal nunca depende de
+  una sentencia fallida, que en pg-mem rompería la paridad entre pruebas y producción.
+- **Alternativas consideradas**: el upsert con reintento ante la violación, que era el diseño
+  inicial y corrompe pg-mem; contar las habilitadas y después insertar sin respaldo en la base, que
+  deja una carrera entre dispositivos; un índice único parcial, que está prohibido; un CHECK con
+  subconsulta, que ni Postgres ni pg-mem soportan.
 
 ## R-B09 · Retiro por irritación
 
