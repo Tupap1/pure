@@ -2,6 +2,7 @@
 // manage_program (MCP) — Principio I: una sola vía de datos, sin lógica duplicada en la web.
 
 import { addDays, localParts } from './time';
+import { isoDayOfWeekForDateKey } from '../domain/execution';
 import type { ExecutionResult } from '../validations/schemas';
 import {
   fetchProgramWeeksFromDb,
@@ -61,6 +62,73 @@ export async function initProgram(input: ProgramInitInput): Promise<ExecutionRes
 /** Semana cuyo rango [starts_on, starts_on+6] contiene la fecha local de `now`, o null. */
 function findCurrentWeek(weeks: ProgramWeekRecord[], todayKey: string): ProgramWeekRecord | null {
   return weeks.find((week) => week.starts_on <= todayKey && todayKey <= addDays(week.starts_on, 6)) || null;
+}
+
+// --- Resolución de semana (US-B1) ---------------------------------------------------------------
+
+export type WeekResolution = { ok: true; week: ProgramWeekRecord } | { ok: false; reason: 'sin_programa' | 'programa_terminado' };
+
+/**
+ * Decide cuál es la semana para planear (US-B1, contracts/mcp-tools.md:plan_week:preview):
+ * - si hoy es domingo y hay una semana que arranca mañana, esa;
+ * - la que contiene hoy (findCurrentWeek);
+ * - la más próxima con starts_on > hoy;
+ * - si nada aplica, `{ ok: false, reason: 'sin_programa' | 'programa_terminado' }`.
+ * Exportada porque se reutiliza en lib/execution/routine.ts:rehearseRoutineSlot
+ * (Principio I: una sola función decide "cuál es la semana que se está planeando").
+ */
+export function resolvePlanningWeek(weeks: ProgramWeekRecord[], todayKey: string): WeekResolution {
+  // Paso 1: si hoy es domingo y existe una semana que arranca mañana
+  if (isoDayOfWeekForDateKey(todayKey) === 7) {
+    const tomorrowKey = addDays(todayKey, 1);
+    const nextWeek = weeks.find((w) => w.starts_on === tomorrowKey);
+    if (nextWeek) return { ok: true, week: nextWeek };
+  }
+
+  // Paso 2: la semana que contiene hoy
+  const currentWeek = findCurrentWeek(weeks, todayKey);
+  if (currentWeek) return { ok: true, week: currentWeek };
+
+  // Paso 3: la más próxima con starts_on > hoy
+  const nextWeek = weeks.find((w) => w.starts_on > todayKey);
+  if (nextWeek) return { ok: true, week: nextWeek };
+
+  // Paso 4: sin semana disponible
+  return { ok: false, reason: weeks.length === 0 ? 'sin_programa' : 'programa_terminado' };
+}
+
+/**
+ * Decide cuál es la semana para ver (US-B1, contracts/mcp-tools.md:plan_week:open_view):
+ * pasos 2 a 4 de resolvePlanningWeek (sin el salto del domingo).
+ */
+export function resolveViewWeek(weeks: ProgramWeekRecord[], todayKey: string): WeekResolution {
+  // Paso 2: la semana que contiene hoy
+  const currentWeek = findCurrentWeek(weeks, todayKey);
+  if (currentWeek) return { ok: true, week: currentWeek };
+
+  // Paso 3: la más próxima con starts_on > hoy
+  const nextWeek = weeks.find((w) => w.starts_on > todayKey);
+  if (nextWeek) return { ok: true, week: nextWeek };
+
+  // Paso 4: sin semana disponible
+  return { ok: false, reason: weeks.length === 0 ? 'sin_programa' : 'programa_terminado' };
+}
+
+/** true si la semana ya empezó (starts_on <= todayKey); false si todavía no. */
+export function weekHasStarted(week: ProgramWeekRecord, todayKey: string): boolean {
+  return week.starts_on <= todayKey;
+}
+
+/**
+ * Mensajes de error cuando la resolución falla (contracts/mcp-tools.md:plan_week).
+ * `verbo` es 'planear' o 'ver'.
+ */
+export function weekNotFoundMessage(reason: 'sin_programa' | 'programa_terminado', verbo: 'planear' | 'ver'): string {
+  if (reason === 'sin_programa') {
+    return `No hay un programa creado: no hay semana para ${verbo}.`;
+  } else {
+    return `El programa ya terminó: no quedan semanas por ${verbo}.`;
+  }
 }
 
 export async function readProgram(now: Date = new Date()): Promise<ExecutionResult> {

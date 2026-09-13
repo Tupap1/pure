@@ -455,10 +455,10 @@ export const TOOLS_LIST = [
   {
     name: 'plan_week',
     description:
-      'Módulo de Ejecución: planeación del domingo y la vista de semana (US8-US9). ' +
+      'Módulo de Ejecución: planeación del domingo y la vista de semana (US8-US9-B1). ' +
       '"preview" arma el asistente del domingo: la semana pasada (cumplimiento), las entregas de los próximos 14 días con sus alertas, las intenciones y disparadores de la semana que viene con su ensayo, y el reparto sugerido de tandas por materia (de la norma de créditos, 48h/crédito/semestre, con la urgencia y la proyección de nota en columnas aparte) — excluye de ese reparto una materia con intención declarada menor a 6. ' +
       '"set_intentions" registra, por materia y semana, una intención de 0 a 10; menor a 6 exige razón (RAZON_REQUERIDA si falta) y esa materia deja de recibir reparto sugerido. ' +
-      '"open_view" es la compuerta de la vista de semana (FR-037): libre 2 veces por semana; desde la 3.ª exige reason (RAZON_REQUERIDA si falta) y esa apertura queda contada en el reporte semanal ("Aperturas del plan"). Devuelve la rejilla de la semana en curso: cada disparador con su resultado por día y las tandas por día, sin gráficas.',
+      '"open_view" abre la vista de una semana: si no existe la indicada, NO_ENCONTRADO; si es futura, apertura de planeación (surface=planeacion, sin compuerta); si es la semana en curso, compuerta normal (libre 2 veces, desde la 3.ª exige reason). Devuelve la rejilla: cada disparador con su resultado por día y las tandas por día, sin gráficas.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -466,9 +466,9 @@ export const TOOLS_LIST = [
         data: {
           type: 'object',
           description:
-            'preview: { program_week_id? } (la semana en curso, o la siguiente si hoy es domingo, si se omite). ' +
+            'preview: { program_week_id? } (domingo→siguiente, si no en curso, si no siguiente disponible; sin nada → NO_ENCONTRADO). ' +
             'set_intentions: { program_week_id, items: [{ subject_id, strength (0-10), reason? }] }. ' +
-            'open_view: { reason? } (obligatorio desde la 3.ª apertura de la semana en curso).',
+            'open_view: { program_week_id?, reason? } (la semana indicada o resuelta; futura es apertura de planeación sin compuerta; en curso aplica compuerta normal).',
         },
       },
       required: ['action'],
@@ -789,7 +789,7 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'plan_week',
-    'Módulo de Ejecución: planeación del domingo y vista de semana (US8-US9). preview/set_intentions/open_view. El reparto sugerido sale de la norma de créditos (urgencia y proyección aparte) y excluye materias con intención < 6; open_view es la compuerta de la semana (2 aperturas libres, desde la 3.ª pide razón) y devuelve la rejilla de disparadores y tandas por día, sin gráficas.',
+    'Módulo de Ejecución: planeación del domingo y vista de semana (US8-US9-B1). preview/set_intentions/open_view. El reparto sugerido sale de la norma de créditos (urgencia y proyección aparte) y excluye materias con intención < 6. open_view abre la vista de una semana (indicada o resuelta): si es futura, apertura de planeación sin compuerta; si es en curso, compuerta normal (2 aperturas libres, desde la 3.ª pide razón). Devuelve la rejilla de disparadores y tandas por día, sin gráficas.',
     {
       action: z.enum(['preview', 'set_intentions', 'open_view']),
       data: z.any().optional(),

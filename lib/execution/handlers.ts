@@ -661,11 +661,12 @@ export async function handleManageTasks(
 export type ManagePlanWeekAction = 'preview' | 'set_intentions' | 'open_view';
 
 /**
- * `plan_week` (US8-US9): el asistente del domingo (`preview`, `set_intentions`) y la compuerta de
- * la vista de semana (`open_view`, FR-037). `preview` sin `program_week_id` resuelve la semana en
- * curso, o la siguiente si hoy es domingo (mismo criterio que `manage_routine_slots:rehearse`,
- * lib/execution/routine.ts:resolveRehearsalWeekId); `open_view` siempre mira la semana en curso,
- * nunca la que se está planeando.
+ * `plan_week` (US8-US9-B1): el asistente del domingo (`preview`, `set_intentions`) y la apertura
+ * de la vista de semana (`open_view`, FR-037 + US-B1). Sin `program_week_id`, ambas resuelven
+ * con resolvePlanningWeek/resolveViewWeek desde lib/execution/program.ts (Principio I):
+ * - `preview`: domingo → siguiente; luego en curso; luego próxima; sin nada → NO_ENCONTRADO.
+ * - `open_view`: en curso; luego próxima; sin nada → NO_ENCONTRADO. Además, si la semana
+ *   todavía no empieza, abre como "planeación" sin compuerta y sin restar aperturas.
  */
 export async function handlePlanWeek(
   action: ManagePlanWeekAction,
