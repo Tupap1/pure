@@ -8,6 +8,7 @@ import {
 } from '../../lib/execution/handlers';
 import { handleManageUniversities, handleManageSubjects } from '../../mcp-server/tools-handler';
 import { resolvePlanningWeek, resolveViewWeek } from '../../lib/execution/program';
+import * as executionPg from '../../lib/db/execution-pg';
 import type { ExecutionResult } from '../../lib/validations/schemas';
 import type { ProgramWeekRecord } from '../../lib/db/execution-pg';
 
@@ -372,6 +373,32 @@ describe('[002] US-B1 — Planear la semana que todavía no empieza', () => {
     expect(b.status).toBe('success');
     if (b.status === 'success') {
       expect((b.data as any).surface).toBe('planeacion');
+    }
+  });
+
+  it('si guardar la apertura falla, open_view responde error y no la da por hecha', async () => {
+    await setupProgram();
+
+    // Semana en curso (surface semana)
+    vi.setSystemTime(new Date('2026-09-15T15:00:00.000Z'));
+    const spySemana = vi.spyOn(executionPg, 'savePlanViewToDb').mockRejectedValueOnce(new Error('base caída'));
+    try {
+      const res = await handlePlanWeek('open_view', {});
+      expect(spySemana).toHaveBeenCalledTimes(1);
+      expect(res.status).toBe('error');
+    } finally {
+      spySemana.mockRestore();
+    }
+
+    // Semana futura (surface planeacion)
+    vi.setSystemTime(new Date('2026-09-13T20:00:00.000Z'));
+    const spyPlaneacion = vi.spyOn(executionPg, 'savePlanViewToDb').mockRejectedValueOnce(new Error('base caída'));
+    try {
+      const res = await handlePlanWeek('open_view', { program_week_id: 'pw-01' });
+      expect(spyPlaneacion).toHaveBeenCalledTimes(1);
+      expect(res.status).toBe('error');
+    } finally {
+      spyPlaneacion.mockRestore();
     }
   });
 });
