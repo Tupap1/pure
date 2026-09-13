@@ -3,7 +3,6 @@ import { createTestDb, TestDbHarness } from '../helpers/test-db';
 import {
   handleManageProgram,
   handleManageFriction,
-  runExecutionTick,
 } from '../../lib/execution/handlers';
 import { runExecutionTick as runTick } from '../../lib/execution/tick';
 import type { Mailer } from '../../lib/execution/mailer';

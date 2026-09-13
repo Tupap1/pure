@@ -40,6 +40,7 @@ import {
   handleGetComplianceReport,
   handleManageTasks,
   handlePlanWeek,
+  handleManageFriction,
 } from './tools-handler';
 import { runExecutionTick } from '../lib/execution/tick';
 import { createZeptoMailer } from '../lib/execution/mailer';
@@ -474,6 +475,21 @@ export const TOOLS_LIST = [
       required: ['action'],
     },
   },
+  {
+    name: 'manage_friction',
+    description: 'Registrar y gestionar medidas de fricción del teléfono. Pure solo registra; la ejecución la hace el SO. Máximo 2 habilitadas a la vez (si hay más de 2 → LIMITE_FRICCION). Calificación semanal de irritación (0-10); dos semanas consecutivas ≥7 retiran automáticamente la medida más recientemente habilitada sin avisos. Medidas: sin biometría, clave larga, escala de grises, redes fuera de la pantalla de inicio, app desinstalada.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['enable', 'disable', 'verify', 'rate', 'read'] },
+        data: {
+          type: 'object',
+          description: 'enable/disable/verify: { measure_key } (sin biometria, clave_larga, escala_grises, redes_fuera_home, app_desinstalada). rate: { score: 0-10, program_week_id? (defecto: semana en curso) }. read: sin data.',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -796,6 +812,19 @@ export function createMcpServerInstance() {
     },
     async ({ action, data }) => {
       const res = await handlePlanWeek(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_friction',
+    'Registrar y gestionar medidas de fricción del teléfono (US-B5). Pure solo registra; el sistema operativo ejecuta. Máximo 2 simultáneas. Calificación semanal (0-10); dos semanas consecutivas ≥7 retiran la más recientemente habilitada.',
+    {
+      action: z.enum(['enable', 'disable', 'verify', 'rate', 'read']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageFriction(action, data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );

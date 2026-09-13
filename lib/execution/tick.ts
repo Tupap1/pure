@@ -343,6 +343,10 @@ export async function runExecutionTick(now: Date, options: TickOptions): Promise
     notified++;
   }
 
+  // US-B5: aplicar retiros por irritación
+  const { applyIrritationDrops } = await import('./friction');
+  await applyIrritationDrops(now);
+
   await revertStuckSendingToFrozenInDb(now, REPORT_STUCK_SENDING_MINUTES);
 
   // Cada semana recién congelada disparó exactamente un aviso (arriba, dentro de freezeOneWeek).

@@ -701,3 +701,59 @@ export async function handlePlanWeek(
     };
   }
 }
+
+export type ManageFrictionAction = 'enable' | 'disable' | 'verify' | 'rate' | 'read';
+
+/**
+ * `manage_friction` (US-B5): registrar y gestionar medidas de fricción del teléfono.
+ * Acciones: enable, disable, verify, rate, read.
+ */
+export async function handleManageFriction(
+  action: ManageFrictionAction,
+  data?: unknown,
+  now: Date = new Date()
+): Promise<ExecutionResult> {
+  try {
+    const { FrictionMeasureSchema, FrictionRateSchema } = await import('../validations/schemas');
+    const { enableFriction, disableFriction, verifyFriction, rateFriction, readFriction } = await import('./friction');
+
+    switch (action) {
+      case 'enable': {
+        const parsed = FrictionMeasureSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await enableFriction(parsed.data.measure_key, now);
+      }
+      case 'disable': {
+        const parsed = FrictionMeasureSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await disableFriction(parsed.data.measure_key, now);
+      }
+      case 'verify': {
+        const parsed = FrictionMeasureSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await verifyFriction(parsed.data.measure_key, now);
+      }
+      case 'rate': {
+        const parsed = FrictionRateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await rateFriction(parsed.data, now);
+      }
+      case 'read': {
+        return await readFriction(now);
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para manage_friction: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_friction:', error);
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: 'Error inesperado en manage_friction',
+    };
+  }
+}

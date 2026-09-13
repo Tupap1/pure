@@ -62,3 +62,16 @@ export const REPORT_RETRY_BACKOFF_MINUTES = 10;
 /** US6: un reporte que lleva más de 15 minutos en 'enviando' vuelve a 'congelado' (intento
  * colgado: el proceso que lo reclamó murió antes de terminar el envío). */
 export const REPORT_STUCK_SENDING_MINUTES = 15;
+
+/** US-B5: límite máximo de medidas de fricción habilitadas simultáneamente (FR-B17). */
+export const FRICTION_MAX_ENABLED = 2;
+
+/** US-B5: slots de la base para habilitar medidas de fricción ('a' y 'b') (FR-B17). */
+export const FRICTION_SLOTS = ['a', 'b'] as const;
+
+/** US-B5: umbral de irritación para aplicar retiros automáticos (dos semanas consecutivas >= 7) (FR-B20). */
+export const FRICTION_IRRITATION_THRESHOLD = 7;
+
+/** US-B5: mensaje de error cuando se intenta habilitar una tercera medida (FR-B17). */
+export const FRICTION_LIMIT_MESSAGE =
+  'Ya hay 2 medidas de fricción habilitadas. El límite existe porque la restricción parcial aumenta el estrés reportado y una medida abandonada por irritación vale 0: dos sostenibles valen más que cinco abandonadas. Deshabilita una antes de agregar otra.';
