@@ -22,9 +22,11 @@ import {
 import {
   isHabitActive,
   evaluateDay,
+  describeDay,
   isTandaBeforeCutoff,
   isoDayOfWeekForDateKey,
   DayEvaluation,
+  DayBreakdown,
 } from '../domain/execution';
 
 export interface ComplianceInput {
@@ -42,6 +44,7 @@ export interface ComplianceDay {
   date: string;
   week_number: number | null;
   evaluacion: DayEvaluation | null;
+  evaluacion_dia: DayBreakdown | null;
 }
 
 export interface ComplianceHabit {
@@ -79,14 +82,16 @@ function evaluateOneDay(
   const week = weeks.find((w) => w.starts_on <= dateKey && dateKey <= addDays(w.starts_on, 6)) ?? null;
   const completedThatDay = tandas.filter((t) => t.local_date === dateKey && t.status === 'completada').length;
   const checksForDate = checks.filter((c) => c.date === dateKey);
-  const evaluacion = evaluateDay({
+  const evaluationInput = {
     dateKey,
     minTandasDia: week ? week.min_tandas_dia : null,
     completedTandas: completedThatDay,
     habits,
     checks: checksForDate.map((c) => ({ habit_id: c.habit_id, status: c.status })),
-  });
-  return { date: dateKey, week_number: week?.week_number ?? null, evaluacion };
+  };
+  const evaluacion = evaluateDay(evaluationInput);
+  const evaluacion_dia = describeDay(evaluationInput);
+  return { date: dateKey, week_number: week?.week_number ?? null, evaluacion, evaluacion_dia };
 }
 
 export async function getCompliance(input: ComplianceInput): Promise<ComplianceResult> {
@@ -128,14 +133,16 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
   const days_fulfilled = dias.filter((d) => d.evaluacion?.fulfilled).length;
   const dias_cumplidos_totales = allDays.filter((d) => d.evaluacion?.fulfilled).length;
 
-  const habitos: ComplianceHabit[] = habits.map((h) => {
-    const activeDays = dias.filter((d) => isHabitActive(h, d.date));
-    const cumplidos = activeDays.filter((d) => {
-      const check = allChecks.find((c) => c.date === d.date && c.habit_id === h.id);
-      return check?.status === 'cumplido' || check?.status === 'na';
-    }).length;
-    return { id: h.id, label: h.label, cumplidos, total: activeDays.length };
-  });
+  const habitos: ComplianceHabit[] = habits
+    .map((h) => {
+      const activeDays = dias.filter((d) => isHabitActive(h, d.date));
+      const cumplidos = activeDays.filter((d) => {
+        const check = allChecks.find((c) => c.date === d.date && c.habit_id === h.id);
+        return check?.status === 'cumplido' || check?.status === 'na';
+      }).length;
+      return { id: h.id, label: h.label, cumplidos, total: activeDays.length };
+    })
+    .filter((h) => h.total > 0);
 
   const tandasInRange = tandasBeforeCutoff.filter((t) => t.local_date >= input.from && t.local_date <= input.to);
   const completadas = tandasInRange.filter((t) => t.status === 'completada').length;

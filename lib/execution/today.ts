@@ -7,7 +7,7 @@ import { readProgram } from './program';
 import { currentTanda, readTandas } from './tandas';
 import { resolveTodayTrigger } from './routine';
 import { fetchHabitsFromDb, fetchDailyChecksFromDb, HabitRecord, DailyCheckRecord } from '../db/execution-pg';
-import { isHabitActive, evaluateDay, CurrentTrigger } from '../domain/execution';
+import { isHabitActive, evaluateDay, describeDay, CurrentTrigger, DayBreakdown } from '../domain/execution';
 import type { ExecutionResult } from '../validations/schemas';
 
 export interface TodayRunningTanda {
@@ -32,6 +32,7 @@ export interface TodayPayload {
   pending_checks: TodayPendingCheck[];
   tandas_today: number;
   day_fulfilled: boolean | null;
+  evaluacion_dia: DayBreakdown | null;
 }
 
 export async function getToday(now: Date = new Date()): Promise<ExecutionResult<TodayPayload>> {
@@ -81,13 +82,16 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
     .filter((h) => isHabitActive(h, dateKey) && !respondedHabitIds.has(h.id))
     .map((h) => ({ habit_id: h.id, label: h.label }));
 
-  const evaluation = evaluateDay({
+  const evaluationInput = {
     dateKey,
     minTandasDia: currentWeek ? currentWeek.min_tandas_dia : null,
     completedTandas: completedToday,
     habits,
     checks: checksToday.map((c) => ({ habit_id: c.habit_id, status: c.status })),
-  });
+  };
+
+  const evaluation = evaluateDay(evaluationInput);
+  const evaluacion_dia = describeDay(evaluationInput);
 
   return {
     status: 'success',
@@ -100,6 +104,7 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
       pending_checks,
       tandas_today: completedToday,
       day_fulfilled: evaluation ? evaluation.fulfilled : null,
+      evaluacion_dia,
     },
   };
 }

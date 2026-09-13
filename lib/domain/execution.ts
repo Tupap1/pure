@@ -235,6 +235,32 @@ export function evaluateDay(input: EvaluateDayInput): DayEvaluation | null {
   return { tandasOk, habitsOk, fulfilled: tandasOk && habitsOk };
 }
 
+export interface DayBreakdown {
+  tandas_completadas: number;
+  min_requerido: number;
+  cumplio_tandas: boolean;
+  cumplio_habitos: boolean;
+  day_fulfilled: boolean;
+}
+
+/**
+ * Desglose publicitario de la evaluación del día (FR-B12): traduce los booleanos de evaluateDay
+ * a campos nominales para exposición en la API y en los reportes. Devuelve null si el día cae
+ * fuera del programa (como evaluateDay).
+ */
+export function describeDay(input: EvaluateDayInput): DayBreakdown | null {
+  const evaluation = evaluateDay(input);
+  if (evaluation === null) return null;
+
+  return {
+    tandas_completadas: input.completedTandas,
+    min_requerido: input.minTandasDia as number,
+    cumplio_tandas: evaluation.tandasOk,
+    cumplio_habitos: evaluation.habitsOk,
+    day_fulfilled: evaluation.fulfilled,
+  };
+}
+
 // --- US5: computeAlerts ---------------------------------------------------------------------
 
 export interface AlertSubjectInput {

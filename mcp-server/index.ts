@@ -331,7 +331,7 @@ export const TOOLS_LIST = [
   {
     name: 'get_today',
     description:
-      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (con los segundos restantes), el disparador vigente si lo hay, los hábitos pendientes y si el día quedó cumplido.',
+      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (con los segundos restantes), el disparador vigente si lo hay, los hábitos pendientes, si el día quedó cumplido y la evaluación desglosada del día (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -400,7 +400,7 @@ export const TOOLS_LIST = [
   {
     name: 'get_compliance_report',
     description:
-      'Módulo de Ejecución: vista de salud del hábito para un rango de días o una semana del programa entera (US6), de solo lectura. Devuelve los días con su evaluación, days_fulfilled, los hábitos como fracción, las tandas (completadas/interrumpidas y por materia), los disparadores (hecho/no/sin_respuesta), las razones de interrupción, las ediciones tardías, los días cumplidos acumulados desde el inicio del programa y el horizonte del hábito (66 por defecto).',
+      'Módulo de Ejecución: vista de salud del hábito para un rango de días o una semana del programa entera (US6), de solo lectura. Devuelve los días con su evaluación y desglose (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled), days_fulfilled, los hábitos como fracción (sin los que tienen 0 días activos en el rango), las tandas (completadas/interrumpidas y por materia), los disparadores (hecho/no/sin_respuesta), las razones de interrupción, las ediciones tardías, los días cumplidos acumulados desde el inicio del programa y el horizonte del hábito (66 por defecto).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -701,7 +701,7 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'get_today',
-    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso, disparador vigente, hábitos pendientes, día cumplido). Solo lectura.',
+    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso, disparador vigente, hábitos pendientes, día cumplido, evaluación desglosada con tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled). Solo lectura.',
     {
       data: z.any().optional(),
     },
@@ -751,7 +751,7 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'get_compliance_report',
-    'Módulo de Ejecución: vista de salud del hábito (US6), de solo lectura. Días con su evaluación, days_fulfilled, hábitos por fracción, tandas, disparadores, razones de interrupción, ediciones tardías, días cumplidos acumulados y horizonte.',
+    'Módulo de Ejecución: vista de salud del hábito (US6), de solo lectura. Días con evaluación desglosada (tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled), days_fulfilled, hábitos por fracción (sin los de 0 días activos), tandas, disparadores, razones de interrupción, ediciones tardías, días cumplidos acumulados y horizonte.',
     {
       data: z.any().optional(),
     },
