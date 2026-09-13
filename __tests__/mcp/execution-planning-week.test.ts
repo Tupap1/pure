@@ -7,7 +7,9 @@ import {
   handleManageWeeklyReport,
 } from '../../lib/execution/handlers';
 import { handleManageUniversities, handleManageSubjects } from '../../mcp-server/tools-handler';
+import { resolvePlanningWeek, resolveViewWeek } from '../../lib/execution/program';
 import type { ExecutionResult } from '../../lib/validations/schemas';
+import type { ProgramWeekRecord } from '../../lib/db/execution-pg';
 
 describe('[002] US-B1 — Planear la semana que todavía no empieza', () => {
   let harness: TestDbHarness;
@@ -159,6 +161,7 @@ describe('[002] US-B1 — Planear la semana que todavía no empieza', () => {
       action_text: 'prueba',
       anchor_time: '07:00',
     });
+    expect(slotRes.status).toBe('success');
     if (slotRes.status === 'success') {
       const slotId = (slotRes.data as any).id;
       const rehearseNotFoundRes = await handleManageRoutineSlots('rehearse', {
@@ -206,6 +209,8 @@ describe('[002] US-B1 — Planear la semana que todavía no empieza', () => {
     if (open1.status === 'success') {
       expect((open1.data as any).surface).toBe('planeacion');
       expect((open1.data as any).needs_reason).toBe(false);
+      expect((open1.data as any).opens_this_week).toBe(0);
+      expect((open1.data as any).program_week_id).toBe('pw-01');
     }
 
     const open2 = await handlePlanWeek('open_view', { program_week_id: 'pw-01' });
@@ -213,6 +218,8 @@ describe('[002] US-B1 — Planear la semana que todavía no empieza', () => {
     if (open2.status === 'success') {
       expect((open2.data as any).surface).toBe('planeacion');
       expect((open2.data as any).needs_reason).toBe(false);
+      expect((open2.data as any).opens_this_week).toBe(0);
+      expect((open2.data as any).program_week_id).toBe('pw-01');
     }
 
     // martes 15, dentro de la semana 1
@@ -231,6 +238,7 @@ describe('[002] US-B1 — Planear la semana que todavía no empieza', () => {
     expect(open4.status).toBe('success');
     if (open4.status === 'success') {
       expect((open4.data as any).surface).toBe('semana');
+      expect((open4.data as any).needs_reason).toBe(false);
       expect((open4.data as any).opens_this_week).toBe(2);
     }
   });
@@ -272,6 +280,54 @@ describe('[002] US-B1 — Planear la semana que todavía no empieza', () => {
     expect(resWithWeek.status).toBe('success');
     if (resWithWeek.status === 'success') {
       expect((resWithWeek.data as any).payload.program_week_id).toBe('pw-01');
+    }
+  });
+
+  it('resolvePlanningWeek y resolveViewWeek eligen la próxima por starts_on aunque las semanas lleguen desordenadas', () => {
+    // Arreglo de semanas desordenadas
+    const weeks: any[] = [
+      { id: 'pw-03', week_number: 3, starts_on: '2026-09-28', phase: 'consolidacion', min_tandas_dia: 6 },
+      { id: 'pw-02', week_number: 2, starts_on: '2026-09-21', phase: 'consolidacion', min_tandas_dia: 3 },
+      { id: 'pw-01', week_number: 1, starts_on: '2026-09-14', phase: 'arranque', min_tandas_dia: 1 },
+    ];
+
+    // Con todayKey = '2026-09-12' (sábado), ambos deben devolver pw-01
+    const planningResult = resolvePlanningWeek(weeks, '2026-09-12');
+    expect(planningResult.ok).toBe(true);
+    if (planningResult.ok) {
+      expect(planningResult.week.id).toBe('pw-01');
+    }
+
+    const viewResult = resolveViewWeek(weeks, '2026-09-12');
+    expect(viewResult.ok).toBe(true);
+    if (viewResult.ok) {
+      expect(viewResult.week.id).toBe('pw-01');
+    }
+
+    // Con arreglo vacío, debe devolver error
+    const emptyPlanningResult = resolvePlanningWeek([], '2026-09-12');
+    expect(emptyPlanningResult.ok).toBe(false);
+    if (!emptyPlanningResult.ok) {
+      expect(emptyPlanningResult.reason).toBe('sin_programa');
+    }
+
+    const emptyViewResult = resolveViewWeek([], '2026-09-12');
+    expect(emptyViewResult.ok).toBe(false);
+    if (!emptyViewResult.ok) {
+      expect(emptyViewResult.reason).toBe('sin_programa');
+    }
+
+    // Con todayKey = '2026-10-05' (después del programa), debe devolver 'programa_terminado'
+    const afterPlanningResult = resolvePlanningWeek(weeks, '2026-10-05');
+    expect(afterPlanningResult.ok).toBe(false);
+    if (!afterPlanningResult.ok) {
+      expect(afterPlanningResult.reason).toBe('programa_terminado');
+    }
+
+    const afterViewResult = resolveViewWeek(weeks, '2026-10-05');
+    expect(afterViewResult.ok).toBe(false);
+    if (!afterViewResult.ok) {
+      expect(afterViewResult.reason).toBe('programa_terminado');
     }
   });
 });
