@@ -200,6 +200,8 @@ describe('[002] US-B3 — Ver cuántas veces abrí el plan', () => {
       program_week_id: 'pw-01',
       week_number: 1,
       starts_on: '2026-09-14',
+      ends_on: '2026-09-20',
+      verdict: 'cumplida' as any,
       days_fulfilled: 0,
       habits: [],
       accumulated_fulfilled_days: 0,
