@@ -873,12 +873,13 @@ export async function savePlanViewToDb(view: {
   surface: string;
   was_gated: boolean;
   reason?: string | null;
-}): Promise<PlanViewRecord> {
+}): Promise<PlanViewRecord | null> {
   const res = await pgPool.query(
     `INSERT INTO plan_views (id, program_week_id, viewed_at, surface, was_gated, reason)
      VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (id) DO NOTHING
      RETURNING *`,
     [view.id, view.program_week_id, view.viewed_at, view.surface, view.was_gated, view.reason ?? null]
   );
-  return res.rows[0];
+  return res.rows[0] ?? null;
 }

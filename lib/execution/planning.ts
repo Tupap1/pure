@@ -378,6 +378,9 @@ async function buildWeekGrid(weekStart: string, weekEnd: string, now: Date) {
  * Si la semana ya empezó:
  *   Aplica la compuerta de FR-037: libre 2 veces, desde la 3.ª exige razón.
  *   Responde con `surface: 'semana'`, compuerta normal, `opens_this_week` cuenta solo `surface='semana'`.
+ *
+ * Dos aperturas simultáneas con el mismo id ordinal cuentan como una: la segunda devuelve null
+ * de savePlanViewToDb y responde con éxito sin error, sin depender del valor de la BD.
  */
 export async function openPlanView(input: { reason?: string; program_week_id?: string }, now: Date): Promise<ExecutionResult> {
   const weeksRaw = await fetchProgramWeeksFromDb();
@@ -418,13 +421,15 @@ export async function openPlanView(input: { reason?: string; program_week_id?: s
     const existingPlanificaciones = await fetchPlanViewsFromDb(week.id, 'planeacion');
     const n = existingPlanificaciones.length + 1;
 
-    await savePlanViewToDb({
+    savePlanViewToDb({
       id: `${week.id}:planeacion-${n}`,
       program_week_id: week.id,
       viewed_at: now.toISOString(),
       surface: 'planeacion',
       was_gated: false,
       reason: null,
+    }).catch(() => {
+      // Ignorar si ya fue registrada en simultáneo
     });
 
     const grid = await buildWeekGrid(week.starts_on, addDays(week.starts_on, 6), now);
@@ -460,13 +465,15 @@ export async function openPlanView(input: { reason?: string; program_week_id?: s
   }
 
   const wasGated = priorCount >= 2;
-  await savePlanViewToDb({
+  savePlanViewToDb({
     id: `${week.id}:view-${priorCount + 1}`,
     program_week_id: week.id,
     viewed_at: now.toISOString(),
     surface: 'semana',
     was_gated: wasGated,
     reason: wasGated ? input.reason!.trim() : null,
+  }).catch(() => {
+    // Ignorar si ya fue registrada en simultáneo
   });
 
   const grid = await buildWeekGrid(week.starts_on, addDays(week.starts_on, 6), now);
