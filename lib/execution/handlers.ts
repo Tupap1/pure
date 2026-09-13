@@ -68,7 +68,6 @@ import {
   setIntentions,
   previewPlanWeek,
   openPlanView,
-  countGatedPlanOpenings,
 } from './planning';
 import {
   fetchProgramWeeksFromDb,
@@ -358,10 +357,9 @@ async function assembleReportInput(
   const from = week.starts_on;
   const to = addDays(week.starts_on, 6);
 
-  const [compliance, projections, planOpenings] = await Promise.all([
+  const [compliance, projections] = await Promise.all([
     getCompliance({ from, to, cutoff }),
     computeGradeProjections(cutoff),
-    countGatedPlanOpenings(week.id),
   ]);
   const enRiesgo = deriveRiskSection(projections.materias, projections.alertas);
 
@@ -388,10 +386,7 @@ async function assembleReportInput(
     // Un preview no anticipa "segunda semana fallida seguida": ese veredicto todavía puede
     // cambiar mientras la semana en curso no se congele de verdad.
     second_consecutive_failure: false,
-    // US9: aperturas de la vista de semana que pasaron por la compuerta esta semana. El
-    // congelamiento real (lib/execution/tick.ts:freezeOneWeek) calcula el mismo dato con la
-    // misma función (countGatedPlanOpenings), para su propia semana.
-    plan_openings: planOpenings,
+    aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
   };
 }
 

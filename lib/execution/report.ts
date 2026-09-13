@@ -50,8 +50,10 @@ export interface BuildReportPayloadInput {
   previous_report_failed: boolean;
   /** Esta semana y la anterior tienen veredicto 'fallida' (US6-AS7). */
   second_consecutive_failure: boolean;
-  /** US9: aperturas de la vista de la semana que pasaron por la compuerta. Opcional porque US9
-   * todavía no existe; cuando no se provee, el reporte simplemente no menciona la línea. */
+  /** US-B3: aperturas de la vista de la semana con desglose. Opcional para compatibilidad con
+   * payloads congelados antes del despliegue. */
+  aperturas_plan?: { total: number; con_razon: number; libres_usadas: number };
+  /** @deprecated solo payloads congelados antes de la 002. */
   plan_openings?: number;
 }
 
@@ -187,7 +189,11 @@ export function renderReportText(payload: ReportPayload): string {
 
   lines.push('');
   lines.push(`Ediciones después del cierre: ${payload.late_edits}`);
-  if (payload.plan_openings != null) {
+  if (payload.aperturas_plan) {
+    const { total, con_razon } = payload.aperturas_plan;
+    const conRazonText = con_razon > 0 ? ` (${con_razon} con razón)` : '';
+    lines.push(`Aperturas del plan: ${total}${conRazonText}`);
+  } else if (payload.plan_openings != null) {
     lines.push(`Aperturas del plan: ${payload.plan_openings}`);
   }
 

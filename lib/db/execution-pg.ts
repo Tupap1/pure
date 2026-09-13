@@ -861,6 +861,11 @@ export async function fetchPlanViewsFromDb(programWeekId: string, surface?: stri
   return res.rows;
 }
 
+export async function fetchAllPlanViewsFromDb(): Promise<PlanViewRecord[]> {
+  const res = await pgPool.query('SELECT * FROM plan_views ORDER BY viewed_at ASC');
+  return res.rows;
+}
+
 export async function savePlanViewToDb(view: {
   id: string;
   program_week_id: string;

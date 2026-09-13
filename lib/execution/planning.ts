@@ -484,10 +484,3 @@ export async function openPlanView(input: { reason?: string; program_week_id?: s
   };
 }
 
-/** Cuántas aperturas de esta semana pasaron por la compuerta (US9-AS1): lo que tanto
- * lib/execution/handlers.ts (para `preview`) como lib/execution/tick.ts:freezeOneWeek (para el
- * congelamiento real) añaden al payload del reporte semanal como "Aperturas del plan". */
-export async function countGatedPlanOpenings(programWeekId: string): Promise<number> {
-  const views = await fetchPlanViewsFromDb(programWeekId);
-  return views.filter((v) => v.was_gated).length;
-}
