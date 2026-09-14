@@ -38,6 +38,8 @@ import {
   IntentionsSetSchema,
   PlanWeekPreviewSchema,
   PlanWeekOpenViewSchema,
+  FrictionMeasureSchema,
+  FrictionRateSchema,
   zodErrorToExecutionResult,
   type ExecutionResult,
 } from '../validations/schemas';
@@ -51,6 +53,14 @@ import {
   respondToRoutineSlot,
   rehearseRoutineSlot,
 } from './routine';
+import {
+  enableFriction,
+  disableFriction,
+  verifyFriction,
+  rateFriction,
+  readFriction,
+  listIrritationDropsInRange,
+} from './friction';
 import { setDailyCheck, readDailyChecks } from './checks';
 import { computeGradeProjections } from './grade-projection';
 import { getCompliance } from './compliance';
@@ -357,9 +367,10 @@ async function assembleReportInput(
   const from = week.starts_on;
   const to = addDays(week.starts_on, 6);
 
-  const [compliance, projections] = await Promise.all([
+  const [compliance, projections, friccionRetiradas] = await Promise.all([
     getCompliance({ from, to, cutoff }),
     computeGradeProjections(cutoff),
+    listIrritationDropsInRange(from, to, cutoff),
   ]);
   const enRiesgo = deriveRiskSection(projections.materias, projections.alertas);
 
@@ -387,6 +398,7 @@ async function assembleReportInput(
     // cambiar mientras la semana en curso no se congele de verdad.
     second_consecutive_failure: false,
     aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
+    friccion_retiradas: friccionRetiradas,
   };
 }
 
@@ -698,6 +710,59 @@ export async function handlePlanWeek(
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: 'Error inesperado en plan_week',
+    };
+  }
+}
+
+export type ManageFrictionAction = 'enable' | 'disable' | 'verify' | 'rate' | 'read';
+
+/**
+ * `manage_friction` (US-B5): registrar y gestionar medidas de fricción del teléfono.
+ * Acciones: enable, disable, verify, rate, read.
+ */
+export async function handleManageFriction(
+  action: ManageFrictionAction,
+  data?: unknown,
+  now: Date = new Date()
+): Promise<ExecutionResult> {
+  try {
+    switch (action) {
+      case 'enable': {
+        const parsed = FrictionMeasureSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await enableFriction(parsed.data.measure_key, now);
+      }
+      case 'disable': {
+        const parsed = FrictionMeasureSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await disableFriction(parsed.data.measure_key, now);
+      }
+      case 'verify': {
+        const parsed = FrictionMeasureSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await verifyFriction(parsed.data.measure_key, now);
+      }
+      case 'rate': {
+        const parsed = FrictionRateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await rateFriction(parsed.data, now);
+      }
+      case 'read': {
+        return await readFriction(now);
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para manage_friction: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_friction:', error);
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: 'Error inesperado en manage_friction',
     };
   }
 }

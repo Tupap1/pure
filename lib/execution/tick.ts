@@ -6,6 +6,7 @@
 // (`manage_weekly_report:run_tick`): es la misma función en los dos casos.
 
 import { finalizeElapsed } from './tandas';
+import { applyIrritationDrops, listIrritationDropsInRange } from './friction';
 import { addDays, localDateTimeToInstant, localParts } from './time';
 import {
   REPORT_FREEZE_TIME,
@@ -136,6 +137,7 @@ async function freezeOneWeek(
     previous_report_failed: previousReportFailed,
     second_consecutive_failure: secondConsecutiveFailure,
     aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
+    friccion_retiradas: await listIrritationDropsInRange(from, to, cutoff),
   };
   const payload = buildReportPayload(input);
 
@@ -342,6 +344,10 @@ export async function runExecutionTick(now: Date, options: TickOptions): Promise
     await markTandaEndNotifiedInDb(finalizedTanda.id, now);
     notified++;
   }
+
+  // US-B5/FR-B20: retiro automático por irritación sostenida, antes de congelar (R-B09): así un
+  // retiro previo al corte del domingo entra en el reporte de esa semana (listIrritationDropsInRange).
+  await applyIrritationDrops(now);
 
   await revertStuckSendingToFrozenInDb(now, REPORT_STUCK_SENDING_MINUTES);
 

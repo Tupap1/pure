@@ -97,7 +97,7 @@ aperturas_plan: {
 | Acción | `data` | Devuelve |
 |---|---|---|
 | `enable` | `measure_key` | La medida habilitada, con `ya_habilitada: boolean` · `LIMITE_FRICCION` |
-| `disable` | `measure_key` | La medida, o `null` si nunca existió, con `ya_deshabilitada: boolean`; motivo `manual` |
+| `disable` | `measure_key` | La medida con `ya_deshabilitada: boolean`; motivo `manual`. Si ya estaba deshabilitada o nunca existió, `ya_deshabilitada: true` y sin cambios (una medida que nunca existió responde `{ id, confirmada: false, ya_deshabilitada: true }`) |
 | `verify` | `measure_key` | La medida con `verified_at` · `NO_ENCONTRADO` si no está habilitada |
 | `rate` | `score` (entero 0–10), `program_week_id?` (por defecto, la semana en curso) | La calificación de la semana · `NO_ENCONTRADO` · `FECHA_FUTURA` |
 | `read` | — | `{ activas: [{ measure_key, started_on, verified_at, confirmada }], total_activas, limite: 2, irritacion_semana_actual: number \| null }` |

@@ -883,3 +883,125 @@ export async function savePlanViewToDb(view: {
   );
   return res.rows[0] ?? null;
 }
+
+// --- friction_measures and friction_ratings (US-B5) ---
+
+export interface FrictionMeasureRecord {
+  id: string;
+  enabled_slot?: string | null;
+  started_on?: string | null;
+  enabled_at?: string | null;
+  verified_at?: string | null;
+  disabled_at?: string | null;
+  drop_reason?: string | null;
+  created_at?: string;
+}
+
+export interface FrictionRatingRecord {
+  id: string;
+  program_week_id: string;
+  score: number;
+  rated_at: string;
+  drop_applied_at?: string | null;
+  dropped_measure_id?: string | null;
+  created_at?: string;
+}
+
+export async function fetchFrictionMeasuresFromDb(
+  id?: string,
+  client?: PoolClient
+): Promise<FrictionMeasureRecord | FrictionMeasureRecord[] | null> {
+  const runner = client ?? pgPool;
+  if (id) {
+    const res = await runner.query('SELECT * FROM friction_measures WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await runner.query('SELECT * FROM friction_measures ORDER BY created_at ASC');
+  return res.rows;
+}
+
+export async function ensureFrictionMeasureRowInDb(id: string): Promise<void> {
+  await pgPool.query(`INSERT INTO friction_measures (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`, [id]);
+}
+
+export async function claimFrictionSlotInDb(
+  id: string,
+  slot: string,
+  startedOn: string,
+  now: Date
+): Promise<FrictionMeasureRecord | null> {
+  const res = await pgPool.query(
+    `UPDATE friction_measures
+     SET enabled_slot = $2, started_on = $3, enabled_at = $4, verified_at = NULL, disabled_at = NULL, drop_reason = NULL
+     WHERE id = $1 AND enabled_slot IS NULL AND NOT EXISTS (SELECT 1 FROM friction_measures f2 WHERE f2.enabled_slot = $2)
+     RETURNING *`,
+    [id, slot, startedOn, now.toISOString()]
+  );
+  return res.rows[0] || null;
+}
+
+export async function disableFrictionMeasureInDb(
+  id: string,
+  reason: string,
+  now: Date,
+  client?: PoolClient
+): Promise<FrictionMeasureRecord | null> {
+  const runner = client ?? pgPool;
+  const res = await runner.query(
+    `UPDATE friction_measures
+     SET enabled_slot = NULL, disabled_at = $2, drop_reason = $3
+     WHERE id = $1 AND enabled_slot IS NOT NULL
+     RETURNING *`,
+    [id, now.toISOString(), reason]
+  );
+  return res.rows[0] || null;
+}
+
+export async function verifyFrictionMeasureInDb(id: string, now: Date): Promise<FrictionMeasureRecord | null> {
+  const res = await pgPool.query(
+    `UPDATE friction_measures SET verified_at = $2 WHERE id = $1 AND enabled_slot IS NOT NULL RETURNING *`,
+    [id, now.toISOString()]
+  );
+  return res.rows[0] || null;
+}
+
+export async function fetchFrictionRatingsFromDb(id?: string): Promise<FrictionRatingRecord | FrictionRatingRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM friction_ratings WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM friction_ratings ORDER BY created_at ASC');
+  return res.rows;
+}
+
+export async function saveFrictionRatingToDb(input: {
+  program_week_id: string;
+  score: number;
+  rated_at: Date;
+}): Promise<FrictionRatingRecord> {
+  const id = input.program_week_id;
+  const res = await pgPool.query(
+    `INSERT INTO friction_ratings (id, program_week_id, score, rated_at)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (id) DO UPDATE SET score = EXCLUDED.score, rated_at = EXCLUDED.rated_at
+     RETURNING *`,
+    [id, input.program_week_id, input.score, input.rated_at.toISOString()]
+  );
+  return res.rows[0];
+}
+
+export async function claimIrritationDropInDb(
+  ratingId: string,
+  measureId: string | null,
+  now: Date,
+  client: PoolClient
+): Promise<FrictionRatingRecord | null> {
+  const res = await client.query(
+    `UPDATE friction_ratings
+     SET drop_applied_at = $2, dropped_measure_id = $3
+     WHERE id = $1 AND drop_applied_at IS NULL
+     RETURNING *`,
+    [ratingId, now.toISOString(), measureId]
+  );
+  return res.rows[0] || null;
+}

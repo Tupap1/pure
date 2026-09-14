@@ -242,7 +242,8 @@ export type ExecutionErrorCode =
   | 'REPORTE_NO_CONGELADO'
   | 'VENTANA_CERRADA'
   | 'YA_ENVIADO'
-  | 'PARTIR_TAREA';
+  | 'PARTIR_TAREA'
+  | 'LIMITE_FRICCION';
 
 export interface ExecutionErrorResult {
   status: 'error';
@@ -695,5 +696,28 @@ export const PlanWeekOpenViewSchema = z
   .object({
     program_week_id: z.string().min(1).optional(),
     reason: z.string().optional(),
+  })
+  .strict();
+
+// --- Fricción del teléfono (manage_friction, US-B5) ---
+
+export const FRICTION_MEASURE_KEYS = [
+  'sin_biometria',
+  'clave_larga',
+  'escala_grises',
+  'redes_fuera_home',
+  'app_desinstalada',
+] as const;
+
+export const FrictionMeasureSchema = z
+  .object({
+    measure_key: z.enum(FRICTION_MEASURE_KEYS),
+  })
+  .strict();
+
+export const FrictionRateSchema = z
+  .object({
+    score: z.number().int().min(0).max(10),
+    program_week_id: z.string().min(1).optional(),
   })
   .strict();
