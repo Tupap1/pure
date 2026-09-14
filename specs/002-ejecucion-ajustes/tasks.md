@@ -54,8 +54,8 @@ propósito y el commit RED lo dice.
 
 **Purpose**: línea base
 
-- [ ] T001 Confirmar la rama `002-ejecucion-ajustes`, creada desde `main` en `bcc5304`, y la línea base: `npm run test:all` en verde antes de tocar código (package.json)
-- [ ] T002 Commit de los artefactos de Spec Kit de la 002 y de la enmienda 1.0.1 de la constitución, una vez que Andres apruebe la spec: `docs(002): spec, plan y tareas de los ajustes del Módulo de Ejecución` (specs/002-ejecucion-ajustes/, .specify/memory/constitution.md). Lo hace el orquestador
+- [X] T001 Confirmar la rama `002-ejecucion-ajustes`, creada desde `main` en `bcc5304`, y la línea base: `npm run test:all` en verde antes de tocar código (package.json)
+- [X] T002 Commit de los artefactos de Spec Kit de la 002 y de la enmienda 1.0.1 de la constitución, una vez que Andres apruebe la spec: `docs(002): spec, plan y tareas de los ajustes del Módulo de Ejecución` (specs/002-ejecucion-ajustes/, .specify/memory/constitution.md). Lo hace el orquestador
 
 ---
 
@@ -65,12 +65,12 @@ propósito y el commit RED lo dice.
 
 **⚠️ CRITICAL**: ninguna historia empieza antes de terminar esta fase
 
-- [ ] T003 TEST Generalizar __tests__/build/spec-traceability.test.ts a una tabla de specs:
+- [X] T003 TEST Generalizar __tests__/build/spec-traceability.test.ts a una tabla de specs:
   - `{ feature: '001', spec: 'specs/001-modulo-ejecucion/spec.md', idRe: /US\d+-AS\d+/ }` y `{ feature: '002', spec: 'specs/002-ejecucion-ajustes/spec.md', idRe: /US-B\d+-AS\d+/ }`;
   - por cada spec, un `describe('[NNN] Trazabilidad spec -> tests …')` con los tres `it` de hoy (sanity, ningún escenario sin test, ningún ID inventado). Los IDs salen de las líneas con el ID en negrita (`**ID**`), excluyendo las que dicen `[manual]`, y las citas se buscan con el patrón de esa spec;
   - sanity de la 002: 34 IDs y `US-B4-AS8` excluido. La de la 001 no cambia (US4-AS1 y US4-AS2 excluidos);
   - correr `npx vitest run __tests__/build/spec-traceability.test.ts`: la parte 002 DEBE fallar (RED), con los 34 IDs sin test, y la 001 seguir en verde.
-- [ ] T004 Crear los placeholders `it.todo('US-Bn-ASm · <resumen>')` de los 34 escenarios no manuales, cada archivo con `describe('[002] US-Bn — <historia>')`:
+- [X] T004 Crear los placeholders `it.todo('US-Bn-ASm · <resumen>')` de los 34 escenarios no manuales, cada archivo con `describe('[002] US-Bn — <historia>')`:
   - __tests__/mcp/execution-planning-week.test.ts: US-B1-AS1…AS10;
   - __tests__/mcp/execution-tandas-olvidada.test.ts: US-B2-AS1…AS3;
   - __tests__/mcp/execution-day-breakdown.test.ts: US-B4-AS1…AS7;
@@ -93,7 +93,7 @@ martes 15, domingo 20 y después de la última semana, y comprobar la semana que
 
 ### Tests for User Story B1 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T005 [US-B1] TEST Convertir los `it.todo` en tests reales en __tests__/mcp/execution-planning-week.test.ts (pg-mem; programa de 3 semanas con `min_tandas_dia` 1, 3 y 6):
+- [X] T005 [US-B1] TEST Convertir los `it.todo` en tests reales en __tests__/mcp/execution-planning-week.test.ts (pg-mem; programa de 3 semanas con `min_tandas_dia` 1, 3 y 6):
   - US-B1-AS1 [regresión]: a `2026-09-13T20:00:00Z`, `handlePlanWeek('preview', {})` → `data.program_week_id === 'pw-01'`;
   - US-B1-AS2 [regresión]: a `2026-09-15T15:00:00Z` → `pw-01`;
   - US-B1-AS3 [regresión]: a `2026-09-20T20:00:00Z` → `pw-02`;
@@ -108,28 +108,28 @@ martes 15, domingo 20 y después de la última semana, y comprobar la semana que
 
 ### Implementation for User Story B1
 
-- [ ] T006 [US-B1] IMPL Funciones puras exportadas en lib/execution/program.ts, sin base de datos:
+- [X] T006 [US-B1] IMPL Funciones puras exportadas en lib/execution/program.ts, sin base de datos:
   - `type WeekResolution = { ok: true; week: ProgramWeekRecord } | { ok: false; reason: 'sin_programa' | 'programa_terminado' }`;
   - `resolvePlanningWeek(weeks, todayKey)`: (1) si `isoDayOfWeekForDateKey(todayKey) === 7` (de `lib/domain/execution.ts`) y hay una semana con `starts_on === addDays(todayKey, 1)`, esa; (2) `findCurrentWeek(weeks, todayKey)`; (3) la de menor `starts_on` con `starts_on > todayKey`; (4) `weeks.length === 0 ? 'sin_programa' : 'programa_terminado'`;
   - `resolveViewWeek(weeks, todayKey)`: los pasos 2 a 4;
   - `weekHasStarted(week, todayKey)`: `week.starts_on <= todayKey`;
   - `weekNotFoundMessage(reason, verbo: 'planear' | 'ver')` con los textos literales de contracts/mcp-tools.md: "No hay un programa creado: no hay semana para planear." y "El programa ya terminó: no quedan semanas por planear." (y sus versiones con "ver").
-- [ ] T007 [US-B1] IMPL `rehearseRoutineSlot` en lib/execution/routine.ts:
+- [X] T007 [US-B1] IMPL `rehearseRoutineSlot` en lib/execution/routine.ts:
   - con `program_week_id`, `fetchProgramWeeksFromDb(id)`; si no existe → `NO_ENCONTRADO` ("No existe la semana X.");
   - sin id, `resolvePlanningWeek(weeks, localParts(now).dateKey)`; si `!ok` → `NO_ENCONTRADO` con `weekNotFoundMessage(reason, 'planear')`;
   - `resolveRehearsalWeekId` se elimina; su único otro uso (lib/execution/planning.ts) se reemplaza en T008.
-- [ ] T008 [US-B1] IMPL lib/execution/planning.ts:
+- [X] T008 [US-B1] IMPL lib/execution/planning.ts:
   - `resolveTargetAndPastWeek` devuelve un resultado discriminado: id inexistente → `NO_ENCONTRADO` ("No existe la semana X."); sin id → `resolvePlanningWeek` y `weekNotFoundMessage(reason, 'planear')`. `previewPlanWeek` propaga el error;
   - `setIntentions`: antes de validar razones, `fetchProgramWeeksFromDb(input.program_week_id)`; si no existe → `NO_ENCONTRADO` sin guardar nada;
   - `openPlanView(input: { reason?: string; program_week_id?: string }, now)`: la semana sale del id (o `NO_ENCONTRADO`) o de `resolveViewWeek` (con `weekNotFoundMessage(reason, 'ver')`). Si `!weekHasStarted(week, todayKey)`, guardar `{ id: `${week.id}:planeacion-${n}`, surface: 'planeacion', was_gated: false, reason: null }`, con `n` = aperturas `planeacion` previas de esa semana + 1, sin compuerta. Si la semana ya empezó, la compuerta de hoy sin cambios con `surface: 'semana'`. La respuesta agrega `program_week_id` y `surface`; `opens_this_week` cuenta solo las aperturas `semana` de esa semana;
   - actualizar el comentario de `openPlanView` y el de `handlePlanWeek` en lib/execution/handlers.ts: "open_view siempre mira la semana en curso" deja de ser cierto.
-- [ ] T009 [P] [US-B1] IMPL `PlanWeekOpenViewSchema` en lib/validations/schemas.ts: agregar `program_week_id: z.string().min(1).optional()`, manteniendo `.strict()`.
-- [ ] T010 [US-B1] IMPL Descripciones en mcp-server/index.ts, tanto en `TOOLS_LIST` como en `mcpServer.tool('plan_week', …)`:
+- [X] T009 [P] [US-B1] IMPL `PlanWeekOpenViewSchema` en lib/validations/schemas.ts: agregar `program_week_id: z.string().min(1).optional()`, manteniendo `.strict()`.
+- [X] T010 [US-B1] IMPL Descripciones en mcp-server/index.ts, tanto en `TOOLS_LIST` como en `mcpServer.tool('plan_week', …)`:
   - `preview` sin `program_week_id`: domingo → la semana que arranca mañana; si no, la que contiene hoy; si no, la próxima; si no, `NO_ENCONTRADO`;
   - `open_view: { program_week_id?, reason? }`, con la apertura de planeación sin compuerta;
   - en `manage_routine_slots`, si la descripción de `rehearse` menciona "la semana en curso, o la siguiente si es domingo", reemplazarla por la misma resolución;
   - GREEN: `npx vitest run __tests__/mcp/execution-planning-week.test.ts __tests__/mcp/execution-planning.test.ts __tests__/mcp/plan-views.test.ts __tests__/mcp/execution-routine.test.ts` y después `npm run test:all` en verde. Commit: `feat(002): US-B1 resolución de semana para planear y aperturas de planeación`.
-- [ ] T011 [US-B1] VERIFY Lo hace el orquestador: `npm run mcp:start:http` en local, `curl http://localhost:3001/health`, y las llamadas 1, 3, 4 y 5 de quickstart.md (US-B1). Luego la vista de la semana en la web (`npm run dev`) a 375 px y en escritorio, sin errores de consola (specs/002-ejecucion-ajustes/quickstart.md)
+- [X] T011 [US-B1] VERIFY Lo hace el orquestador: `npm run mcp:start:http` en local, `curl http://localhost:3001/health`, y las llamadas 1, 3, 4 y 5 de quickstart.md (US-B1). Luego la vista de la semana en la web (`npm run dev`) a 375 px y en escritorio, sin errores de consola (specs/002-ejecucion-ajustes/quickstart.md)
 
 ### Correcciones que salieron de la verificación de US-B1 (T011)
 
@@ -138,8 +138,8 @@ lib/hooks/usePlanWeek.ts, con React StrictMode). Las dos llamadas calculan el mi
 segunda choca con la clave primaria de `plan_views`, así que responde 400. Pasa igual con las
 aperturas `semana` de la 001 y con las de planeación.
 
-- [ ] T043 [US-B1] TEST En __tests__/mcp/execution-planning-week.test.ts, un test sin ID de escenario: dos `open_view {}` simultáneos (`Promise.all`) sobre la semana en curso (`2026-09-15T15:00:00Z`) devuelven `success` los dos con `opens_this_week: 1`, y una tercera apertura, ya en serie, devuelve `opens_this_week: 2`. Lo mismo con dos `open_view { program_week_id: 'pw-01' }` simultáneos el domingo 13, que devuelven `success` y `surface: 'planeacion'`. Hoy la segunda llamada falla con `DATOS_INVALIDOS` (RED).
-- [ ] T044 [US-B1] IMPL `savePlanViewToDb` en lib/db/execution-pg.ts con `ON CONFLICT (id) DO NOTHING RETURNING *`, que devuelve la fila o `null`. `openPlanView` en lib/execution/planning.ts trata `null` como la misma apertura hecha en simultáneo: responde éxito con los mismos valores calculados, sin error y sin volver a contar.
+- [X] T043 [US-B1] TEST En __tests__/mcp/execution-planning-week.test.ts, un test sin ID de escenario: dos `open_view {}` simultáneos (`Promise.all`) sobre la semana en curso (`2026-09-15T15:00:00Z`) devuelven `success` los dos con `opens_this_week: 1`, y una tercera apertura, ya en serie, devuelve `opens_this_week: 2`. Lo mismo con dos `open_view { program_week_id: 'pw-01' }` simultáneos el domingo 13, que devuelven `success` y `surface: 'planeacion'`. Hoy la segunda llamada falla con `DATOS_INVALIDOS` (RED).
+- [X] T044 [US-B1] IMPL `savePlanViewToDb` en lib/db/execution-pg.ts con `ON CONFLICT (id) DO NOTHING RETURNING *`, que devuelve la fila o `null`. `openPlanView` en lib/execution/planning.ts trata `null` como la misma apertura hecha en simultáneo: responde éxito con los mismos valores calculados, sin error y sin volver a contar.
 
 **Checkpoint**: US-B1 funciona sola.
 
@@ -155,12 +155,12 @@ veces; empezar a las 22:25 y ver que termina por tiempo.
 
 ### Tests for User Story B2 (caracterización, RED por mutación) ⚠️
 
-- [ ] T012 [P] [US-B2] TEST Convertir los `it.todo` en tests reales en __tests__/mcp/execution-tandas-olvidada.test.ts:
+- [X] T012 [P] [US-B2] TEST Convertir los `it.todo` en tests reales en __tests__/mcp/execution-tandas-olvidada.test.ts:
   - US-B2-AS1: `handleManageTandas('start', {})` a `2026-09-14T15:00:00Z`; `start {}` a `2026-09-14T17:00:00Z` → `success`. En `handleManageTandas('read', {})`, la anterior tiene `status: 'completada'`, `actual_minutes: 10`, `running_lock: null` y `ended_at` igual a `2026-09-14T15:10:00.000Z`, y la nueva `status: 'en_curso'`;
   - US-B2-AS2: `start {}` a `15:00:00Z`; a `15:10:01Z`, `runExecutionTick(new Date(), { mailer: { send: async () => {} }, pusher })` con un fake de `Pusher` que guarda las llamadas (patrón `makeFakePusher` de __tests__/mcp/execution-push.test.ts) → tanda `completada` y un aviso con `tag: 'tanda'`. Segunda corrida a `15:10:25Z` → mismo `ended_at` y sigue habiendo un solo aviso;
   - US-B2-AS3: `start {}` a `2026-09-15T03:25:00Z` (lunes 14, 22:25 en Bogotá). A `03:31:00Z` corre el tick y `manage_tandas current` sigue devolviendo la tanda en curso con `seconds_left > 0`. A `03:35:01Z` corre el tick → `completada` con `local_date: '2026-09-14'`, y `handleGetToday()` a `03:36:00Z` → `tandas_today: 1`;
   - estos tests nacen en verde porque no hay implementación. El RED se demuestra por mutación: comentar temporalmente `await finalizeElapsed(now);` en `startTanda` (lib/execution/tandas.ts), ver fallar US-B2-AS1 con `TANDA_EN_CURSO`, restaurar la línea y confirmar con `git diff --exit-code lib/execution/tandas.ts`. Commit: `test(002): US-B2 la tanda olvidada no bloquea (regresión)`, con la mutación y su resultado en el cuerpo.
-- [ ] T013 [US-B2] VERIFY `npm run test:all` en verde. No hay validación en producción, porque no cambia comportamiento (specs/002-ejecucion-ajustes/quickstart.md)
+- [X] T013 [US-B2] VERIFY `npm run test:all` en verde. No hay validación en producción, porque no cambia comportamiento (specs/002-ejecucion-ajustes/quickstart.md)
 
 **Checkpoint**: US-B1 y US-B2 funcionan por separado. Fin del bloque 1: PR a `main`.
 
@@ -175,7 +175,7 @@ FR-B14), y sin hábitos de 0 días activos en las fracciones (FR-B15).
 
 ### Tests for User Story B4 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T014 [US-B4] TEST Convertir los `it.todo` en tests reales en __tests__/mcp/execution-day-breakdown.test.ts:
+- [X] T014 [US-B4] TEST Convertir los `it.todo` en tests reales en __tests__/mcp/execution-day-breakdown.test.ts:
   - preparación: programa de 3 semanas con mínimos 1, 3 y 6; hábitos `h-a` y `h-b` con `started_on: '2026-09-14'`; día de prueba martes 22 (semana 2). Las tandas se completan encadenando `start` y avanzando el reloj 10 min 1 s (la última se cierra con `current`), empezando en `2026-09-22T15:00:00Z`. Los hábitos se marcan con `handleManageDailyChecks('set', { habit_id, status })` ese mismo día;
   - US-B4-AS1: 2 tandas y `h-a`, `h-b` cumplidos → `handleGetToday()` devuelve `evaluacion_dia` igual a `{ tandas_completadas: 2, min_requerido: 3, cumplio_tandas: false, cumplio_habitos: true, day_fulfilled: false }`, y `handleGetComplianceReport({ from: '2026-09-22', to: '2026-09-22' })` devuelve lo mismo en `dias[0].evaluacion_dia`;
   - US-B4-AS2: 3 tandas, `h-a` en `fallado` y `h-b` cumplido → `{ tandas_completadas: 3, min_requerido: 3, cumplio_tandas: true, cumplio_habitos: false, day_fulfilled: false }`;
@@ -188,11 +188,11 @@ FR-B14), y sin hábitos de 0 días activos en las fracciones (FR-B15).
 
 ### Implementation for User Story B4
 
-- [ ] T015 [US-B4] IMPL En lib/domain/execution.ts, `export interface DayBreakdown { tandas_completadas: number; min_requerido: number; cumplio_tandas: boolean; cumplio_habitos: boolean; day_fulfilled: boolean }` y `export function describeDay(input: EvaluateDayInput): DayBreakdown | null`: llama a `evaluateDay` y traduce `tandasOk`, `habitsOk` y `fulfilled`, sin duplicar la regla. `evaluateDay` no cambia.
-- [ ] T016 [US-B4] IMPL En lib/execution/today.ts, `TodayPayload.evaluacion_dia: DayBreakdown | null` con `describeDay` sobre la misma entrada que hoy; `day_fulfilled` sale de ese desglose, con el mismo valor de antes.
-- [ ] T017 [US-B4] IMPL En lib/execution/compliance.ts, `ComplianceDay.evaluacion_dia` con `describeDay` (se conserva `evaluacion`), y `habitos` omite los hábitos con `total === 0`.
-- [ ] T018 [US-B4] IMPL Descripciones de `get_today` y `get_compliance_report` en mcp-server/index.ts (`TOOLS_LIST` y `mcpServer.tool`): `evaluacion_dia` y la omisión de hábitos sin días activos. GREEN con los tests de la fase y `npm run test:all`. Commit: `feat(002): US-B4 evaluación desglosada del día`.
-- [ ] T019 [US-B4] VERIFY Lo hace el orquestador: pasos 1, 2 y 4 de quickstart.md (US-B4) en local, y Hoy a 375 px y en escritorio sin mínimo ni faltantes y sin errores de consola. US-B4-AS8 `[manual]` quedó verificado el 2026-09-12 (specs/002-ejecucion-ajustes/quickstart.md)
+- [X] T015 [US-B4] IMPL En lib/domain/execution.ts, `export interface DayBreakdown { tandas_completadas: number; min_requerido: number; cumplio_tandas: boolean; cumplio_habitos: boolean; day_fulfilled: boolean }` y `export function describeDay(input: EvaluateDayInput): DayBreakdown | null`: llama a `evaluateDay` y traduce `tandasOk`, `habitsOk` y `fulfilled`, sin duplicar la regla. `evaluateDay` no cambia.
+- [X] T016 [US-B4] IMPL En lib/execution/today.ts, `TodayPayload.evaluacion_dia: DayBreakdown | null` con `describeDay` sobre la misma entrada que hoy; `day_fulfilled` sale de ese desglose, con el mismo valor de antes.
+- [X] T017 [US-B4] IMPL En lib/execution/compliance.ts, `ComplianceDay.evaluacion_dia` con `describeDay` (se conserva `evaluacion`), y `habitos` omite los hábitos con `total === 0`.
+- [X] T018 [US-B4] IMPL Descripciones de `get_today` y `get_compliance_report` en mcp-server/index.ts (`TOOLS_LIST` y `mcpServer.tool`): `evaluacion_dia` y la omisión de hábitos sin días activos. GREEN con los tests de la fase y `npm run test:all`. Commit: `feat(002): US-B4 evaluación desglosada del día`.
+- [X] T019 [US-B4] VERIFY Lo hace el orquestador: pasos 1, 2 y 4 de quickstart.md (US-B4) en local, y Hoy a 375 px y en escritorio sin mínimo ni faltantes y sin errores de consola. US-B4-AS8 `[manual]` quedó verificado el 2026-09-12 (specs/002-ejecucion-ajustes/quickstart.md)
 
 **Checkpoint**: US-B4 funciona sola.
 
@@ -208,7 +208,7 @@ semana y su reporte congelado.
 
 ### Tests for User Story B3 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T020 [US-B3] TEST Convertir los `it.todo` en tests reales en __tests__/mcp/execution-plan-openings.test.ts (programa de 2 semanas):
+- [X] T020 [US-B3] TEST Convertir los `it.todo` en tests reales en __tests__/mcp/execution-plan-openings.test.ts (programa de 2 semanas):
   - US-B3-AS1: a `2026-09-15T15:00:00Z`, dos veces `open_view {}` y luego `open_view { reason: 'reviso antes del parcial' }` → `handleGetComplianceReport({ program_week_id: 'pw-01' })` devuelve `aperturas_plan` igual a `{ libres_usadas: 2, con_razon: 1, total: 3, razones: ['reviso antes del parcial'] }`;
   - US-B3-AS2: sin aperturas → `{ libres_usadas: 0, con_razon: 0, total: 0, razones: [] }`, nunca `null` ni ausente;
   - US-B3-AS3: `open_view {}` a `2026-09-14T15:00:00Z` y a `2026-09-21T15:00:00Z` → a `2026-09-21T16:00:00Z`, `get_compliance_report { from: '2026-09-14', to: '2026-09-20' }` → `total: 1`;
@@ -220,18 +220,18 @@ semana y su reporte congelado.
 
 ### Implementation for User Story B3
 
-- [ ] T021 [US-B3] IMPL `fetchAllPlanViewsFromDb(): Promise<PlanViewRecord[]>` en lib/db/execution-pg.ts, con `SELECT * FROM plan_views ORDER BY viewed_at ASC`.
-- [ ] T022 [US-B3] IMPL En lib/execution/compliance.ts:
+- [X] T021 [US-B3] IMPL `fetchAllPlanViewsFromDb(): Promise<PlanViewRecord[]>` en lib/db/execution-pg.ts, con `SELECT * FROM plan_views ORDER BY viewed_at ASC`.
+- [X] T022 [US-B3] IMPL En lib/execution/compliance.ts:
   - exportar la función pura `summarizePlanOpenings(views: PlanViewRecord[], from: string, to: string, cutoff: Date)`, que devuelve `{ libres_usadas: number; con_razon: number; total: number; razones: string[] }`: solo `surface === 'semana'`, `localParts(viewed_at).dateKey` dentro de `[from, to]` y `new Date(viewed_at) <= cutoff`. `razones` son las de las aperturas `was_gated` con `reason` no vacía, en orden de `viewed_at`;
   - `getCompliance` suma `fetchAllPlanViewsFromDb()` a su `Promise.all` y agrega `aperturas_plan` a `ComplianceResult`.
-- [ ] T023 [US-B3] IMPL En lib/execution/report.ts:
+- [X] T023 [US-B3] IMPL En lib/execution/report.ts:
   - `BuildReportPayloadInput` agrega `aperturas_plan?: { total: number; con_razon: number; libres_usadas: number }` y marca `plan_openings` como `@deprecated`, solo para payloads congelados antes de la 002;
   - `renderReportText` escribe `Aperturas del plan: {total}`, más ` ({con_razon} con razón)` si `con_razon > 0`. Sin `aperturas_plan` pero con `plan_openings`, la línea anterior (contracts/notifications.md).
-- [ ] T024 [US-B3] IMPL `freezeOneWeek` en lib/execution/tick.ts y `assembleReportInput` en lib/execution/handlers.ts:
+- [X] T024 [US-B3] IMPL `freezeOneWeek` en lib/execution/tick.ts y `assembleReportInput` en lib/execution/handlers.ts:
   - `aperturas_plan: { total, con_razon, libres_usadas }` tomado de `compliance.aperturas_plan`;
   - dejar de escribir `plan_openings`, quitar `countGatedPlanOpenings` de ambos imports y eliminarla de lib/execution/planning.ts.
-- [ ] T025 [US-B3] IMPL Descripción de `get_compliance_report` en mcp-server/index.ts (`TOOLS_LIST` y `mcpServer.tool`) con `aperturas_plan`. GREEN con los tests de la fase, __tests__/mcp/plan-views.test.ts, __tests__/mcp/weekly-report.test.ts y `npm run test:all`. Commit: `feat(002): US-B3 aperturas del plan en el cumplimiento y el reporte`.
-- [ ] T026 [US-B3] VERIFY Lo hace el orquestador: `get_compliance_report` con aperturas en local (quickstart.md, US-B3, paso 1). El paso 2 se valida en producción tras el congelamiento del domingo 20 (specs/002-ejecucion-ajustes/quickstart.md)
+- [X] T025 [US-B3] IMPL Descripción de `get_compliance_report` en mcp-server/index.ts (`TOOLS_LIST` y `mcpServer.tool`) con `aperturas_plan`. GREEN con los tests de la fase, __tests__/mcp/plan-views.test.ts, __tests__/mcp/weekly-report.test.ts y `npm run test:all`. Commit: `feat(002): US-B3 aperturas del plan en el cumplimiento y el reporte`.
+- [ ] T026 [US-B3] VERIFY Lo hace el orquestador: `get_compliance_report` con aperturas en local (quickstart.md, US-B3, paso 1). El paso 2 se valida en producción tras el congelamiento del domingo 20 (specs/002-ejecucion-ajustes/quickstart.md) — **Local verificado el 2026-09-13; falta el paso 2 en producción, tras el congelamiento del domingo 20.**
 
 **Checkpoint**: US-B3 y US-B4 funcionan. Fin del bloque 2: PR a `main` y despliegue antes del domingo
 2026-09-20 a las 19:00.
@@ -248,16 +248,16 @@ el tick (FR-B20), la mención en el reporte (FR-B21) y sin bloquear nada (FR-B23
 
 ### Tests for User Story B5 (MANDATORY — RED antes de implementar) ⚠️
 
-- [ ] T027 [P] [US-B5] TEST Migración en __tests__/db/friction-schema.test.ts (pg-mem):
+- [X] T027 [P] [US-B5] TEST Migración en __tests__/db/friction-schema.test.ts (pg-mem):
   - `012_friction.sql` corre y crea `friction_measures` y `friction_ratings`;
   - `enabled_slot` admite varias filas con `NULL` y rechaza, con un `INSERT` simple de una fila nueva, una segunda fila con `'a'` (código `23505`, con `enabled_slot` en el mensaje). Esa violación no se provoca con `INSERT … ON CONFLICT … DO UPDATE`, que corrompe el índice de pg-mem (research.md, R-B08);
   - el reclamo condicionado (`UPDATE … WHERE id = $1 AND enabled_slot IS NULL AND NOT EXISTS (SELECT 1 FROM friction_measures f2 WHERE f2.enabled_slot = $slot) RETURNING *`) devuelve 0 filas, sin error, cuando el slot está ocupado, y 1 fila cuando está libre;
   - `score` rechaza 11 por el CHECK, y la FK de `friction_ratings.program_week_id` rechaza una semana inexistente;
   - `reset()` deja las dos tablas vacías.
-- [ ] T028 [P] [US-B5] TEST Esquemas en __tests__/validations/friction-schemas.test.ts:
+- [X] T028 [P] [US-B5] TEST Esquemas en __tests__/validations/friction-schemas.test.ts:
   - `FrictionMeasureSchema` acepta `sin_biometria`, `clave_larga`, `escala_grises`, `redes_fuera_home` y `app_desinstalada`, y rechaza `celular_afuera` y las claves extra;
   - `FrictionRateSchema` acepta `score` entero de 0 a 10 con `program_week_id` opcional, y rechaza 11, -1, 7.5 y las claves extra.
-- [ ] T029 [US-B5] TEST Convertir los `it.todo` en tests reales en __tests__/mcp/execution-friction.test.ts (programa de 3 semanas; `handleManageFriction` desde lib/execution/handlers.ts):
+- [X] T029 [US-B5] TEST Convertir los `it.todo` en tests reales en __tests__/mcp/execution-friction.test.ts (programa de 3 semanas; `handleManageFriction` desde lib/execution/handlers.ts):
   - US-B5-AS1: habilitar `sin_biometria` y `escala_grises` → `read` con `total_activas: 2`. `enable { measure_key: 'clave_larga' }` → `code: 'LIMITE_FRICCION'` y `message` que coincide con `/estrés/` y con `/vale 0/`;
   - US-B5-AS2: `enable { measure_key: 'celular_afuera' }` → `DATOS_INVALIDOS`;
   - US-B5-AS3: una medida habilitada sin verificar → `read` con `confirmada: false`. `verify` → `read` con `confirmada: true` y `verified_at` presente. `verify` de una medida no habilitada → `NO_ENCONTRADO`;
@@ -267,15 +267,15 @@ el tick (FR-B20), la mención en el reporte (FR-B21) y sin bloquear nada (FR-B23
   - US-B5-AS7: con dos medidas habilitadas, calificaciones 8 en pw-01, 6 en pw-02 y 8 en pw-03, cada una hecha dentro de su semana → tras el tick no se retira ninguna;
   - US-B5-AS8: se repite la preparación de AS6 y se corre `runExecutionTick` a `2026-10-05T00:05:00Z` (domingo 4 de octubre, 19:05) → el `payload.friccion_retiradas` de pw-03 contiene `{ measure_key: 'escala_grises', fecha: '2026-09-28' }`, y `renderReportText` contiene `Fricción: se retiró "escala de grises" por irritación.`;
   - US-B5-AS9: dos habilitadas y `rate { score: 5 }` en la semana en curso → `read` con `total_activas: 2`, `limite: 2` e `irritacion_semana_actual: 5`. Sin calificación → `irritacion_semana_actual: null`.
-- [ ] T030 [US-B5] TEST Ajustar __tests__/mcp/all-tools.test.ts:28-29 y __tests__/mcp/mcp-crud-tools.test.ts:26-27 a 31 herramientas, con `toContain('manage_friction')`. Confirmar el RED de T027 a T030. Commit: `test(002): US-B5 escenarios en rojo (fricción del teléfono)`.
+- [X] T030 [US-B5] TEST Ajustar __tests__/mcp/all-tools.test.ts:28-29 y __tests__/mcp/mcp-crud-tools.test.ts:26-27 a 31 herramientas, con `toContain('manage_friction')`. Confirmar el RED de T027 a T030. Commit: `test(002): US-B5 escenarios en rojo (fricción del teléfono)`.
 
 ### Implementation for User Story B5
 
-- [ ] T031 [US-B5] IMPL Migración db/migrations/012_friction.sql con el SQL literal de data-model.md: `enabled_slot TEXT UNIQUE` ("'a' | 'b' mientras está habilitada; NULL si no (máximo 2)") y `score INT NOT NULL CHECK (score BETWEEN 0 AND 10)`. En __tests__/helpers/test-db.ts, agregar `'friction_ratings'` y `'friction_measures'` al principio de la lista de `reset()`.
-- [ ] T032 [P] [US-B5] IMPL Esquemas y constantes:
+- [X] T031 [US-B5] IMPL Migración db/migrations/012_friction.sql con el SQL literal de data-model.md: `enabled_slot TEXT UNIQUE` ("'a' | 'b' mientras está habilitada; NULL si no (máximo 2)") y `score INT NOT NULL CHECK (score BETWEEN 0 AND 10)`. En __tests__/helpers/test-db.ts, agregar `'friction_ratings'` y `'friction_measures'` al principio de la lista de `reset()`.
+- [X] T032 [P] [US-B5] IMPL Esquemas y constantes:
   - en lib/validations/schemas.ts, `FRICTION_MEASURE_KEYS` con las 5 claves, `FrictionMeasureSchema = z.object({ measure_key: z.enum(FRICTION_MEASURE_KEYS) }).strict()`, `FrictionRateSchema = z.object({ score: z.number().int().min(0).max(10), program_week_id: z.string().min(1).optional() }).strict()` y `'LIMITE_FRICCION'` en `ExecutionErrorCode`;
   - en lib/execution/constants.ts, `FRICTION_MAX_ENABLED = 2`, `FRICTION_SLOTS = ['a', 'b'] as const`, `FRICTION_IRRITATION_THRESHOLD = 7` y `FRICTION_LIMIT_MESSAGE` con el texto literal de contracts/mcp-tools.md.
-- [ ] T033 [US-B5] IMPL Repositorio en lib/db/execution-pg.ts:
+- [X] T033 [US-B5] IMPL Repositorio en lib/db/execution-pg.ts:
   - tipos `FrictionMeasureRecord` y `FrictionRatingRecord`;
   - `fetchFrictionMeasuresFromDb(id?)`;
   - `ensureFrictionMeasureRowInDb(id)`: `INSERT INTO friction_measures (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`. Nunca toca `enabled_slot`;
@@ -285,7 +285,7 @@ el tick (FR-B20), la mención en el reporte (FR-B21) y sin bloquear nada (FR-B23
   - `fetchFrictionRatingsFromDb(id?)`;
   - `saveFrictionRatingToDb({ program_week_id, score, rated_at })`: `ON CONFLICT (id) DO UPDATE SET score = EXCLUDED.score, rated_at = EXCLUDED.rated_at`, conservando `drop_applied_at` y `dropped_measure_id`;
   - `claimIrritationDropInDb(ratingId, measureId | null, now, client)`: `UPDATE … SET drop_applied_at = $, dropped_measure_id = $ WHERE id = $1 AND drop_applied_at IS NULL RETURNING *`.
-- [ ] T034 [US-B5] IMPL Servicio lib/execution/friction.ts:
+- [X] T034 [US-B5] IMPL Servicio lib/execution/friction.ts:
   - `enableFriction(key, now)`, en cuatro pasos:
     1. `ensureFrictionMeasureRowInDb(key)`;
     2. si la fila ya tiene `enabled_slot`, éxito con `ya_habilitada: true` y sin cambios;
@@ -297,18 +297,18 @@ el tick (FR-B20), la mención en el reporte (FR-B21) y sin bloquear nada (FR-B23
   - `readFriction(now)`: `confirmada = verified_at != null && verified_at >= enabled_at`;
   - `applyIrritationDrops(now)`: recorre los pares de semanas consecutivas por `week_number`. Si las dos calificaciones son ≥ `FRICTION_IRRITATION_THRESHOLD` y la posterior no tiene `drop_applied_at`, dentro de `withExecutionTransaction`: `claimIrritationDropInDb` con la habilitada de mayor `enabled_at` (o `null`) y, si el claim devolvió fila y había medida, `disableFrictionMeasureInDb(id, 'irritacion', now, client)`. Devuelve cuántas retiró y registra `[execution-tick] fricción retirada por irritación: <clave>` solo cuando retira;
   - `listIrritationDropsInRange(from, to, cutoff)`: `[{ measure_key, fecha }]` de las medidas con `drop_reason = 'irritacion'`, `localParts(disabled_at).dateKey` dentro de `[from, to]` y `disabled_at <= cutoff`.
-- [ ] T035 [US-B5] IMPL Integración:
+- [X] T035 [US-B5] IMPL Integración:
   - en lib/execution/handlers.ts, `export type ManageFrictionAction = 'enable' | 'disable' | 'verify' | 'rate' | 'read'` y `handleManageFriction(action, data?, now = new Date())`, con el mismo try/catch y la misma forma de error que los demás handlers;
   - en mcp-server/tools-handler.ts, re-exportar `handleManageFriction`;
   - en lib/execution/tick.ts, `await applyIrritationDrops(now)` después del bloque de `finalizeElapsed` y antes de `revertStuckSendingToFrozenInDb` y `freezeDueWeeks`, sin cambiar `TickResult`. En `freezeOneWeek`, `friccion_retiradas: await listIrritationDropsInRange(from, to, cutoff)`;
   - en `assembleReportInput` (lib/execution/handlers.ts), lo mismo con el corte de la vista previa;
   - en lib/execution/report.ts, `friccion_retiradas?: { measure_key: string; fecha: string }[]` en `BuildReportPayloadInput`. `renderReportText` agrega `Fricción: se retiró "{etiqueta}" por irritación.` por cada elemento, después de la línea de aperturas, con las etiquetas de contracts/notifications.md.
-- [ ] T036 [US-B5] IMPL Registro en mcp-server/index.ts:
+- [X] T036 [US-B5] IMPL Registro en mcp-server/index.ts:
   - `manage_friction` en `TOOLS_LIST`, con la descripción y el `inputSchema` de contracts/mcp-tools.md (`action` enum `['enable', 'disable', 'verify', 'rate', 'read']`);
   - `mcpServer.tool('manage_friction', …, { action: z.enum([...]), data: z.any().optional() }, …)`, igual que `plan_week`;
   - no tocar app/api/execution/route.ts;
   - GREEN con los tests de la fase y `npm run test:all`. Commit: `feat(002): US-B5 fricción del teléfono con límite de 2 y retiro por irritación`.
-- [ ] T037 [US-B5] VERIFY Lo hace el orquestador, en local: `npm run db:migrate` contra la base local, `npm run mcp:start:http`, `curl http://localhost:3001/health`, `tools/list` con 31 herramientas y `manage_friction read`. En producción, tras desplegar, quickstart.md US-B5 (specs/002-ejecucion-ajustes/quickstart.md)
+- [ ] T037 [US-B5] VERIFY Lo hace el orquestador, en local: `npm run db:migrate` contra la base local, `npm run mcp:start:http`, `curl http://localhost:3001/health`, `tools/list` con 31 herramientas y `manage_friction read`. En producción, tras desplegar, quickstart.md US-B5 (specs/002-ejecucion-ajustes/quickstart.md) — **Local verificado el 2026-09-13 (migración 012, 31 herramientas, límite de 2, verify, rate y disable); falta la validación en producción tras desplegar.**
 
 **Checkpoint**: las cinco historias funcionan. Fin del bloque 3: PR a `main`.
 
@@ -318,11 +318,11 @@ el tick (FR-B20), la mención en el reporte (FR-B21) y sin bloquear nada (FR-B23
 
 **Purpose**: documentación, cierre y pasos fuera de esta máquina
 
-- [ ] T038 [P] Documentación:
+- [X] T038 [P] Documentación:
   - mcp-server/instructions.md: la resolución de la semana para planear, la apertura de planeación sin compuerta, y en `manage_friction` que Pure solo registra, el máximo de 2, el retiro por irritación y que `celular_afuera` es un hábito;
   - mcp-server/README.md: catálogo de 31 herramientas, sección de `manage_friction` y `plan_week`, `get_today` y `get_compliance_report` actualizados;
   - CLAUDE.md, sección "Execution Module": tablas `friction_measures` y `friction_ratings`.
-- [ ] T039 [P] Nota "Actualizado por la 002" al principio de specs/001-modulo-ejecucion/contracts/mcp-tools.md, con enlace a specs/002-ejecucion-ajustes/contracts/mcp-tools.md para `plan_week`, `rehearse`, `get_today`, `get_compliance_report` y el payload del reporte, sin reescribir la 001.
+- [X] T039 [P] Nota "Actualizado por la 002" al principio de specs/001-modulo-ejecucion/contracts/mcp-tools.md, con enlace a specs/002-ejecucion-ajustes/contracts/mcp-tools.md para `plan_week`, `rehearse`, `get_today`, `get_compliance_report` y el payload del reporte, sin reescribir la 001.
 - [ ] T040 VERIFY Cierre: `npm run test:all` en verde, `/speckit-converge` sin tareas pendientes y quickstart.md completo (specs/002-ejecucion-ajustes/quickstart.md)
 - [ ] T041 MANUAL Desplegar cada bloque en el servidor con el procedimiento de docs/despliegue-modulo-ejecucion.md: el bloque 2 antes del domingo 20 a las 19:00, y el bloque 3 con `docker compose exec pure-mcp npm run db:migrate`. Lo ejecuta el agente del servidor, porque esta máquina no tiene acceso a él
 - [ ] T042 MANUAL Andres habilita desde el asistente solo las medidas de fricción que de verdad tenga puestas en el teléfono y las verifica (quickstart.md US-B5, pasos 3 y 4): solo él sabe cuáles tiene

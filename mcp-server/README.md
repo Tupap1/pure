@@ -230,7 +230,7 @@ Parámetro `data?`: `{ at? }` (ISO, solo lectura). Respuesta:
 ```
 
 #### 10. `get_compliance_report` — Cumplimiento semanal (US6)
-Parámetro `data?`: `{ from?, to?, program_week_id? }`. Respuesta: `dias[]` con `evaluacion_dia` (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled), `days_fulfilled`, `aperturas_plan: { libres_usadas, con_razon, total, razones[] }` (solo aperturas de semana, no planeación), hábitos sin 0 días activos, tandas por materia, disparadores respondidos, razones de interrupción, `dias_cumplidos_totales` y horizonte.
+Parámetro `data?`: `{ from?, to?, program_week_id? }`. Respuesta: `dias[]` con `evaluacion_dia` (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled), `days_fulfilled`, `aperturas_plan: { libres_usadas, con_razon, total, razones[] }` (solo aperturas de semana, no planeación), hábitos como fracción (se omiten los que no tienen días activos en el rango), tandas por materia, disparadores respondidos, razones de interrupción, `dias_cumplidos_totales` y horizonte.
 
 #### 11. `get_grade_projection` — Proyección de notas (US5)
 Parámetro `data?`: `{ subject_id? }`. Respuesta:
