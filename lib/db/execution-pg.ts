@@ -907,12 +907,16 @@ export interface FrictionRatingRecord {
   created_at?: string;
 }
 
-export async function fetchFrictionMeasuresFromDb(id?: string): Promise<FrictionMeasureRecord | FrictionMeasureRecord[] | null> {
+export async function fetchFrictionMeasuresFromDb(
+  id?: string,
+  client?: PoolClient
+): Promise<FrictionMeasureRecord | FrictionMeasureRecord[] | null> {
+  const runner = client ?? pgPool;
   if (id) {
-    const res = await pgPool.query('SELECT * FROM friction_measures WHERE id = $1', [id]);
+    const res = await runner.query('SELECT * FROM friction_measures WHERE id = $1', [id]);
     return res.rows[0] || null;
   }
-  const res = await pgPool.query('SELECT * FROM friction_measures ORDER BY created_at ASC');
+  const res = await runner.query('SELECT * FROM friction_measures ORDER BY created_at ASC');
   return res.rows;
 }
 

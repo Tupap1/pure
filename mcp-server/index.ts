@@ -484,7 +484,7 @@ export const TOOLS_LIST = [
         action: { type: 'string', enum: ['enable', 'disable', 'verify', 'rate', 'read'] },
         data: {
           type: 'object',
-          description: 'enable/disable/verify: { measure_key } (sin biometria, clave_larga, escala_grises, redes_fuera_home, app_desinstalada). rate: { score: 0-10, program_week_id? (defecto: semana en curso) }. read: sin data.',
+          description: 'enable/disable/verify: { measure_key } (sin_biometria, clave_larga, escala_grises, redes_fuera_home, app_desinstalada). rate: { score: 0-10, program_week_id? (defecto: semana en curso) }. read: sin data.',
         },
       },
       required: ['action'],
