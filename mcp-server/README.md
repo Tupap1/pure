@@ -274,7 +274,7 @@ Sin `program_week_id`, la semana se resuelve así: si hoy es domingo con una que
 | Acción | `data` | Respuesta |
 |---|---|---|
 | `enable` | `measure_key` | La medida habilitada \| `LIMITE_FRICCION` |
-| `disable` | `measure_key` | La medida \| null si nunca existió |
+| `disable` | `measure_key` | La medida con `ya_deshabilitada` (si ya estaba deshabilitada o nunca existió: `ya_deshabilitada: true` y sin cambios) |
 | `verify` | `measure_key` | La medida verificada \| `NO_ENCONTRADO` |
 | `rate` | `score` (0–10), `program_week_id?` (semana en curso por defecto) | La calificación \| `NO_ENCONTRADO` \| `FECHA_FUTURA` |
 | `read` | — | `{ activas: [{ measure_key, started_on, verified_at, confirmada }], total_activas, limite: 2, irritacion_semana_actual: 0-10 \| null }` |
