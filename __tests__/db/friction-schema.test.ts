@@ -87,7 +87,8 @@ describe('[002] Migración 012 — fricción del teléfono (US-B5)', () => {
     // Crea un programa para tener un program_week_id válido
     await harness.pool.query(
       `INSERT INTO program_weeks (id, week_number, starts_on)
-       VALUES ($1, 1, '2026-09-14')`
+       VALUES ($1, 1, '2026-09-14')`,
+      ['pw-01']
     );
 
     // Score 11 viola el CHECK
@@ -132,7 +133,8 @@ describe('[002] Migración 012 — fricción del teléfono (US-B5)', () => {
     // Inserta una medida y una calificación
     await harness.pool.query(
       `INSERT INTO program_weeks (id, week_number, starts_on)
-       VALUES ($1, 1, '2026-09-14')`
+       VALUES ($1, 1, '2026-09-14')`,
+      ['pw-01']
     );
     await harness.pool.query(
       `INSERT INTO friction_measures (id) VALUES ($1)`,

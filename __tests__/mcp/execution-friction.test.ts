@@ -3,8 +3,11 @@ import { createTestDb, TestDbHarness } from '../helpers/test-db';
 import {
   handleManageProgram,
   handleManageFriction,
+  handleManageWeeklyReport,
 } from '../../lib/execution/handlers';
 import { runExecutionTick as runTick } from '../../lib/execution/tick';
+import { renderReportText } from '../../lib/execution/report';
+import { fetchFrictionMeasuresFromDb, fetchFrictionRatingsFromDb } from '../../lib/db/execution-pg';
 import type { Mailer } from '../../lib/execution/mailer';
 import type { Pusher } from '../../lib/execution/tick';
 
@@ -134,11 +137,25 @@ describe('[002] US-B5 — Registrar la fricción del teléfono y sacarla cuando 
     }
   });
 
-  it('US-B5-AS4 · deshabilitar una medida es idempotente', async () => {
+  it('US-B5-AS4 · deshabilitar o habilitar una medida que ya está en ese estado no cambia nada', async () => {
     await setupProgram();
     vi.setSystemTime(new Date('2026-09-14T15:00:00.000Z'));
 
-    await handleManageFriction('enable', { measure_key: 'sin_biometria' });
+    const enable1 = await handleManageFriction('enable', { measure_key: 'sin_biometria' });
+    expect(enable1.status).toBe('success');
+    if (enable1.status === 'success') {
+      expect((enable1.data as any).ya_habilitada).toBe(false);
+      expect((enable1.data as any).started_on).toBe('2026-09-14');
+    }
+
+    // habilitar otra vez una medida ya habilitada no cambia nada (FR-B17): mismo started_on
+    vi.setSystemTime(new Date('2026-09-15T15:00:00.000Z'));
+    const enableAgain = await handleManageFriction('enable', { measure_key: 'sin_biometria' });
+    expect(enableAgain.status).toBe('success');
+    if (enableAgain.status === 'success') {
+      expect((enableAgain.data as any).ya_habilitada).toBe(true);
+      expect((enableAgain.data as any).started_on).toBe('2026-09-14');
+    }
 
     const disable1 = await handleManageFriction('disable', { measure_key: 'sin_biometria' });
     expect(disable1.status).toBe('success');
@@ -153,17 +170,19 @@ describe('[002] US-B5 — Registrar la fricción del teléfono y sacarla cuando 
       expect((readAfter.data as any).total_activas).toBe(0);
     }
 
+    // lee la medida ya deshabilitada directamente del repositorio, para comparar su disabled_at
+    // contra el que quede tras la segunda deshabilitación
+    const disabledRow = await fetchFrictionMeasuresFromDb('sin_biometria');
+    const firstDisabledAt = !Array.isArray(disabledRow) ? disabledRow?.disabled_at : undefined;
+    expect(firstDisabledAt).toBeTruthy();
+
+    // deshabilitar otra vez una medida ya deshabilitada no cambia nada (FR-B17): mismo disabled_at
+    vi.setSystemTime(new Date('2026-09-16T15:00:00.000Z'));
     const disable2 = await handleManageFriction('disable', { measure_key: 'sin_biometria' });
     expect(disable2.status).toBe('success');
     if (disable2.status === 'success') {
       expect((disable2.data as any).ya_deshabilitada).toBe(true);
-    }
-
-    const enable2 = await handleManageFriction('enable', { measure_key: 'sin_biometria' });
-    expect(enable2.status).toBe('success');
-    if (enable2.status === 'success') {
-      expect((enable2.data as any).ya_habilitada).toBe(true);
-      expect((enable2.data as any).started_on).toBe('2026-09-14');
+      expect((disable2.data as any).disabled_at).toBe(firstDisabledAt);
     }
   });
 
@@ -220,7 +239,7 @@ describe('[002] US-B5 — Registrar la fricción del teléfono y sacarla cuando 
     vi.setSystemTime(new Date('2026-09-28T15:01:00.000Z'));
     await runTick(new Date(), { mailer: makeFakeMailer(), pusher });
 
-    // escala_grises debe estar deshabilitada
+    // escala_grises debe estar deshabilitada, con motivo irritación, y sin_biometria sigue activa
     const read = await handleManageFriction('read', {});
     expect(read.status).toBe('success');
     if (read.status === 'success') {
@@ -230,14 +249,29 @@ describe('[002] US-B5 — Registrar la fricción del teléfono y sacarla cuando 
       expect(biometria).toBeTruthy();
     }
 
-    // sin_biometria no debe estar en los retiros (se retiró escala_grises)
-    // ningún aviso debe mencionar fricción
+    const scalesRowAfterFirstRun = await fetchFrictionMeasuresFromDb('escala_grises');
+    const scalesAfterFirstRun = !Array.isArray(scalesRowAfterFirstRun) ? scalesRowAfterFirstRun : undefined;
+    expect(scalesAfterFirstRun?.enabled_slot).toBeFalsy();
+    expect(scalesAfterFirstRun?.drop_reason).toBe('irritacion');
+    const firstDisabledAt = scalesAfterFirstRun?.disabled_at;
+    expect(firstDisabledAt).toBeTruthy();
+
+    // la calificación de pw-03 (la posterior del par) queda con la medida que retiró
+    const ratingRow = await fetchFrictionRatingsFromDb('pw-03');
+    const rating = !Array.isArray(ratingRow) ? ratingRow : undefined;
+    expect(rating?.dropped_measure_id).toBe('escala_grises');
+
+    // ningún aviso debe mencionar fricción: el retiro no envía avisos (FR-B20)
     const frictionCalls = pusher.calls.filter((c) => c.title.toLowerCase().includes('fricci') || c.body.toLowerCase().includes('fricci') || c.tag.toLowerCase().includes('fricci'));
     expect(frictionCalls).toHaveLength(0);
 
-    // segunda corrida del tick
+    // segunda corrida del tick: no cambia nada (FR-039 + FR-B20)
     vi.setSystemTime(new Date('2026-09-28T15:02:00.000Z'));
     await runTick(new Date(), { mailer: makeFakeMailer(), pusher });
+
+    const scalesRowAfterSecondRun = await fetchFrictionMeasuresFromDb('escala_grises');
+    const scalesAfterSecondRun = !Array.isArray(scalesRowAfterSecondRun) ? scalesRowAfterSecondRun : undefined;
+    expect(scalesAfterSecondRun?.disabled_at).toBe(firstDisabledAt);
 
     // sin_biometria debe seguir habilitada
     const read2 = await handleManageFriction('read', {});
@@ -253,6 +287,7 @@ describe('[002] US-B5 — Registrar la fricción del teléfono y sacarla cuando 
 
     vi.setSystemTime(new Date('2026-09-14T15:00:00.000Z'));
     await handleManageFriction('enable', { measure_key: 'sin_biometria' });
+    await handleManageFriction('enable', { measure_key: 'escala_grises' });
 
     // semana 1 con 8
     await handleManageFriction('rate', { score: 8 });
@@ -270,11 +305,11 @@ describe('[002] US-B5 — Registrar la fricción del teléfono y sacarla cuando 
     vi.setSystemTime(new Date('2026-09-28T15:01:00.000Z'));
     await runTick(new Date(), { mailer: makeFakeMailer(), pusher });
 
-    // sin_biometria debe seguir habilitada (no hay dos semanas consecutivas >= 7)
+    // ninguna medida se retira: los pares (1,2)=8,6 y (2,3)=6,8 no llegan los dos a 7
     const read = await handleManageFriction('read', {});
     expect(read.status).toBe('success');
     if (read.status === 'success') {
-      expect((read.data as any).total_activas).toBe(1);
+      expect((read.data as any).total_activas).toBe(2);
     }
   });
 
@@ -292,17 +327,27 @@ describe('[002] US-B5 — Registrar la fricción del teléfono y sacarla cuando 
     vi.setSystemTime(new Date('2026-09-28T15:00:00.000Z'));
     await handleManageFriction('rate', { score: 8 });
 
-    // correr el tick que congela pw-03
-    vi.setSystemTime(new Date('2026-10-05T00:05:00.000Z')); // domingo 4 de octubre, 19:05 Bogotá
+    // el tick que retira escala_grises tiene que correr ANTES del corte de pw-03 (domingo 4 de
+    // octubre, 19:00 Bogotá): si el retiro ocurriera recién en la corrida del congelamiento,
+    // disabled_at quedaría después del corte y listIrritationDropsInRange lo dejaría fuera de
+    // este reporte.
     const pusher = makeFakePusher();
+    vi.setSystemTime(new Date('2026-09-28T15:01:00.000Z'));
     await runTick(new Date(), { mailer: makeFakeMailer(), pusher });
 
-    // leer el payload congelado de pw-03
-    // friccion_retiradas debe contener la medida retirada
-    // renderReportText debe mencionar el retiro
-    // En este punto, esperamos que el reporte contenga friccion_retiradas
-    // Pero para verificar esto necesitaríamos acceso a la base de datos de reportes
-    // Por ahora, solo verificamos que ningún aviso mencione fricción (como en AS6)
+    // correr el tick que congela pw-03 (domingo 4 de octubre, 19:05 Bogotá)
+    vi.setSystemTime(new Date('2026-10-05T00:05:00.000Z'));
+    await runTick(new Date(), { mailer: makeFakeMailer(), pusher });
+
+    const report = await handleManageWeeklyReport('read', { program_week_id: 'pw-03' });
+    expect(report.status).toBe('success');
+    if (report.status === 'success') {
+      const payload = (report.data as any).payload;
+      expect(payload.friccion_retiradas).toContainEqual({ measure_key: 'escala_grises', fecha: '2026-09-28' });
+      expect(renderReportText(payload)).toContain('Fricción: se retiró "escala de grises" por irritación.');
+    }
+
+    // el retiro sigue sin avisar al teléfono (FR-B20)
     const frictionNotifications = pusher.calls.filter((c) => c.title.toLowerCase().includes('fricci') || c.body.toLowerCase().includes('fricci') || c.tag.toLowerCase().includes('fricci'));
     expect(frictionNotifications).toHaveLength(0);
   });
