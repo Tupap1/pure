@@ -687,11 +687,13 @@ export const PlanWeekPreviewSchema = z
   })
   .strict();
 
-// FR-037: libre las primeras 2 veces por semana; desde la 3.ª, reason vacío/ausente -> RAZON_REQUERIDA.
+// FR-037 + US-B1: libre las primeras 2 veces por semana; desde la 3.ª, reason vacío/ausente -> RAZON_REQUERIDA.
 // La cuenta de "es esta la 3.ª apertura" depende de plan_views (estado en base), así que aquí solo
 // se valida la forma; lib/execution/planning.ts decide cuándo aplica el RAZON_REQUERIDA real.
+// US-B1: program_week_id opcional para abrir una semana futura como planeación sin compuerta.
 export const PlanWeekOpenViewSchema = z
   .object({
+    program_week_id: z.string().min(1).optional(),
     reason: z.string().optional(),
   })
   .strict();

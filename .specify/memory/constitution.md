@@ -27,9 +27,12 @@ regla terminan divergiendo en silencio.
   (GREEN) y al final el refactor, con los tests en verde.
 - En `tasks.md`, toda tarea de implementación DEBE tener antes su tarea de test. Ninguna
   historia se implementa sin sus tests en rojo.
-- Cada escenario no manual DEBE tener un test automatizado nombrado por su ID (`USn-ASm`). Un
-  test de trazabilidad DEBE verificar dos cosas: que ningún escenario de la spec quede sin test y
-  que ningún test cite un escenario inexistente.
+- Cada escenario no manual DEBE tener un test automatizado nombrado por su ID. Los IDs son únicos
+  en todo el repositorio: la 001 usa `USn-ASm` y cada feature posterior antepone al número de
+  historia la letra que le asigne Andres (`US-Bn-ASm` en la 002), para que el test de una feature
+  nunca cuente como cobertura de otra. Un test de trazabilidad por spec DEBE verificar dos cosas:
+  que ningún escenario de esa spec quede sin test y que ningún test cite un escenario de esa spec
+  que no exista.
 - La lógica de UI DEBE extraerse a funciones puras testeables en el entorno `node` de Vitest.
   El componente se verifica según el Principio IV.
 - En la rama de la feature se admite un commit con tests en rojo como evidencia de TDD. `main`
@@ -147,5 +150,10 @@ exponerlas y en no guardar secretos donde puedan viajar.
   final verifican cada principio. Toda desviación justificada se registra en "Complexity
   Tracking" del plan, junto con la alternativa descartada.
 - La guía operativa del día a día está en `CLAUDE.md`.
+- **Historial de enmiendas**:
+  - 1.0.1 (2026-09-12, PATCH): los IDs de escenario son únicos en todo el repositorio y cada
+    feature posterior a la 001 antepone la letra que le asigne Andres (`US-Bn-ASm` en la 002).
+    Motivo: la 002 habría repetido IDs como `US1-AS1`, y el test de trazabilidad no habría podido
+    distinguir la cobertura de cada feature.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-11 | **Last Amended**: 2026-09-11
+**Version**: 1.0.1 | **Ratified**: 2026-09-11 | **Last Amended**: 2026-09-12

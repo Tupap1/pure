@@ -4,7 +4,8 @@
 // (lib/domain/execution.ts:resolveCurrentTrigger); este archivo solo carga los datos y aplica
 // los efectos de negocio que sí necesitan la base (crear, responder, ensayar).
 
-import { localParts, addDays } from './time';
+import { localParts } from './time';
+import { resolvePlanningWeek, weekNotFoundMessage } from './program';
 import type { ExecutionResult } from '../validations/schemas';
 import {
   fetchRoutineSlotsFromDb,
@@ -166,43 +167,52 @@ export interface RoutineSlotRehearseInput {
   program_week_id?: string;
 }
 
-/** Semana en curso; si hoy es domingo, la siguiente (contracts/mcp-tools.md: "la semana en
- * curso, o la siguiente si es domingo" — el domingo es el día de planear la semana que viene).
- * Exportada porque lib/execution/planning.ts (US8) reusa exactamente esta misma resolución para
- * decidir qué semana previsualiza plan_week:preview (Principio I: una sola función decide "cuál
- * es la semana que se está planeando"). */
-export async function resolveRehearsalWeekId(now: Date): Promise<string | null> {
-  const local = localParts(now);
-  const targetDateKey = local.dayOfWeek === 7 ? addDays(local.dateKey, 1) : local.dateKey;
-
-  const weeksRaw = await fetchProgramWeeksFromDb();
-  const weeks = (Array.isArray(weeksRaw) ? weeksRaw : []) as ProgramWeekRecord[];
-  const week = weeks.find((w) => w.starts_on <= targetDateKey && targetDateKey <= addDays(w.starts_on, 6));
-  return week?.id ?? null;
-}
-
 /** FR-013: como máximo un ensayo por disparador y semana del programa (idempotente por
- * `${program_week_id}:${routine_slot_id}`). */
+ * `${program_week_id}:${routine_slot_id}`). Con `program_week_id`, busca esa semana
+ * (NO_ENCONTRADO si no existe). Sin id, resuelve con resolvePlanningWeek
+ * (Principio I: la misma resolución que plan_week:preview). */
 export async function rehearseRoutineSlot(
   input: RoutineSlotRehearseInput,
   now: Date = new Date()
 ): Promise<ExecutionResult<{ ya_ensayado: boolean }>> {
-  const weekId = input.program_week_id ?? (await resolveRehearsalWeekId(now));
-  if (!weekId) {
-    return {
-      status: 'error',
-      code: 'NO_ENCONTRADO',
-      message: 'No hay una semana del programa vigente (ni la siguiente) para ensayar este disparador.',
-    };
+  const local = localParts(now);
+  const todayKey = local.dateKey;
+
+  let week: ProgramWeekRecord | null = null;
+
+  if (input.program_week_id) {
+    // Con id explícito, busca esa semana
+    const weekRaw = await fetchProgramWeeksFromDb(input.program_week_id);
+    week = (Array.isArray(weekRaw) ? weekRaw[0] : weekRaw) as ProgramWeekRecord | null;
+    if (!week) {
+      return {
+        status: 'error',
+        code: 'NO_ENCONTRADO',
+        message: `No existe la semana ${input.program_week_id}.`,
+      };
+    }
+  } else {
+    // Sin id, resuelve la semana para planear
+    const weeksRaw = await fetchProgramWeeksFromDb();
+    const weeks = (Array.isArray(weeksRaw) ? weeksRaw : []) as ProgramWeekRecord[];
+    const resolved = resolvePlanningWeek(weeks, todayKey);
+    if (!resolved.ok) {
+      return {
+        status: 'error',
+        code: 'NO_ENCONTRADO',
+        message: weekNotFoundMessage(resolved.reason, 'planear'),
+      };
+    }
+    week = resolved.week;
   }
 
-  const id = `${weekId}:${input.routine_slot_id}`;
+  const id = `${week.id}:${input.routine_slot_id}`;
   const existingRaw = await fetchPlanRehearsalsFromDb(id);
   if (existingRaw) {
     return { status: 'success', data: { ya_ensayado: true } };
   }
 
-  await savePlanRehearsalToDb({ id, program_week_id: weekId, routine_slot_id: input.routine_slot_id });
+  await savePlanRehearsalToDb({ id, program_week_id: week.id, routine_slot_id: input.routine_slot_id });
   return { status: 'success', data: { ya_ensayado: false } };
 }
 

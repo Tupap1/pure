@@ -7,6 +7,7 @@
 
 import { localParts, addDays } from './time';
 import { isoDayOfWeekForDateKey } from '../domain/execution';
+import { resolvePlanningWeek, resolveViewWeek, weekHasStarted, weekNotFoundMessage } from './program';
 import {
   fetchExecutionTasksFromDb,
   saveExecutionTaskToDb,
@@ -31,7 +32,6 @@ import { computeAcademicLoad } from '../algorithms/academic-load';
 import { computeGradeProjections } from './grade-projection';
 import { getCompliance } from './compliance';
 import { readTandas } from './tandas';
-import { resolveRehearsalWeekId } from './routine';
 import type { ExecutionResult } from '../validations/schemas';
 
 // --- Tareas (tasks, US8) ---------------------------------------------------------------------
@@ -122,9 +122,18 @@ export interface SetIntentionsInput {
  * materia ni las demás del mismo lote quedan a medias. No vive en el esquema Zod porque
  * IntentionItemSchema ya tiene un test de forma en verde que acepta `strength: 0` sin `reason`
  * (__tests__/validations/execution-schemas.test.ts): esa prueba solo valida el rango numérico, la
- * regla de negocio "hace falta una razón" es justo lo que esta función decide.
+ * regla de negocio "hace falta una razón" es justo lo que esta función decide. US-B1: además,
+ * verifica que la semana exista antes de guardar nada.
  */
 export async function setIntentions(input: SetIntentionsInput): Promise<ExecutionResult<IntentionRecord[]>> {
+  // Verificar que la semana existe (NO_ENCONTRADO antes de guardar nada)
+  const weekRaw = await fetchProgramWeeksFromDb(input.program_week_id);
+  const week = (Array.isArray(weekRaw) ? weekRaw[0] : weekRaw) as ProgramWeekRecord | null;
+  if (!week) {
+    return { status: 'error', code: 'NO_ENCONTRADO', message: `No existe la semana ${input.program_week_id}.` };
+  }
+
+  // Verificar razones
   for (const item of input.items) {
     if (item.strength < 6 && (!item.reason || !item.reason.trim())) {
       return {
@@ -151,29 +160,51 @@ export async function setIntentions(input: SetIntentionsInput): Promise<Executio
 
 // --- plan_week: preview (asistente del domingo, US8) ------------------------------------------
 
+type ResolveTargetResult =
+  | { ok: true; target: ProgramWeekRecord; past: ProgramWeekRecord | null }
+  | { ok: false; code: 'NO_ENCONTRADO'; message: string };
+
 async function resolveTargetAndPastWeek(
   programWeekId: string | undefined,
   now: Date
-): Promise<{ target: ProgramWeekRecord; past: ProgramWeekRecord | null } | null> {
+): Promise<ResolveTargetResult> {
   const weeksRaw = await fetchProgramWeeksFromDb();
   const weeks = (Array.isArray(weeksRaw) ? weeksRaw : []) as ProgramWeekRecord[];
+  const local = localParts(now);
+  const todayKey = local.dateKey;
 
-  const targetId = programWeekId ?? (await resolveRehearsalWeekId(now)) ?? undefined;
-  if (!targetId) return null;
+  let target: ProgramWeekRecord;
 
-  const target = weeks.find((w) => w.id === targetId);
-  if (!target) return null;
+  if (programWeekId) {
+    // Con id explícito, busca esa semana
+    const found = weeks.find((w) => w.id === programWeekId);
+    if (!found) {
+      return { ok: false, code: 'NO_ENCONTRADO', message: `No existe la semana ${programWeekId}.` };
+    }
+    target = found;
+  } else {
+    // Sin id, resuelve la semana para planear
+    const resolved = resolvePlanningWeek(weeks, todayKey);
+    if (!resolved.ok) {
+      return {
+        ok: false,
+        code: 'NO_ENCONTRADO',
+        message: weekNotFoundMessage(resolved.reason, 'planear'),
+      };
+    }
+    target = resolved.week;
+  }
 
   const past = weeks.find((w) => w.week_number === target.week_number - 1) ?? null;
-  return { target, past };
+  return { ok: true, target, past };
 }
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 
 export async function previewPlanWeek(input: { program_week_id?: string }, now: Date): Promise<ExecutionResult> {
   const resolved = await resolveTargetAndPastWeek(input.program_week_id, now);
-  if (!resolved) {
-    return { status: 'error', code: 'NO_ENCONTRADO', message: 'No hay una semana del programa para planear.' };
+  if (!resolved.ok) {
+    return { status: 'error', code: resolved.code, message: resolved.message };
   }
   const { target, past } = resolved;
 
@@ -336,23 +367,90 @@ async function buildWeekGrid(weekStart: string, weekEnd: string, now: Date) {
 }
 
 /**
- * FR-037: libre 2 veces por semana; desde la 3.ª exige `reason` (RAZON_REQUERIDA si falta) y esa
- * apertura queda `was_gated=true`. El conteo es por semana del programa vigente hoy (nunca "la
- * siguiente si es domingo": la vista de semana siempre muestra la semana en curso, no la que se
- * está planeando). No hay claim atómico como en tandas/weekly_reports porque no hace falta
- * garantizar exclusión mutua entre dispositivos aquí — el id determinista por ordinal
- * (`${program_week_id}:view-N`) ya evita duplicar una misma apertura si esta función se llama dos
- * veces con el mismo conteo previo.
+ * FR-037 + US-B1: abre la vista de una semana (indicada o resuelta).
+ * - Con `program_week_id` explícito: si la semana no existe → NO_ENCONTRADO.
+ * - Sin `program_week_id`: resuelve con `resolveViewWeek` (nunca salto del domingo).
+ *
+ * Si la semana todavía no empieza (weekHasStarted = false):
+ *   Guarda como apertura de planeación (`surface='planeacion'`, sin compuerta, `reason=NULL`).
+ *   Responde con `surface: 'planeacion'`, `needs_reason: false`, sin sumar en `opens_this_week`.
+ *
+ * Si la semana ya empezó:
+ *   Aplica la compuerta de FR-037: libre 2 veces, desde la 3.ª exige razón.
+ *   Responde con `surface: 'semana'`, compuerta normal, `opens_this_week` cuenta solo `surface='semana'`.
+ *
+ * Dos aperturas simultáneas con el mismo id ordinal cuentan como una: la segunda no inserta
+ * nada (ON CONFLICT DO NOTHING) y responde lo mismo. Un error real de la base se propaga y
+ * el handler lo devuelve como error: una apertura nunca se da por hecha sin quedar guardada.
  */
-export async function openPlanView(input: { reason?: string }, now: Date): Promise<ExecutionResult> {
+export async function openPlanView(input: { reason?: string; program_week_id?: string }, now: Date): Promise<ExecutionResult> {
   const weeksRaw = await fetchProgramWeeksFromDb();
   const weeks = (Array.isArray(weeksRaw) ? weeksRaw : []) as ProgramWeekRecord[];
-  const todayKey = localParts(now).dateKey;
-  const week = weeks.find((w) => w.starts_on <= todayKey && todayKey <= addDays(w.starts_on, 6));
-  if (!week) {
-    return { status: 'error', code: 'NO_ENCONTRADO', message: 'No hay una semana del programa vigente para ver.' };
+  const local = localParts(now);
+  const todayKey = local.dateKey;
+
+  let week: ProgramWeekRecord;
+
+  if (input.program_week_id) {
+    // Con id explícito, busca esa semana
+    const found = weeks.find((w) => w.id === input.program_week_id);
+    if (!found) {
+      return {
+        status: 'error',
+        code: 'NO_ENCONTRADO',
+        message: `No existe la semana ${input.program_week_id}.`,
+      };
+    }
+    week = found;
+  } else {
+    // Sin id, resuelve con resolveViewWeek (pasos 2-4, sin domingo)
+    const resolved = resolveViewWeek(weeks, todayKey);
+    if (!resolved.ok) {
+      return {
+        status: 'error',
+        code: 'NO_ENCONTRADO',
+        message: weekNotFoundMessage(resolved.reason, 'ver'),
+      };
+    }
+    week = resolved.week;
   }
 
+  const hasStarted = weekHasStarted(week, todayKey);
+
+  if (!hasStarted) {
+    // Apertura de planeación: sin compuerta, `surface='planeacion'`, `reason=NULL`
+    const existingPlanificaciones = await fetchPlanViewsFromDb(week.id, 'planeacion');
+    const n = existingPlanificaciones.length + 1;
+
+    await savePlanViewToDb({
+      id: `${week.id}:planeacion-${n}`,
+      program_week_id: week.id,
+      viewed_at: now.toISOString(),
+      surface: 'planeacion',
+      was_gated: false,
+      reason: null,
+    });
+
+    const grid = await buildWeekGrid(week.starts_on, addDays(week.starts_on, 6), now);
+
+    // Contar aperturas surface='semana' de esa semana para opens_this_week
+    const semanaViews = await fetchPlanViewsFromDb(week.id, 'semana');
+    const opensThisWeek = semanaViews.length;
+
+    return {
+      status: 'success',
+      data: {
+        allowed: true,
+        needs_reason: false,
+        opens_this_week: opensThisWeek,
+        program_week_id: week.id,
+        surface: 'planeacion',
+        ...grid,
+      },
+    };
+  }
+
+  // Semana ya empezó: aplicar compuerta de FR-037
   const existing = await fetchPlanViewsFromDb(week.id, 'semana');
   const priorCount = existing.length;
   const hasReason = !!input.reason && !!input.reason.trim();
@@ -383,15 +481,10 @@ export async function openPlanView(input: { reason?: string }, now: Date): Promi
       allowed: true,
       needs_reason: wasGated,
       opens_this_week: priorCount + 1,
+      program_week_id: week.id,
+      surface: 'semana',
       ...grid,
     },
   };
 }
 
-/** Cuántas aperturas de esta semana pasaron por la compuerta (US9-AS1): lo que tanto
- * lib/execution/handlers.ts (para `preview`) como lib/execution/tick.ts:freezeOneWeek (para el
- * congelamiento real) añaden al payload del reporte semanal como "Aperturas del plan". */
-export async function countGatedPlanOpenings(programWeekId: string): Promise<number> {
-  const views = await fetchPlanViewsFromDb(programWeekId);
-  return views.filter((v) => v.was_gated).length;
-}

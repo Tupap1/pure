@@ -85,7 +85,7 @@ describe('[001] US9 — Semana con compuerta y alertas en la agenda', () => {
     const report = await handleManageWeeklyReport('read', { program_week_id: 'pw-01' });
     expect(report.status).toBe('success');
     if (report.status === 'success') {
-      expect((report.data as any).payload.plan_openings).toBe(1);
+      expect((report.data as any).payload.aperturas_plan).toEqual({ total: 3, con_razon: 1, libres_usadas: 2 });
     }
   });
 

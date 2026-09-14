@@ -68,7 +68,6 @@ import {
   setIntentions,
   previewPlanWeek,
   openPlanView,
-  countGatedPlanOpenings,
 } from './planning';
 import {
   fetchProgramWeeksFromDb,
@@ -358,10 +357,9 @@ async function assembleReportInput(
   const from = week.starts_on;
   const to = addDays(week.starts_on, 6);
 
-  const [compliance, projections, planOpenings] = await Promise.all([
+  const [compliance, projections] = await Promise.all([
     getCompliance({ from, to, cutoff }),
     computeGradeProjections(cutoff),
-    countGatedPlanOpenings(week.id),
   ]);
   const enRiesgo = deriveRiskSection(projections.materias, projections.alertas);
 
@@ -388,10 +386,7 @@ async function assembleReportInput(
     // Un preview no anticipa "segunda semana fallida seguida": ese veredicto todavía puede
     // cambiar mientras la semana en curso no se congele de verdad.
     second_consecutive_failure: false,
-    // US9: aperturas de la vista de semana que pasaron por la compuerta esta semana. El
-    // congelamiento real (lib/execution/tick.ts:freezeOneWeek) calcula el mismo dato con la
-    // misma función (countGatedPlanOpenings), para su propia semana.
-    plan_openings: planOpenings,
+    aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
   };
 }
 
@@ -661,11 +656,12 @@ export async function handleManageTasks(
 export type ManagePlanWeekAction = 'preview' | 'set_intentions' | 'open_view';
 
 /**
- * `plan_week` (US8-US9): el asistente del domingo (`preview`, `set_intentions`) y la compuerta de
- * la vista de semana (`open_view`, FR-037). `preview` sin `program_week_id` resuelve la semana en
- * curso, o la siguiente si hoy es domingo (mismo criterio que `manage_routine_slots:rehearse`,
- * lib/execution/routine.ts:resolveRehearsalWeekId); `open_view` siempre mira la semana en curso,
- * nunca la que se está planeando.
+ * `plan_week` (US8-US9-B1): el asistente del domingo (`preview`, `set_intentions`) y la apertura
+ * de la vista de semana (`open_view`, FR-037 + US-B1). Sin `program_week_id`, ambas resuelven
+ * con resolvePlanningWeek/resolveViewWeek desde lib/execution/program.ts (Principio I):
+ * - `preview`: domingo → siguiente; luego en curso; luego próxima; sin nada → NO_ENCONTRADO.
+ * - `open_view`: en curso; luego próxima; sin nada → NO_ENCONTRADO. Además, si la semana
+ *   todavía no empieza, abre como "planeación" sin compuerta y sin restar aperturas.
  */
 export async function handlePlanWeek(
   action: ManagePlanWeekAction,

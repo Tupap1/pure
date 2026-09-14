@@ -4,7 +4,7 @@
 // responder. lib/execution/report.ts lo consume para construir el payload congelado del reporte
 // semanal (US6); get_compliance_report (T055) lo expone tal cual por MCP.
 
-import { addDays } from './time';
+import { addDays, localParts } from './time';
 import {
   fetchHabitsFromDb,
   fetchDailyChecksFromDb,
@@ -12,19 +12,23 @@ import {
   fetchRoutineSlotsFromDb,
   fetchSlotOutcomesFromDb,
   fetchTandasFromDb,
+  fetchAllPlanViewsFromDb,
   HabitRecord,
   DailyCheckRecord,
   ProgramWeekRecord,
   RoutineSlotRecord,
   SlotOutcomeRecord,
   TandaRecord,
+  PlanViewRecord,
 } from '../db/execution-pg';
 import {
   isHabitActive,
   evaluateDay,
+  describeDay,
   isTandaBeforeCutoff,
   isoDayOfWeekForDateKey,
   DayEvaluation,
+  DayBreakdown,
 } from '../domain/execution';
 
 export interface ComplianceInput {
@@ -42,6 +46,7 @@ export interface ComplianceDay {
   date: string;
   week_number: number | null;
   evaluacion: DayEvaluation | null;
+  evaluacion_dia: DayBreakdown | null;
 }
 
 export interface ComplianceHabit {
@@ -57,6 +62,13 @@ export interface ComplianceSubjectTandas {
   minutes: number;
 }
 
+export interface AperturasPlan {
+  libres_usadas: number;
+  con_razon: number;
+  total: number;
+  razones: string[];
+}
+
 export interface ComplianceResult {
   dias: ComplianceDay[];
   days_fulfilled: number;
@@ -67,6 +79,31 @@ export interface ComplianceResult {
   ediciones_tardias: number;
   dias_cumplidos_totales: number;
   horizonte: number;
+  aperturas_plan: AperturasPlan;
+}
+
+export function summarizePlanOpenings(
+  views: PlanViewRecord[],
+  from: string,
+  to: string,
+  cutoff: Date
+): AperturasPlan {
+  const filtered = views.filter((v) => {
+    if (v.surface !== 'semana') return false;
+    const dateKey = localParts(new Date(v.viewed_at)).dateKey;
+    if (dateKey < from || dateKey > to) return false;
+    if (new Date(v.viewed_at).getTime() > cutoff.getTime()) return false;
+    return true;
+  });
+
+  const libres_usadas = filtered.filter((v) => !v.was_gated).length;
+  const con_razon = filtered.filter((v) => v.was_gated && v.reason).length;
+  const total = filtered.length;
+  const razones = filtered
+    .filter((v) => v.was_gated && v.reason)
+    .map((v) => v.reason as string);
+
+  return { libres_usadas, con_razon, total, razones };
 }
 
 function evaluateOneDay(
@@ -79,26 +116,29 @@ function evaluateOneDay(
   const week = weeks.find((w) => w.starts_on <= dateKey && dateKey <= addDays(w.starts_on, 6)) ?? null;
   const completedThatDay = tandas.filter((t) => t.local_date === dateKey && t.status === 'completada').length;
   const checksForDate = checks.filter((c) => c.date === dateKey);
-  const evaluacion = evaluateDay({
+  const evaluationInput = {
     dateKey,
     minTandasDia: week ? week.min_tandas_dia : null,
     completedTandas: completedThatDay,
     habits,
     checks: checksForDate.map((c) => ({ habit_id: c.habit_id, status: c.status })),
-  });
-  return { date: dateKey, week_number: week?.week_number ?? null, evaluacion };
+  };
+  const evaluacion = evaluateDay(evaluationInput);
+  const evaluacion_dia = describeDay(evaluationInput);
+  return { date: dateKey, week_number: week?.week_number ?? null, evaluacion, evaluacion_dia };
 }
 
 export async function getCompliance(input: ComplianceInput): Promise<ComplianceResult> {
   const cutoff = input.cutoff ?? new Date(`${input.to}T23:59:59.999Z`);
 
-  const [weeksRaw, habitsRaw, checksRaw, tandasRaw, slotsRaw, outcomesRaw] = await Promise.all([
+  const [weeksRaw, habitsRaw, checksRaw, tandasRaw, slotsRaw, outcomesRaw, planViewsRaw] = await Promise.all([
     fetchProgramWeeksFromDb(),
     fetchHabitsFromDb(),
     fetchDailyChecksFromDb(),
     fetchTandasFromDb(),
     fetchRoutineSlotsFromDb(),
     fetchSlotOutcomesFromDb(),
+    fetchAllPlanViewsFromDb(),
   ]);
 
   const weeks = (Array.isArray(weeksRaw) ? weeksRaw : []) as ProgramWeekRecord[];
@@ -109,6 +149,7 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
   );
   const slots = (Array.isArray(slotsRaw) ? slotsRaw : []) as RoutineSlotRecord[];
   const outcomes = (Array.isArray(outcomesRaw) ? outcomesRaw : []) as SlotOutcomeRecord[];
+  const planViews = (Array.isArray(planViewsRaw) ? planViewsRaw : []) as PlanViewRecord[];
 
   // Un solo recorrido, desde el inicio del programa (o desde `from` si no hay programa) hasta
   // `to`: `dias_cumplidos_totales` es el acumulado de TODO el programa (FR-022), no solo del
@@ -128,14 +169,16 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
   const days_fulfilled = dias.filter((d) => d.evaluacion?.fulfilled).length;
   const dias_cumplidos_totales = allDays.filter((d) => d.evaluacion?.fulfilled).length;
 
-  const habitos: ComplianceHabit[] = habits.map((h) => {
-    const activeDays = dias.filter((d) => isHabitActive(h, d.date));
-    const cumplidos = activeDays.filter((d) => {
-      const check = allChecks.find((c) => c.date === d.date && c.habit_id === h.id);
-      return check?.status === 'cumplido' || check?.status === 'na';
-    }).length;
-    return { id: h.id, label: h.label, cumplidos, total: activeDays.length };
-  });
+  const habitos: ComplianceHabit[] = habits
+    .map((h) => {
+      const activeDays = dias.filter((d) => isHabitActive(h, d.date));
+      const cumplidos = activeDays.filter((d) => {
+        const check = allChecks.find((c) => c.date === d.date && c.habit_id === h.id);
+        return check?.status === 'cumplido' || check?.status === 'na';
+      }).length;
+      return { id: h.id, label: h.label, cumplidos, total: activeDays.length };
+    })
+    .filter((h) => h.total > 0);
 
   const tandasInRange = tandasBeforeCutoff.filter((t) => t.local_date >= input.from && t.local_date <= input.to);
   const completadas = tandasInRange.filter((t) => t.status === 'completada').length;
@@ -174,6 +217,7 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
   }
 
   const horizonte = habits.length > 0 ? Math.max(...habits.map((h) => h.target_days ?? 66)) : 66;
+  const aperturas_plan = summarizePlanOpenings(planViews, input.from, input.to, cutoff);
 
   return {
     dias,
@@ -185,5 +229,6 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
     ediciones_tardias,
     dias_cumplidos_totales,
     horizonte,
+    aperturas_plan,
   };
 }

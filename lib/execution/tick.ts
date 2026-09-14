@@ -37,7 +37,6 @@ import {
 import { fetchSubjectsFromDb } from '../db/repository-pg';
 import { getCompliance } from './compliance';
 import { computeGradeProjections } from './grade-projection';
-import { countGatedPlanOpenings } from './planning';
 import { computeVerdict } from '../domain/execution';
 import { buildReportPayload, deriveRiskSection, renderReportSubject, renderReportText, BuildReportPayloadInput, ReportPayload } from './report';
 import type { Mailer } from './mailer';
@@ -99,11 +98,10 @@ async function freezeOneWeek(
   const from = week.starts_on;
   const to = addDays(week.starts_on, 6);
 
-  const [compliance, projections, activePartner, planOpenings] = await Promise.all([
+  const [compliance, projections, activePartner] = await Promise.all([
     getCompliance({ from, to, cutoff }),
     computeGradeProjections(cutoff),
     fetchActivePartnerFromDb(),
-    countGatedPlanOpenings(week.id),
   ]);
 
   const enRiesgo = deriveRiskSection(projections.materias, projections.alertas);
@@ -137,7 +135,7 @@ async function freezeOneWeek(
     late,
     previous_report_failed: previousReportFailed,
     second_consecutive_failure: secondConsecutiveFailure,
-    plan_openings: planOpenings,
+    aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
   };
   const payload = buildReportPayload(input);
 

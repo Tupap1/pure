@@ -331,7 +331,7 @@ export const TOOLS_LIST = [
   {
     name: 'get_today',
     description:
-      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (con los segundos restantes), el disparador vigente si lo hay, los hábitos pendientes y si el día quedó cumplido.',
+      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (con los segundos restantes), el disparador vigente si lo hay, los hábitos pendientes, si el día quedó cumplido y la evaluación desglosada del día (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -400,7 +400,7 @@ export const TOOLS_LIST = [
   {
     name: 'get_compliance_report',
     description:
-      'Módulo de Ejecución: vista de salud del hábito para un rango de días o una semana del programa entera (US6), de solo lectura. Devuelve los días con su evaluación, days_fulfilled, los hábitos como fracción, las tandas (completadas/interrumpidas y por materia), los disparadores (hecho/no/sin_respuesta), las razones de interrupción, las ediciones tardías, los días cumplidos acumulados desde el inicio del programa y el horizonte del hábito (66 por defecto).',
+      'Módulo de Ejecución: vista de salud del hábito para un rango de días o una semana del programa entera (US6), de solo lectura. Devuelve los días con su evaluación y desglose (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled), days_fulfilled, aperturas_plan { libres_usadas, con_razon, total, razones } (solo aperturas de la vista de semana; las de planeación no cuentan), los hábitos como fracción (sin los que tienen 0 días activos en el rango), las tandas (completadas/interrumpidas y por materia), los disparadores (hecho/no/sin_respuesta), las razones de interrupción, las ediciones tardías, los días cumplidos acumulados desde el inicio del programa y el horizonte del hábito (66 por defecto).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -455,10 +455,10 @@ export const TOOLS_LIST = [
   {
     name: 'plan_week',
     description:
-      'Módulo de Ejecución: planeación del domingo y la vista de semana (US8-US9). ' +
+      'Módulo de Ejecución: planeación del domingo y la vista de semana (US8-US9-B1). ' +
       '"preview" arma el asistente del domingo: la semana pasada (cumplimiento), las entregas de los próximos 14 días con sus alertas, las intenciones y disparadores de la semana que viene con su ensayo, y el reparto sugerido de tandas por materia (de la norma de créditos, 48h/crédito/semestre, con la urgencia y la proyección de nota en columnas aparte) — excluye de ese reparto una materia con intención declarada menor a 6. ' +
       '"set_intentions" registra, por materia y semana, una intención de 0 a 10; menor a 6 exige razón (RAZON_REQUERIDA si falta) y esa materia deja de recibir reparto sugerido. ' +
-      '"open_view" es la compuerta de la vista de semana (FR-037): libre 2 veces por semana; desde la 3.ª exige reason (RAZON_REQUERIDA si falta) y esa apertura queda contada en el reporte semanal ("Aperturas del plan"). Devuelve la rejilla de la semana en curso: cada disparador con su resultado por día y las tandas por día, sin gráficas.',
+      '"open_view" abre la vista de una semana: la indicada con program_week_id o, sin él, la que contiene hoy o la próxima que empiece (nunca salta a la siguiente por ser domingo); si la indicada no existe, NO_ENCONTRADO. Si la semana todavía no empieza, es una apertura de planeación (surface=planeacion): no pasa por la compuerta, no pide razón y no cuenta como apertura. Si ya empezó, aplica la compuerta (FR-037): libre 2 veces por semana y desde la 3.ª exige reason (RAZON_REQUERIDA si falta); esas aperturas se cuentan en el reporte semanal. Devuelve la rejilla de la semana: cada disparador con su resultado por día y las tandas por día, sin gráficas.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -466,9 +466,9 @@ export const TOOLS_LIST = [
         data: {
           type: 'object',
           description:
-            'preview: { program_week_id? } (la semana en curso, o la siguiente si hoy es domingo, si se omite). ' +
+            'preview: { program_week_id? } (domingo→siguiente, si no en curso, si no siguiente disponible; sin nada → NO_ENCONTRADO). ' +
             'set_intentions: { program_week_id, items: [{ subject_id, strength (0-10), reason? }] }. ' +
-            'open_view: { reason? } (obligatorio desde la 3.ª apertura de la semana en curso).',
+            'open_view: { program_week_id?, reason? } (la semana indicada o resuelta; futura es apertura de planeación sin compuerta; en curso aplica compuerta normal).',
         },
       },
       required: ['action'],
@@ -701,7 +701,7 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'get_today',
-    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso, disparador vigente, hábitos pendientes, día cumplido). Solo lectura.',
+    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso, disparador vigente, hábitos pendientes, día cumplido, evaluación desglosada con tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled). Solo lectura.',
     {
       data: z.any().optional(),
     },
@@ -751,7 +751,7 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'get_compliance_report',
-    'Módulo de Ejecución: vista de salud del hábito (US6), de solo lectura. Días con su evaluación, days_fulfilled, hábitos por fracción, tandas, disparadores, razones de interrupción, ediciones tardías, días cumplidos acumulados y horizonte.',
+    'Módulo de Ejecución: vista de salud del hábito (US6), de solo lectura. Días con evaluación desglosada (tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled), days_fulfilled, aperturas_plan (solo semana, no planeación), hábitos por fracción (sin los de 0 días activos), tandas, disparadores, razones de interrupción, ediciones tardías, días cumplidos acumulados y horizonte.',
     {
       data: z.any().optional(),
     },
@@ -789,7 +789,7 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'plan_week',
-    'Módulo de Ejecución: planeación del domingo y vista de semana (US8-US9). preview/set_intentions/open_view. El reparto sugerido sale de la norma de créditos (urgencia y proyección aparte) y excluye materias con intención < 6; open_view es la compuerta de la semana (2 aperturas libres, desde la 3.ª pide razón) y devuelve la rejilla de disparadores y tandas por día, sin gráficas.',
+    'Módulo de Ejecución: planeación del domingo y vista de semana (US8-US9-B1). preview/set_intentions/open_view. El reparto sugerido sale de la norma de créditos (urgencia y proyección aparte) y excluye materias con intención < 6. open_view abre la vista de una semana (indicada o resuelta): si es futura, apertura de planeación sin compuerta; si es en curso, compuerta normal (2 aperturas libres, desde la 3.ª pide razón). Devuelve la rejilla de disparadores y tandas por día, sin gráficas.',
     {
       action: z.enum(['preview', 'set_intentions', 'open_view']),
       data: z.any().optional(),
