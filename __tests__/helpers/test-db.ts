@@ -87,6 +87,7 @@ export async function createTestDb(): Promise<TestDbHarness> {
         'routine_slots',
         'habits',
         'program_weeks',
+        'oauth_refresh_tokens',
         'oauth_access_tokens',
         'oauth_auth_codes',
         'oauth_clients',
