@@ -8,7 +8,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { validateMcpAuth } from './auth-middleware';
 import { handleHealthCheck } from './health-handler';
-import { OAuthStore, globalOAuthStore } from './oauth-store';
+import { OAuthStore, globalOAuthStore, ACCESS_TOKEN_TTL_MS } from './oauth-store';
 import {
   handleGetAcademicOverview,
   handleParseAndIngestSyllabus,
@@ -867,7 +867,7 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
           registration_endpoint: `${baseUrl}/oauth/register`,
           scopes_supported: ['mcp'],
           response_types_supported: ['code'],
-          grant_types_supported: ['authorization_code'],
+          grant_types_supported: ['authorization_code', 'refresh_token'],
           code_challenge_methods_supported: ['S256'],
           token_endpoint_auth_methods_supported: ['none'],
         })
@@ -1053,6 +1053,7 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
         let clientId = '';
         let redirectUri = '';
         let codeVerifier = '';
+        let refreshToken = '';
 
         if (req.headers['content-type']?.includes('application/json')) {
           try {
@@ -1062,6 +1063,7 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
             clientId = json.client_id || '';
             redirectUri = json.redirect_uri || '';
             codeVerifier = json.code_verifier || '';
+            refreshToken = json.refresh_token || '';
           } catch (e) {}
         } else {
           const params = new URLSearchParams(body);
@@ -1070,11 +1072,37 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
           clientId = params.get('client_id') || '';
           redirectUri = params.get('redirect_uri') || '';
           codeVerifier = params.get('code_verifier') || '';
+          refreshToken = params.get('refresh_token') || '';
+        }
+
+        try {
+          if (grantType === 'refresh_token') {
+            const rotated = await oauthStore.rotateRefreshToken(refreshToken, clientId);
+            if (!rotated.valid) {
+              res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+              res.end(JSON.stringify({ error: rotated.error || 'invalid_grant', error_description: rotated.errorDescription }));
+              return;
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+            res.end(
+              JSON.stringify({
+                access_token: rotated.accessToken,
+                token_type: 'Bearer',
+                expires_in: rotated.expiresIn,
+                refresh_token: rotated.refreshToken,
+              })
+            );
+            return;
+          }
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+          res.end(JSON.stringify({ error: 'server_error' }));
+          return;
         }
 
         if (grantType !== 'authorization_code') {
           res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-          res.end(JSON.stringify({ error: 'unsupported_grant_type', error_description: 'Only authorization_code is supported' }));
+          res.end(JSON.stringify({ error: 'unsupported_grant_type', error_description: 'Only authorization_code and refresh_token are supported' }));
           return;
         }
 
@@ -1092,6 +1120,7 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
         }
 
         const accessToken = await oauthStore.createAccessToken(clientId);
+        const issuedRefreshToken = await oauthStore.createRefreshToken(clientId);
         res.writeHead(200, {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store',
@@ -1100,7 +1129,8 @@ export function createRequestHandler(opts?: { secretKey?: string; oauthStore?: O
           JSON.stringify({
             access_token: accessToken,
             token_type: 'Bearer',
-            expires_in: 86400,
+            expires_in: ACCESS_TOKEN_TTL_MS / 1000,
+            refresh_token: issuedRefreshToken,
           })
         );
       });
