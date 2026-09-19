@@ -23,6 +23,16 @@ export interface AccessTokenRecord {
   expiresAt: number;
 }
 
+export interface RefreshTokenRecord {
+  token: string;
+  clientId?: string;
+  expiresAt: number;
+  revoked: boolean;
+}
+
+export const ACCESS_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const REFRESH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
 const DEFAULT_ALLOWED_REDIRECT_URIS = [
   'https://claude.ai/api/mcp/auth_callback',
   'https://claude.com/api/mcp/auth_callback',
@@ -49,6 +59,7 @@ export class OAuthStore {
   private registeredClients = new Map<string, RegisteredClient>();
   private authCodes = new Map<string, AuthCodeRecord>();
   private accessTokens = new Map<string, AccessTokenRecord>();
+  private refreshTokens = new Map<string, RefreshTokenRecord>();
 
   constructor() {
     // TAREA 4: Periodic cleanup every 10 minutes with unref()
@@ -275,7 +286,7 @@ export class OAuthStore {
 
   public async createAccessToken(clientId?: string): Promise<string> {
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h TTL
+    const expiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_MS);
 
     const record: AccessTokenRecord = {
       token,
@@ -323,10 +334,94 @@ export class OAuthStore {
     return true;
   }
 
+  public async createRefreshToken(clientId?: string): Promise<string> {
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+
+    try {
+      await pgPool.query(
+        `INSERT INTO oauth_refresh_tokens (token, client_id, expires_at, revoked)
+         VALUES ($1, $2, $3, FALSE)`,
+        [token, clientId || null, expiresAt]
+      );
+    } catch (err) {
+      // Memory fallback
+    }
+
+    this.refreshTokens.set(token, { token, clientId, expiresAt: expiresAt.getTime(), revoked: false });
+    return token;
+  }
+
+  /**
+   * Consume un refresh_token (un solo uso) y emite un par nuevo access + refresh.
+   * Si Postgres responde, su resultado manda: la memoria de otro proceso o de antes
+   * de un reinicio no puede revivir un token ya consumido.
+   */
+  public async rotateRefreshToken(
+    token: string,
+    clientId?: string
+  ): Promise<{
+    valid: boolean;
+    accessToken?: string;
+    refreshToken?: string;
+    expiresIn?: number;
+    error?: string;
+    errorDescription?: string;
+  }> {
+    if (!token) {
+      return { valid: false, error: 'invalid_grant', errorDescription: 'Missing refresh_token' };
+    }
+
+    let ownerClientId: string | undefined;
+    let found = false;
+
+    try {
+      const res = await pgPool.query(
+        `UPDATE oauth_refresh_tokens
+         SET revoked = TRUE
+         WHERE token = $1 AND revoked = FALSE AND expires_at > NOW()
+         RETURNING client_id`,
+        [token]
+      );
+      const memRecord = this.refreshTokens.get(token);
+      if (memRecord) memRecord.revoked = true;
+
+      if (res.rows.length === 0) {
+        return { valid: false, error: 'invalid_grant', errorDescription: 'Refresh token invalid, expired or already used' };
+      }
+      found = true;
+      ownerClientId = res.rows[0].client_id || undefined;
+    } catch (err) {
+      // DB failed or not initialized; fall through to memory check
+    }
+
+    if (!found) {
+      const record = this.refreshTokens.get(token);
+      if (!record || record.revoked || Date.now() > record.expiresAt) {
+        return { valid: false, error: 'invalid_grant', errorDescription: 'Refresh token invalid, expired or already used' };
+      }
+      record.revoked = true;
+      ownerClientId = record.clientId;
+    }
+
+    if (clientId && ownerClientId && ownerClientId !== clientId) {
+      return { valid: false, error: 'invalid_grant', errorDescription: 'Client ID mismatch' };
+    }
+
+    const effectiveClientId = ownerClientId || clientId;
+    return {
+      valid: true,
+      accessToken: await this.createAccessToken(effectiveClientId),
+      refreshToken: await this.createRefreshToken(effectiveClientId),
+      expiresIn: ACCESS_TOKEN_TTL_MS / 1000,
+    };
+  }
+
   public async cleanupExpired(): Promise<void> {
     try {
       await pgPool.query(`DELETE FROM oauth_auth_codes WHERE expires_at < NOW() OR (used = TRUE AND created_at < NOW() - INTERVAL '1 hour')`);
       await pgPool.query(`DELETE FROM oauth_access_tokens WHERE expires_at < NOW()`);
+      await pgPool.query(`DELETE FROM oauth_refresh_tokens WHERE expires_at < NOW() OR (revoked = TRUE AND created_at < NOW() - INTERVAL '1 day')`);
     } catch (err) {
       // Ignore cleanup DB errors
     }
@@ -343,12 +438,19 @@ export class OAuthStore {
         this.accessTokens.delete(token);
       }
     }
+
+    for (const [token, rec] of this.refreshTokens.entries()) {
+      if (rec.expiresAt < now || rec.revoked) {
+        this.refreshTokens.delete(token);
+      }
+    }
   }
 
   public clear(): void {
     this.registeredClients.clear();
     this.authCodes.clear();
     this.accessTokens.clear();
+    this.refreshTokens.clear();
   }
 }
 

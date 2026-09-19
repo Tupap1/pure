@@ -11,7 +11,7 @@ import {
   handleIngestAcademicEnrollment,
   handleParseAndIngestSyllabus,
 } from '../../mcp-server/tools-handler';
-import { globalOAuthStore } from '../../mcp-server/oauth-store';
+import { globalOAuthStore, OAuthStore } from '../../mcp-server/oauth-store';
 
 describe('MCP Server PostgreSQL Real Database Persistence with pg-mem', () => {
   let harness: TestDbHarness;
@@ -199,6 +199,21 @@ describe('MCP Server PostgreSQL Real Database Persistence with pg-mem', () => {
     expect(res2.valid).toBe(false);
     expect(res2.error).toBe('invalid_grant');
     expect(res2.errorDescription).toContain('already used');
+  });
+
+  it('5b. refresh_token survives a server restart and rotates atomically in PostgreSQL', async () => {
+    const refreshToken = await globalOAuthStore.createRefreshToken('pure_client_restart');
+
+    // Un OAuthStore nuevo no tiene nada en memoria: simula el reinicio del contenedor.
+    const afterRestart = new OAuthStore();
+    const rotated = await afterRestart.rotateRefreshToken(refreshToken, 'pure_client_restart');
+    expect(rotated.valid).toBe(true);
+    expect(rotated.refreshToken).toBeTruthy();
+    expect(await new OAuthStore().isValidAccessToken(rotated.accessToken!)).toBe(true);
+
+    const replay = await new OAuthStore().rotateRefreshToken(refreshToken, 'pure_client_restart');
+    expect(replay.valid).toBe(false);
+    expect(replay.error).toBe('invalid_grant');
   });
 
   it('6. should not lose or overwrite syllabus topics of another subject when ingesting a new syllabus', async () => {
