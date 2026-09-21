@@ -28,9 +28,9 @@ tocar nada aparte.
 
 | Campo | Cambio |
 |---|---|
-| `planned_minutes` | Rango pasa de 5–25 (constantes) a 10–60 (constantes + CHECK en BD). Por defecto sigue siendo 10 (FR-T02). |
+| `planned_minutes` | Rango pasa de 5–25 (constantes) a 10–60 (constantes + CHECK en BD). Por defecto sigue siendo 10 (FR-T02). En una tanda de `log_late` se guarda igual a `actual_minutes`: no hubo plan, hubo una sesión, y la columna es NOT NULL. |
 | `late_logged` | Nuevo. `BOOLEAN NOT NULL DEFAULT FALSE`. Verdadero solo para tandas creadas por `log_late`. |
-| Otros campos | Sin cambios. `actual_minutes` sigue siendo lo que dura la tanda en realidad. `status` sigue siendo 'en_curso', 'completada', 'interrumpida', 'huérfana'. |
+| Otros campos | Sin cambios. `actual_minutes` sigue siendo lo que dura la tanda en realidad. `status` sigue siendo 'en_curso', 'completada' e 'interrumpida': no hay estado de tanda huérfana, que la 002 descartó y esta feature tampoco introduce. |
 
 ## Concepto derivado: unidad
 

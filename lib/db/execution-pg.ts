@@ -424,6 +424,8 @@ export interface TandaRecord {
   locked_at: string;
   edited_after_lock: boolean;
   end_notified_at?: string | null;
+  /** US-T2: true solo para tandas creadas por manage_tandas:log_late (registro tardío). */
+  late_logged: boolean;
   created_at?: string;
 }
 
@@ -456,13 +458,14 @@ export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaR
     mode: tanda.mode ?? null,
     locked_at: tanda.locked_at!,
     edited_after_lock: tanda.edited_after_lock ?? false,
+    late_logged: tanda.late_logged ?? false,
   };
   const res = await pgPool.query(
     `INSERT INTO tandas
        (id, subject_id, topic_id, deliverable_id, task_id, routine_slot_id, study_block_id,
         local_date, started_at, ended_at, planned_minutes, actual_minutes, status, running_lock,
-        interrupt_reason, mode, locked_at, edited_after_lock)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        interrupt_reason, mode, locked_at, edited_after_lock, late_logged)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
      ON CONFLICT (id) DO UPDATE SET
        subject_id = EXCLUDED.subject_id,
        topic_id = EXCLUDED.topic_id,
@@ -476,7 +479,8 @@ export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaR
        running_lock = EXCLUDED.running_lock,
        interrupt_reason = EXCLUDED.interrupt_reason,
        mode = EXCLUDED.mode,
-       edited_after_lock = EXCLUDED.edited_after_lock
+       edited_after_lock = EXCLUDED.edited_after_lock,
+       late_logged = EXCLUDED.late_logged
      RETURNING *`,
     [
       record.id,
@@ -497,6 +501,7 @@ export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaR
       record.mode,
       record.locked_at,
       record.edited_after_lock,
+      record.late_logged,
     ]
   );
   return res.rows[0];

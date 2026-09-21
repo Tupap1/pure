@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vite
 import { createZeptoMailer } from '@/lib/execution/mailer';
 import { computeVerdict, isTandaBeforeCutoff } from '@/lib/domain/execution';
 import { localDateTimeToInstant } from '@/lib/execution/time';
+import { buildReportPayload as buildReportPayloadReal } from '@/lib/execution/report';
+import { createTestDb, TestDbHarness } from '../helpers/test-db';
+import { handleManageTandas, handleGetComplianceReport } from '@/lib/execution/handlers';
 
 // Tipos de lib/execution/report.ts repetidos aquí en vez de importados: ese módulo todavía no
 // existe a la altura de este commit RED (T053 lo crea), y hasta un `import type` hace que Vite
@@ -193,6 +196,74 @@ describe('[001] US6 — Reporte semanal congelado por correo', () => {
     const payload = buildReportPayload(baseReportInput({ previous_report_failed: true }));
     const text = renderReportText(payload);
     expect(text).toContain('La semana pasada el reporte no se pudo entregar.');
+  });
+});
+
+// US-T2 — Registros tardíos en el reporte de cumplimiento (FR-T14). A diferencia del describe de
+// arriba, aquí sí hace falta pg-mem: get_compliance_report agrega registros_tardios a partir de
+// tandas reales guardadas con late_logged=true (lib/execution/compliance.ts), algo que
+// buildReportPayload por sí solo no puede probar (es puro y recibe los números ya resueltos).
+describe('[003] US-T2 — Registros tardíos en el reporte de cumplimiento', () => {
+  let harness: TestDbHarness;
+
+  beforeAll(async () => {
+    harness = await createTestDb();
+  });
+
+  beforeEach(async () => {
+    await harness.reset();
+    // subject_id en tandas tiene FK a subjects: log_late exige un subject_id real.
+    const { handleManageUniversities, handleManageSubjects } = await import('../../mcp-server/tools-handler');
+    await handleManageUniversities('create', { id: 'uni-1', name: 'UdeA', scale_max: 5, passing_grade: 3.0 });
+    await handleManageSubjects('create', { id: 'sub-calculo', university_id: 'uni-1', name: 'Cálculo' });
+    await handleManageSubjects('create', { id: 'sub-fisica', university_id: 'uni-1', name: 'Física' });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('US-T2-AS8 · get_compliance_report expone registros_tardios con el total y los minutos de las tandas late_logged', async () => {
+    vi.setSystemTime(new Date('2026-09-21T23:00:00.000Z')); // 18:00 local, 2026-09-21
+
+    const primero = await handleManageTandas('log_late', {
+      subject_id: 'sub-calculo',
+      started_at: '2026-09-21T20:00:00.000Z', // 15:00 local
+      ended_at: '2026-09-21T20:30:00.000Z', // 30 minutos
+    });
+    expect(primero.status).toBe('success');
+
+    const segundo = await handleManageTandas('log_late', {
+      subject_id: 'sub-fisica',
+      started_at: '2026-09-21T21:00:00.000Z', // 16:00 local
+      ended_at: '2026-09-21T21:20:00.000Z', // 20 minutos
+    });
+    expect(segundo.status).toBe('success');
+
+    const report = await handleGetComplianceReport({ from: '2026-09-21', to: '2026-09-21' });
+    expect(report.status).toBe('success');
+    if (report.status === 'success') {
+      const data = report.data as any;
+      expect(data.registros_tardios).toEqual({ total: 2, minutos: 50 });
+    }
+  });
+
+  it('US-T2-AS8 · sin registros tardíos, get_compliance_report expone { total: 0, minutos: 0 } (nunca null ni ausente)', async () => {
+    const report = await handleGetComplianceReport({ from: '2026-01-01', to: '2026-01-01' });
+    expect(report.status).toBe('success');
+    if (report.status === 'success') {
+      const data = report.data as any;
+      expect(data.registros_tardios).toBeDefined();
+      expect(data.registros_tardios).toEqual({ total: 0, minutos: 0 });
+    }
+  });
+
+  it('US-T2-AS8 · el payload del reporte semanal trae registros_tardios cuando se le pasan', () => {
+    const payload = buildReportPayloadReal({
+      ...baseReportInput(),
+      registros_tardios: { total: 2, minutos: 50 },
+    } as any);
+    expect((payload as any).registros_tardios).toEqual({ total: 2, minutos: 50 });
   });
 });
 

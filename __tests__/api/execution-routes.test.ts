@@ -40,6 +40,26 @@ describe('[001] US1 — Rutas web del Módulo de Ejecución', () => {
     }
   });
 
+  it('US-T2-AS9 · [regresión] log_late no está en la lista blanca de manage_tandas en la web', async () => {
+    const request = new Request('http://localhost/api/execution', {
+      method: 'POST',
+      body: JSON.stringify({
+        tool: 'manage_tandas',
+        action: 'log_late',
+        data: {
+          subject_id: 'sub-calculo',
+          started_at: '2026-09-21T20:00:00.000Z',
+          ended_at: '2026-09-21T21:00:00.000Z',
+        },
+      }),
+    });
+    const response = await POST(request);
+    const json = await response.json();
+    expect(response.status).toBe(400);
+    expect(json.status).toBe('error');
+    expect(json.code).toBe('DATOS_INVALIDOS');
+  });
+
   it('POST /api/execution acepta manage_tandas:start (en la lista blanca) y responde 200', async () => {
     const request = new Request('http://localhost/api/execution', {
       method: 'POST',

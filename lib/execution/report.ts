@@ -58,6 +58,10 @@ export interface BuildReportPayloadInput {
   /** US-B5: medidas de fricción retiradas por irritación durante esta semana (FR-B21). Lista
    * vacía si no hubo retiros; ausente en payloads congelados antes de esta feature. */
   friccion_retiradas?: { measure_key: string; fecha: string }[];
+  /** US-T2/FR-T14: registros tardíos (manage_tandas:log_late) de la semana, con ceros explícitos
+   * cuando no hubo ninguno. Opcional para compatibilidad con payloads congelados antes de esta
+   * feature (esos, al leerse de vuelta, simplemente no traen esta sección). */
+  registros_tardios?: { total: number; minutos: number };
 }
 
 export interface ReportPayload extends BuildReportPayloadInput {
@@ -208,6 +212,11 @@ export function renderReportText(payload: ReportPayload): string {
     lines.push(`Aperturas del plan: ${total}${conRazonText}`);
   } else if (payload.plan_openings != null) {
     lines.push(`Aperturas del plan: ${payload.plan_openings}`);
+  }
+  // US-T2/FR-T14: solo aparece cuando hubo al menos uno -- "0 registros tardíos" todas las
+  // semanas sería ruido, no una señal (spec.md, "Qué construir" #8).
+  if (payload.registros_tardios && payload.registros_tardios.total > 0) {
+    lines.push(`Registros tardíos: ${payload.registros_tardios.total} (${payload.registros_tardios.minutos} min)`);
   }
   for (const item of payload.friccion_retiradas ?? []) {
     const label = FRICTION_LABELS[item.measure_key] ?? item.measure_key;

@@ -142,6 +142,7 @@ async function freezeOneWeek(
     second_consecutive_failure: secondConsecutiveFailure,
     aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
     friccion_retiradas: await listIrritationDropsInRange(from, to, cutoff),
+    registros_tardios: compliance.registros_tardios,
   };
   const payload = buildReportPayload(input);
 

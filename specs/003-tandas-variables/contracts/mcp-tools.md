@@ -70,7 +70,7 @@ Devolución (si tiene éxito):
   subject_id: string;
   started_at: ISO 8601;
   ended_at: ISO 8601;
-  planned_minutes: null;     // registro tardío no tiene duración planeada
+  planned_minutes: number;   // igual a actual_minutes: en un registro tardío no hubo plan, hubo una sesión (la columna es NOT NULL)
   actual_minutes: number;
   late_logged: true;
   created_at: ISO 8601;

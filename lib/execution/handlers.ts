@@ -17,6 +17,7 @@ import {
   TandaInterruptSchema,
   TandaReadSchema,
   TandaUpdateSchema,
+  TandaLogLateSchema,
   RoutineSlotSchema,
   RoutineSlotReadSchema,
   RoutineSlotDeleteSchema,
@@ -44,7 +45,7 @@ import {
   type ExecutionResult,
 } from '../validations/schemas';
 import { initProgram, readProgram, updateProgramWeek, upsertHabit, retireHabit } from './program';
-import { startTanda, finishTanda, interruptTanda, currentTanda, readTandas, updateTanda } from './tandas';
+import { startTanda, finishTanda, interruptTanda, currentTanda, readTandas, updateTanda, logLateTanda } from './tandas';
 import { getToday } from './today';
 import {
   upsertRoutineSlot,
@@ -143,13 +144,15 @@ export async function handleManageProgram(
   }
 }
 
-export type ManageTandasAction = 'start' | 'finish' | 'interrupt' | 'current' | 'read' | 'update';
+export type ManageTandasAction = 'start' | 'finish' | 'interrupt' | 'current' | 'read' | 'update' | 'log_late';
 
 /**
- * `manage_tandas` (US1): la tanda de 10 minutos en un toque. `start`/`finish`/`interrupt`/
- * `update` validan su forma con los esquemas Zod estrictos de schemas.ts (que ya rechazan
- * `started_at`/`ended_at` del cliente por ser claves no reconocidas) y delegan las reglas de
- * negocio en lib/execution/tandas.ts. `current` no tiene esquema propio: no recibe `data`.
+ * `manage_tandas` (US1, US-T1, US-T2): la tanda de estudio, de 10 a 60 minutos. `start`/`finish`/
+ * `interrupt`/`update` validan su forma con los esquemas Zod estrictos de schemas.ts (que ya
+ * rechazan `started_at`/`ended_at` del cliente por ser claves no reconocidas) y delegan las
+ * reglas de negocio en lib/execution/tandas.ts. `current` no tiene esquema propio: no recibe
+ * `data`. `log_late` (US-T2) es la única excepción acotada que sí acepta instantes del cliente;
+ * no entra en la lista blanca de app/api/execution/route.ts (FR-T15): solo se dispara por MCP.
  */
 export async function handleManageTandas(
   action: ManageTandasAction,
@@ -191,6 +194,11 @@ export async function handleManageTandas(
         const parsed = TandaUpdateSchema.safeParse(data ?? {});
         if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
         return await updateTanda(parsed.data, now);
+      }
+      case 'log_late': {
+        const parsed = TandaLogLateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await logLateTanda(parsed.data, now);
       }
       default:
         return {
@@ -405,6 +413,7 @@ async function assembleReportInput(
     second_consecutive_failure: false,
     aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
     friccion_retiradas: friccionRetiradas,
+    registros_tardios: compliance.registros_tardios,
   };
 }
 

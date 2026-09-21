@@ -10,6 +10,15 @@ export const TANDA_MINUTES_MAX = 60;
 export const TANDA_UNIT_MINUTES = 10;
 export const TANDA_DURATION_OPTIONS = [10, 25, 40, 60] as const;
 
+/** FR-T11/US-T2: `log_late` solo acepta sesiones que empezaron dentro de esta ventana hacia
+ * atrás (horas), contada desde el reloj del servidor. Es la única entrada del módulo que acepta
+ * instantes del cliente -- excepción deliberada y acotada al Principio III (plan.md). */
+export const LATE_LOG_MAX_HOURS_BACK = 6;
+
+/** FR-T12/US-T2: como máximo esta cantidad de registros tardíos por día local -- el límite existe
+ * para que `log_late` no reemplace el hábito de darle iniciar. */
+export const LATE_LOG_MAX_PER_DAY = 3;
+
 /** FR-011: un disparador sin responder deja de mostrarse pasadas 4 horas de su ancla. */
 export const TRIGGER_WINDOW_MINUTES = 240;
 

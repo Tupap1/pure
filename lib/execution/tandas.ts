@@ -13,7 +13,14 @@
 
 import crypto from 'crypto';
 import { localParts, localDateTimeToInstant, addDays } from './time';
-import { TANDA_MINUTES_DEFAULT, DAY_LOCK_TIME } from './constants';
+import {
+  TANDA_MINUTES_DEFAULT,
+  TANDA_MINUTES_MIN,
+  TANDA_MINUTES_MAX,
+  DAY_LOCK_TIME,
+  LATE_LOG_MAX_HOURS_BACK,
+  LATE_LOG_MAX_PER_DAY,
+} from './constants';
 import { tandaUnits } from '../domain/execution';
 import type { ExecutionResult } from '../validations/schemas';
 import {
@@ -318,4 +325,139 @@ export async function updateTanda(
     edited_after_lock: editedAfterLock,
   });
   return { status: 'success', data: updated };
+}
+
+export interface TandaLogLateInput {
+  subject_id: string;
+  /** ISO 8601, hora local del cliente. Única excepción del módulo (ver el comentario de
+   * logLateTanda más abajo). */
+  started_at: string;
+  ended_at: string;
+  topic_id?: string;
+  task_id?: string;
+}
+
+/**
+ * US-T2/FR-T10..FR-T15: `log_late` es la ÚNICA entrada del módulo que acepta instantes del
+ * cliente (`started_at`/`ended_at`) -- una excepción deliberada y acotada al Principio III de la
+ * Constitución ("todo instante registrado DEBE salir del reloj del servidor"), documentada en
+ * specs/003-tandas-variables/plan.md. La regla "sin tandas retroactivas" existe para que el
+ * reporte no se pueda maquillar; esto no la quita, la acota: registra una sesión que se estudió
+ * sin darle iniciar en la app, dentro de cotas estrechas y siempre visible (`late_logged: true`,
+ * contada aparte en el reporte semanal). Cada cota tiene su propia prueba porque si alguna se
+ * relaja, la excepción deja de estar acotada y la regla entera pierde sentido.
+ *
+ * Las validaciones corren en este orden exacto (deliberado, reflejado en los tests):
+ * 1) finalizeElapsed (misma razón que el resto del módulo: una tanda vencida sin cerrar debe
+ *    quedar cerrada antes de comparar solapamientos). 2) fechas parseables. 3) mismo día local
+ * que `now`. 4) ended_at <= now y ended_at > started_at. 5) started_at no más de
+ * LATE_LOG_MAX_HOURS_BACK horas atrás. 6) duración (redondeada hacia abajo a minutos) entre
+ * TANDA_MINUTES_MIN y TANDA_MINUTES_MAX. 7) límite de LATE_LOG_MAX_PER_DAY registros tardíos por
+ * día local. 8) solapamiento con cualquier otra tanda del mismo día (una en curso ocupa desde su
+ * inicio hasta ahora).
+ */
+export async function logLateTanda(
+  input: TandaLogLateInput,
+  now: Date = new Date()
+): Promise<ExecutionResult<TandaRecord>> {
+  await finalizeElapsed(now);
+
+  const startedAtDate = new Date(input.started_at);
+  const endedAtDate = new Date(input.ended_at);
+  if (Number.isNaN(startedAtDate.getTime()) || Number.isNaN(endedAtDate.getTime())) {
+    return {
+      status: 'error',
+      code: 'REGISTRO_TARDIO_INVALIDO',
+      message: 'started_at y ended_at deben ser fechas ISO 8601 válidas.',
+    };
+  }
+
+  const nowLocal = localParts(now);
+  const startedLocal = localParts(startedAtDate);
+  const endedLocal = localParts(endedAtDate);
+  if (startedLocal.dateKey !== nowLocal.dateKey || endedLocal.dateKey !== nowLocal.dateKey) {
+    return {
+      status: 'error',
+      code: 'REGISTRO_TARDIO_INVALIDO',
+      message: 'El registro tardío solo acepta sesiones de hoy (día local): el camino normal es darle iniciar.',
+    };
+  }
+
+  if (endedAtDate.getTime() > now.getTime() || endedAtDate.getTime() <= startedAtDate.getTime()) {
+    return {
+      status: 'error',
+      code: 'REGISTRO_TARDIO_INVALIDO',
+      message: 'ended_at debe ser posterior a started_at y no puede caer en el futuro.',
+    };
+  }
+
+  const maxBackMs = LATE_LOG_MAX_HOURS_BACK * 60 * 60_000;
+  if (startedAtDate.getTime() < now.getTime() - maxBackMs) {
+    return {
+      status: 'error',
+      code: 'REGISTRO_TARDIO_INVALIDO',
+      message: `started_at no puede ser de hace más de ${LATE_LOG_MAX_HOURS_BACK} horas: el camino normal es darle iniciar.`,
+    };
+  }
+
+  const durationMinutes = Math.floor((endedAtDate.getTime() - startedAtDate.getTime()) / 60_000);
+  if (durationMinutes < TANDA_MINUTES_MIN || durationMinutes > TANDA_MINUTES_MAX) {
+    return {
+      status: 'error',
+      code: 'REGISTRO_TARDIO_INVALIDO',
+      message: `La duración debe quedar entre ${TANDA_MINUTES_MIN} y ${TANDA_MINUTES_MAX} minutos.`,
+    };
+  }
+
+  const allRaw = await fetchTandasFromDb();
+  const all = (Array.isArray(allRaw) ? allRaw : []) as TandaRecord[];
+  const sameDay = all.filter((t) => t.local_date === nowLocal.dateKey);
+
+  const lateCountToday = sameDay.filter((t) => t.late_logged).length;
+  if (lateCountToday >= LATE_LOG_MAX_PER_DAY) {
+    return {
+      status: 'error',
+      code: 'LIMITE_REGISTRO_TARDIO',
+      message: `Ya hay ${LATE_LOG_MAX_PER_DAY} registros tardíos hoy: el límite existe para que esto no reemplace el hábito de darle iniciar.`,
+    };
+  }
+
+  const newStartMs = startedAtDate.getTime();
+  const newEndMs = endedAtDate.getTime();
+  const overlaps = sameDay.some((t) => {
+    const existingStartMs = new Date(t.started_at).getTime();
+    const existingEndMs = t.status === 'en_curso' ? now.getTime() : new Date(t.ended_at ?? t.started_at).getTime();
+    // Se cruzan si ambos intervalos comparten algún instante; tocarse en el borde no cuenta.
+    return newStartMs < existingEndMs && existingStartMs < newEndMs;
+  });
+  if (overlaps) {
+    return {
+      status: 'error',
+      code: 'REGISTRO_TARDIO_INVALIDO',
+      message: 'Ese tramo se solapa con otra tanda de hoy: revisa la hora de inicio y fin.',
+    };
+  }
+
+  const lockedAt = localDateTimeToInstant(addDays(nowLocal.dateKey, 1), DAY_LOCK_TIME);
+  const tanda = await saveTandaToDb({
+    id: `tanda-${crypto.randomUUID()}`,
+    subject_id: input.subject_id,
+    topic_id: input.topic_id,
+    task_id: input.task_id,
+    local_date: nowLocal.dateKey,
+    started_at: startedAtDate.toISOString(),
+    ended_at: endedAtDate.toISOString(),
+    // planned_minutes = actual_minutes a propósito: en un registro tardío no hubo plan, hubo una
+    // sesión ya ocurrida medida una sola vez. La columna es NOT NULL (migración 008), así que no
+    // puede quedar null; y dejarla en el default (10) afirmaría un plan de 10 minutos que nunca
+    // existió. Igualarla a la duración real ya validada (10-60) también satisface el CHECK de la 013.
+    planned_minutes: durationMinutes,
+    actual_minutes: durationMinutes,
+    status: 'completada',
+    running_lock: null,
+    locked_at: lockedAt.toISOString(),
+    late_logged: true,
+  });
+
+  return { status: 'success', data: tanda };
 }

@@ -156,6 +156,13 @@ de cada historia lo da su propio archivo de tests.
       `registros_tardios: { total, minutos }` en `ComplianceResult`; `lib/execution/report.ts` lo
       recibe en `BuildReportPayloadInput` (opcional, por los payloads ya congelados) y lo muestra en
       el texto del reporte; `lib/execution/tick.ts` lo pasa al construir el payload.
+- [ ] **T022b** [US-T2] IMPL — Catálogo de herramientas (CLAUDE.md manda leerlo antes de cambiar una
+      tool): `mcp-server/README.md` línea ~185 documenta `planned_minutes?` como `(5–25, default 10)`
+      y titula la sección "Sesiones de 10 minutos" — actualizar el rango a 10–60 y agregar la fila de
+      `log_late`. **Y sobre todo** `mcp-server/instructions.md` línea 28, que hoy le dice al agente
+      "No retroactive task entry … never by inserting backdated rows": tiene que pasar a describir
+      `log_late` como la excepción acotada y visible, o las instrucciones contradicen a la
+      herramienta y un cliente de IA concluirá que no debe usarla.
 - [ ] **T023** [US-T2] VERIFY — `npm run test:all` en verde y un `log_late` real contra el servidor
       MCP levantado en local, comprobando que la tanda queda marcada y que el cuarto del día se
       rechaza.
