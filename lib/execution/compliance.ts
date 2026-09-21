@@ -25,6 +25,7 @@ import {
   isHabitActive,
   evaluateDay,
   describeDay,
+  tandaUnits,
   isTandaBeforeCutoff,
   isoDayOfWeekForDateKey,
   DayEvaluation,
@@ -114,12 +115,16 @@ function evaluateOneDay(
   checks: DailyCheckRecord[]
 ): ComplianceDay {
   const week = weeks.find((w) => w.starts_on <= dateKey && dateKey <= addDays(w.starts_on, 6)) ?? null;
-  const completedThatDay = tandas.filter((t) => t.local_date === dateKey && t.status === 'completada').length;
+  const completedThatDay = tandas.filter((t) => t.local_date === dateKey && t.status === 'completada');
+  const completedCount = completedThatDay.length;
+  // FR-T05: calcular unidades (suma de tandaUnits sobre las completadas).
+  const completedUnits = completedThatDay.reduce((sum, t) => sum + tandaUnits(t.actual_minutes), 0);
   const checksForDate = checks.filter((c) => c.date === dateKey);
   const evaluationInput = {
     dateKey,
     minTandasDia: week ? week.min_tandas_dia : null,
-    completedTandas: completedThatDay,
+    completedTandas: completedCount,
+    completedUnits,
     habits,
     checks: checksForDate.map((c) => ({ habit_id: c.habit_id, status: c.status })),
   };

@@ -8,7 +8,7 @@
 
 import { localParts, localDateTimeToInstant } from '../execution/time';
 import { occursOnSabadoVariant, getSabadoTypeForDate, DEFAULT_SABADO_A_ANCHOR } from '../algorithms/conflict-detector';
-import { TRIGGER_WINDOW_MINUTES, VERDICT_CUMPLIDA_MIN_DAYS, VERDICT_FALLIDA_MAX_DAYS } from '../execution/constants';
+import { TRIGGER_WINDOW_MINUTES, VERDICT_CUMPLIDA_MIN_DAYS, VERDICT_FALLIDA_MAX_DAYS, TANDA_UNIT_MINUTES } from '../execution/constants';
 import type { GradeProjectionFlag } from './subject';
 
 // --- US2: resolveCurrentTrigger -------------------------------------------------------------
@@ -150,6 +150,21 @@ export function resolveCurrentTrigger(input: ResolveCurrentTriggerInput): Curren
   };
 }
 
+// --- US-T1: tandaUnits (función de dominio del sistema de unidades) --------------------------
+
+/**
+ * FR-T04: una tanda completada vale max(1, floor(actual_minutes / 10)) unidades.
+ * La regla vive en una función pura, no repetida en cada servicio.
+ * Se aplica solo a tandas completadas: las interrumpidas aportan 0 unidades.
+ *
+ * @param actualMinutes Minutos reales de una tanda completada, o null/undefined (mínimo 1).
+ * @returns Unidades de la tanda: al menos 1.
+ */
+export function tandaUnits(actualMinutes: number | null | undefined): number {
+  if (actualMinutes == null || actualMinutes <= 0) return 1;
+  return Math.max(1, Math.floor(actualMinutes / TANDA_UNIT_MINUTES));
+}
+
 // --- US3: isHabitActive / evaluateDay -------------------------------------------------------
 
 export interface HabitActiveInput {
@@ -201,6 +216,9 @@ export interface EvaluateDayInput {
   /** Tandas con status='completada' ese día (US3-AS1: "tandas completadas", no en curso ni
    * interrumpidas). */
   completedTandas: number;
+  /** Unidades completadas ese día (FR-T05): suma de tandaUnits sobre las completadas.
+   * Es la cifra que se compara contra minTandasDia. Obligatorio. */
+  completedUnits: number;
   /** Todos los hábitos del sistema; isHabitActive decide cuáles aplican ese día. */
   habits: HabitForEvaluation[];
   /** Los checks registrados ese día (cualquier fecha ajena a dateKey se ignora si el llamador
@@ -215,10 +233,12 @@ export interface DayEvaluation {
 }
 
 /**
- * FR-015/FR-016: un día queda cumplido si las tandas completadas alcanzan el mínimo de su semana
- * y todo hábito activo ese día quedó 'cumplido' o 'na' (un hábito sin registro cuenta como no
- * cumplido). Sin acumular deuda: cada llamada evalúa un solo día con su propio mínimo y sus
- * propios registros (US3-AS4). Devuelve null si el día cae fuera del programa.
+ * FR-015/FR-016/FR-T05: un día queda cumplido si las unidades completadas alcanzan el mínimo
+ * de su semana y todo hábito activo ese día quedó 'cumplido' o 'na' (un hábito sin registro
+ * cuenta como no cumplido). Sin acumular deuda: cada llamada evalúa un solo día con su propio
+ * mínimo y sus propios registros (US3-AS4). Devuelve null si el día cae fuera del programa.
+ *
+ * FR-T05: se compara contra unidades (completedUnits), no contra filas (completedTandas).
  */
 export function evaluateDay(input: EvaluateDayInput): DayEvaluation | null {
   if (input.minTandasDia == null) return null;
@@ -226,7 +246,7 @@ export function evaluateDay(input: EvaluateDayInput): DayEvaluation | null {
   const activeHabits = input.habits.filter((h) => isHabitActive(h, input.dateKey));
   const statusByHabit = new Map(input.checks.map((c) => [c.habit_id, c.status]));
 
-  const tandasOk = input.completedTandas >= input.minTandasDia;
+  const tandasOk = input.completedUnits >= input.minTandasDia;
   const habitsOk = activeHabits.every((h) => {
     const status = statusByHabit.get(h.id);
     return status === 'cumplido' || status === 'na';
@@ -237,6 +257,7 @@ export function evaluateDay(input: EvaluateDayInput): DayEvaluation | null {
 
 export interface DayBreakdown {
   tandas_completadas: number;
+  unidades_completadas: number;
   min_requerido: number;
   cumplio_tandas: boolean;
   cumplio_habitos: boolean;
@@ -244,9 +265,9 @@ export interface DayBreakdown {
 }
 
 /**
- * Desglose publicitario de la evaluación del día (FR-B12): traduce los booleanos de evaluateDay
- * a campos nominales para exposición en la API y en los reportes. Devuelve null si el día cae
- * fuera del programa (como evaluateDay).
+ * Desglose publicitario de la evaluación del día (FR-B12/FR-T06): traduce los booleanos de
+ * evaluateDay a campos nominales para exposición en la API y en los reportes. Devuelve null si
+ * el día cae fuera del programa (como evaluateDay).
  */
 export function describeDay(input: EvaluateDayInput): DayBreakdown | null {
   const evaluation = evaluateDay(input);
@@ -254,6 +275,7 @@ export function describeDay(input: EvaluateDayInput): DayBreakdown | null {
 
   return {
     tandas_completadas: input.completedTandas,
+    unidades_completadas: input.completedUnits,
     min_requerido: input.minTandasDia as number,
     cumplio_tandas: evaluation.tandasOk,
     cumplio_habitos: evaluation.habitsOk,

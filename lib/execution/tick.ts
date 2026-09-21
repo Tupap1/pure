@@ -54,13 +54,17 @@ export interface TickOptions {
   pusher?: Pusher;
 }
 
-/** "10 minutos de {materia}" (con materia) o "10 minutos" (sin ella), como pide
- * contracts/notifications.md para el aviso de fin de tanda. */
+/** "N minutos de {materia}" (con materia) o "N minutos" (sin ella), como pide
+ * contracts/notifications.md para el aviso de fin de tanda. Usa los minutos reales de la tanda:
+ * tanda.actual_minutes (si no existe, usa planned_minutes como fallback).
+ * FR-T08: el aviso dice los minutos reales de esa tanda. */
 async function tandaEndBody(tanda: TandaRecord): Promise<string> {
-  if (!tanda.subject_id) return '10 minutos';
+  const minutes = tanda.actual_minutes ?? tanda.planned_minutes;
+  const minutesText = minutes === 1 ? '1 minuto' : `${minutes} minutos`;
+  if (!tanda.subject_id) return minutesText;
   const subjectRaw = await fetchSubjectsFromDb(tanda.subject_id);
   const subject = Array.isArray(subjectRaw) ? subjectRaw[0] : subjectRaw;
-  return subject?.name ? `10 minutos de ${subject.name}` : '10 minutos';
+  return subject?.name ? `${minutesText} de ${subject.name}` : minutesText;
 }
 
 function formatHHMM(minutesSinceMidnight: number): string {

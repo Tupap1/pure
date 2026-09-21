@@ -14,6 +14,7 @@
 import crypto from 'crypto';
 import { localParts, localDateTimeToInstant, addDays } from './time';
 import { TANDA_MINUTES_DEFAULT, DAY_LOCK_TIME } from './constants';
+import { tandaUnits } from '../domain/execution';
 import type { ExecutionResult } from '../validations/schemas';
 import {
   fetchTandasFromDb,
@@ -233,6 +234,7 @@ export interface TandaReadInput {
 export interface TandaDayResumen {
   date: string;
   completadas: number;
+  unidades: number;
   interrumpidas: number;
   minutos: number;
 }
@@ -257,8 +259,12 @@ export async function readTandas(
 
   const byDay = new Map<string, TandaDayResumen>();
   for (const t of filtered) {
-    const bucket = byDay.get(t.local_date) ?? { date: t.local_date, completadas: 0, interrumpidas: 0, minutos: 0 };
-    if (t.status === 'completada') bucket.completadas += 1;
+    const bucket = byDay.get(t.local_date) ?? { date: t.local_date, completadas: 0, unidades: 0, interrumpidas: 0, minutos: 0 };
+    if (t.status === 'completada') {
+      bucket.completadas += 1;
+      // FR-T06: unidades solo de las completadas (las interrumpidas no aportan)
+      bucket.unidades += tandaUnits(t.actual_minutes);
+    }
     if (t.status === 'interrumpida') bucket.interrumpidas += 1;
     bucket.minutos += t.actual_minutes ?? 0;
     byDay.set(t.local_date, bucket);

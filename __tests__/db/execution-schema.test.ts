@@ -84,4 +84,26 @@ describe('[001] Migración 008 — esquema base del Módulo de Ejecución (Found
     const after = await harness.pool.query('SELECT COUNT(*)::int AS count FROM tandas');
     expect(after.rows[0].count).toBe(0);
   });
+
+  it('FR-T02 · planned_minutes CHECK valida el rango 10-60 en la base de datos', async () => {
+    const insertTanda = (id: string, plannedMinutes: number) =>
+      harness.pool.query(
+        `INSERT INTO tandas (id, local_date, started_at, locked_at, planned_minutes)
+         VALUES ($1, $2, now(), now(), $3)`,
+        [id, '2026-09-14', plannedMinutes]
+      );
+
+    // Valores fuera del rango se rechazan en la base
+    await expect(insertTanda('tanda-5min', 5)).rejects.toThrow(); // demasiado bajo
+    await expect(insertTanda('tanda-61min', 61)).rejects.toThrow(); // demasiado alto
+
+    // Valores en los límites se aceptan
+    await expect(insertTanda('tanda-10min', 10)).resolves.toBeDefined();
+    await expect(insertTanda('tanda-60min', 60)).resolves.toBeDefined();
+
+    const res = await harness.pool.query('SELECT planned_minutes FROM tandas ORDER BY id');
+    expect(res.rows).toHaveLength(2);
+    expect(res.rows[0].planned_minutes).toBe(10);
+    expect(res.rows[1].planned_minutes).toBe(60);
+  });
 });

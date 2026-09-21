@@ -320,7 +320,7 @@ export const TOOLS_LIST = [
         data: {
           type: 'object',
           description:
-            'start: { subject_id?, topic_id?, deliverable_id?, task_id?, routine_slot_id?, planned_minutes? (5-25, 10 por defecto) }. ' +
+            'start: { subject_id?, topic_id?, deliverable_id?, task_id?, routine_slot_id?, planned_minutes? (10-60, 10 por defecto) }. ' +
             'finish: { id }. interrupt: { id, interrupt_reason (1-140) }. current: sin data. ' +
             'read: { from?, to? (YYYY-MM-DD), subject_id? }. ' +
             'update: { id, subject_id?, topic_id?, deliverable_id?, task_id?, mode?, interrupt_reason? }.',

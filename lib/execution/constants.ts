@@ -2,10 +2,13 @@
 // (lib/validations/schemas.ts) como en los servicios (lib/execution/*), para no repetir los
 // números mágicos de spec.md en dos lugares distintos.
 
-/** FR-001: la pantalla de inicio siempre usa 10 minutos; el rango 5-25 es para el asistente de IA. */
+/** FR-T01: la pantalla de inicio usa 10 minutos; el rango 10-60 permite tandas más largas.
+ * TANDA_DURATION_OPTIONS se usa en la UI (10, 25, 40, 60 minutos, cada uno iniciando la tanda). */
 export const TANDA_MINUTES_DEFAULT = 10;
-export const TANDA_MINUTES_MIN = 5;
-export const TANDA_MINUTES_MAX = 25;
+export const TANDA_MINUTES_MIN = 10;
+export const TANDA_MINUTES_MAX = 60;
+export const TANDA_UNIT_MINUTES = 10;
+export const TANDA_DURATION_OPTIONS = [10, 25, 40, 60] as const;
 
 /** FR-011: un disparador sin responder deja de mostrarse pasadas 4 horas de su ancla. */
 export const TRIGGER_WINDOW_MINUTES = 240;
