@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import type { TodayRunningTanda } from '@/lib/execution/today';
-import { buildTodayFooterView } from '@/lib/execution/today-view';
+import { buildTodayFooterView, describeStartFailure, formatLocalTime } from '@/lib/execution/today-view';
 import { SundayPlanning } from '@/components/dashboards/SundayPlanning';
 import { isoDayOfWeekForDateKey } from '@/lib/domain/execution';
 
@@ -17,10 +17,6 @@ function formatDayLine(dateKey: string, week: { number: number; total: number } 
   const label = new Intl.DateTimeFormat('es-CO', { weekday: 'long', day: 'numeric', month: 'short' }).format(date);
   const capitalized = label.charAt(0).toUpperCase() + label.slice(1);
   return week ? `${capitalized} · Semana ${week.number} de ${week.total}` : capitalized;
-}
-
-function formatClock(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 /**
@@ -47,6 +43,7 @@ export const TodayDashboard: React.FC = () => {
   const { state: pushState, subscribe: subscribeToPush } = usePushNotifications();
 
   const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const [interruptOpen, setInterruptOpen] = useState(false);
   const [interruptReason, setInterruptReason] = useState('');
   const [justFinished, setJustFinished] = useState<TodayRunningTanda | null>(null);
@@ -94,8 +91,11 @@ export const TodayDashboard: React.FC = () => {
 
   const handleStart = async (routine_slot_id?: string) => {
     setIsStarting(true);
+    setStartError(null);
     try {
-      await start(routine_slot_id ? { routine_slot_id } : undefined);
+      const result = await start(routine_slot_id ? { routine_slot_id } : undefined);
+      const error = describeStartFailure(result);
+      setStartError(error);
     } finally {
       setIsStarting(false);
     }
@@ -145,7 +145,9 @@ export const TodayDashboard: React.FC = () => {
               {countdown ?? '00:00'}
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              hasta las <span className="font-mono">{formatClock(running.ends_at)}</span>
+              <span>Empezó a las <span className="font-mono">{formatLocalTime(running.started_at)}</span></span>
+              {' · '}
+              <span>hasta las <span className="font-mono">{formatLocalTime(running.ends_at)}</span></span>
             </p>
             {/* Anuncio para lectores de pantalla: solo cambia de texto una vez por minuto
                 (minutesLeft es un entero de minutos), así aria-live no interrumpe cada segundo. */}
@@ -203,9 +205,16 @@ export const TodayDashboard: React.FC = () => {
             )}
           </>
         ) : (
-          <Button variant="primary" size="lg" onClick={() => handleStart()} disabled={isStarting} className="min-h-[44px] px-10">
-            Empezar tanda
-          </Button>
+          <div className="flex flex-col items-center gap-3 w-full">
+            <Button variant="primary" size="lg" onClick={() => handleStart()} disabled={isStarting} className="min-h-[44px] px-10">
+              Empezar tanda
+            </Button>
+            {startError && (
+              <p className="text-sm text-amber-600 dark:text-amber-500" role="alert">
+                {startError}
+              </p>
+            )}
+          </div>
         )}
       </Card>
 
@@ -371,7 +380,7 @@ export const TodayDashboard: React.FC = () => {
           )}
           {report.status === 'enviado' && (
             <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
-              Enviado{report.sent_at ? ` ${formatClock(report.sent_at)}` : ''}
+              Enviado{report.sent_at ? ` ${formatLocalTime(report.sent_at)}` : ''}
             </p>
           )}
           {report.status === 'fallido' && (

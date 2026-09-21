@@ -160,8 +160,14 @@ export async function handleManageTandas(
     switch (action) {
       case 'start': {
         const parsed = TandaStartSchema.safeParse(data ?? {});
-        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
-        return await startTanda(parsed.data, now);
+        const result = parsed.success
+          ? await startTanda(parsed.data, now)
+          : zodErrorToExecutionResult(parsed.error);
+        // Incidente 21-sep: registrar cada rechazo (validación o regla de negocio) para facilitar investigación
+        if (result.status === 'error') {
+          console.warn('[execution] start rechazado:', result.code, result.message);
+        }
+        return result;
       }
       case 'finish': {
         const parsed = TandaFinishSchema.safeParse(data ?? {});

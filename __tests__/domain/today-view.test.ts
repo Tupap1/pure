@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { clockOffset, secondsLeft, formatCountdown, resolveConnectionState, buildTodayFooterView } from '../../lib/execution/today-view';
+import {
+  clockOffset,
+  secondsLeft,
+  formatCountdown,
+  resolveConnectionState,
+  buildTodayFooterView,
+  describeStartFailure,
+  formatLocalTime,
+} from '../../lib/execution/today-view';
 
 describe('[001] US1 — Tanda de 10 minutos en un toque', () => {
   it('US1-AS8 · el tiempo restante se calcula con la hora del sistema, no con la del teléfono desfasado', () => {
@@ -53,5 +61,45 @@ describe('[001] US3 — Hábitos del día y día cumplido', () => {
     // FR-018/FR-008: el modelo nunca expone minutos totales, mínimo faltante, proyecciones de
     // nota ni un selector de modo de trabajo — solo trae estas tres claves.
     expect(Object.keys(dayDone).sort()).toEqual(['checks', 'dayFulfilledLine', 'tandasLine']);
+  });
+});
+
+describe('[003] US-T3 — Inicio fallido visible e inicio con hora confirmada', () => {
+  it('US-T3-AS1 · si el servidor rechaza un start, describeStartFailure devuelve el mensaje del servidor', () => {
+    const errorResult = { status: 'error', code: 'DATOS_INVALIDOS', message: 'Duración inválida' };
+    expect(describeStartFailure(errorResult)).toBe('Duración inválida');
+
+    const errorWithoutMessage = { status: 'error', code: 'ERROR_DESCONOCIDO' };
+    expect(describeStartFailure(errorWithoutMessage)).toBe(
+      'No se pudo empezar la tanda. Revisa la conexión e inténtalo otra vez.'
+    );
+  });
+
+  it('US-T3-AS2 · si el fetch lanza (sin red), describeStartFailure devuelve aviso de conexión', () => {
+    const noConnectionResult = { status: 'error', code: 'SIN_CONEXION', message: 'Sin conexión con Pure.' };
+    expect(describeStartFailure(noConnectionResult)).toBe(
+      'No se pudo empezar la tanda. Revisa la conexión e inténtalo otra vez.'
+    );
+
+    // Sin respuesta del servidor
+    expect(describeStartFailure(null)).toBe('No se pudo empezar la tanda. Revisa la conexión e inténtalo otra vez.');
+    expect(describeStartFailure(undefined)).toBe('No se pudo empezar la tanda. Revisa la conexión e inténtalo otra vez.');
+  });
+
+  it('US-T3-AS3 · formatLocalTime devuelve HH:MM en zona local', () => {
+    // En zona 'es-CO' (Colombia)
+    const iso1 = '2026-09-21T14:30:00.000Z';
+    const formatted1 = formatLocalTime(iso1);
+    // Esperamos HH:MM en formato 24h, basado en la zona local del test
+    expect(formatted1).toMatch(/^\d{2}:\d{2}$/);
+
+    const iso2 = '2026-09-21T00:05:30.000Z';
+    const formatted2 = formatLocalTime(iso2);
+    expect(formatted2).toMatch(/^\d{2}:\d{2}$/);
+  });
+
+  it('US-T3-AS1 · cuando status es success, describeStartFailure devuelve null', () => {
+    const successResult = { status: 'success' };
+    expect(describeStartFailure(successResult)).toBeNull();
   });
 });

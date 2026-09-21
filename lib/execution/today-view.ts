@@ -69,3 +69,38 @@ export function buildTodayFooterView(input: TodayFooterInput): TodayFooterView {
     dayFulfilledLine: input.day_fulfilled ? 'Día cumplido' : null,
   };
 }
+
+/**
+ * Describe un error de inicio de tanda (US-T3-AS1, AS2).
+ * - Si status es 'success', devuelve null (sin error).
+ * - Si no hay respuesta (null/undefined) o el código es 'SIN_CONEXION', devuelve el aviso de conexión.
+ * - Si hay un message del servidor, lo devuelve.
+ * - Si no hay message, devuelve el aviso de conexión por defecto.
+ */
+export function describeStartFailure(
+  result: { status?: string; code?: string; message?: string } | null | undefined
+): string | null {
+  if (result?.status === 'success') {
+    return null;
+  }
+
+  const fallbackMessage = 'No se pudo empezar la tanda. Revisa la conexión e inténtalo otra vez.';
+
+  if (result === null || result === undefined) {
+    return fallbackMessage;
+  }
+
+  if (result.code === 'SIN_CONEXION') {
+    return fallbackMessage;
+  }
+
+  return result.message ?? fallbackMessage;
+}
+
+/**
+ * Formatea un ISO string a hora local en formato HH:MM (zona 'es-CO').
+ * Usado en la pantalla Hoy para mostrar horas de inicio, fin de tanda y envío de reporte.
+ */
+export function formatLocalTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false });
+}

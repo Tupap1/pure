@@ -54,14 +54,19 @@ export function useToday() {
 
   const callAction = useCallback(
     async (tool: string, action: string, data?: unknown) => {
-      const res = await fetch('/api/execution', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool, action, data: data ?? {} }),
-      });
-      const json = await res.json();
-      await fetchToday();
-      return json;
+      try {
+        const res = await fetch('/api/execution', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tool, action, data: data ?? {} }),
+        });
+        const json = await res.json();
+        await fetchToday();
+        return json;
+      } catch {
+        // Error de red: devolver respuesta con código SIN_CONEXION en vez de rechazar
+        return { status: 'error', code: 'SIN_CONEXION', message: 'Sin conexión con Pure.' };
+      }
     },
     [fetchToday]
   );
