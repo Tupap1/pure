@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import type { TodayRunningTanda } from '@/lib/execution/today';
-import { buildTodayFooterView, describeStartFailure, formatLocalTime } from '@/lib/execution/today-view';
+import { buildTodayFooterView, describeStartFailure, formatLocalTime, tandaDurationOptions } from '@/lib/execution/today-view';
 import { SundayPlanning } from '@/components/dashboards/SundayPlanning';
 import { isoDayOfWeekForDateKey } from '@/lib/domain/execution';
 
@@ -85,15 +85,30 @@ export const TodayDashboard: React.FC = () => {
 
   const running = today.running_tanda;
   const minutesLeft = running && secondsLeft != null ? Math.ceil(secondsLeft / 60) : null;
-  const footer = buildTodayFooterView(today);
+  const footer = buildTodayFooterView({
+    pending_checks: today.pending_checks,
+    tandas_today: today.tandas_today,
+    day_fulfilled: today.day_fulfilled,
+    unidades_hoy: today.unidades_hoy,
+    min_requerido: today.evaluacion_dia?.min_requerido ?? null,
+  });
   // US8 (T067): el asistente del domingo (SundayPlanning.tsx) solo se ofrece ese día de la semana.
   const isSunday = isoDayOfWeekForDateKey(today.date) === 7;
 
-  const handleStart = async (routine_slot_id?: string) => {
+  // US-T1-AS11: opciones de duración para iniciar tanda, separadas en principal y alternativas
+  const opciones = tandaDurationOptions();
+  const principal = opciones.find((o) => o.isDefault);
+  const alternativas = opciones.filter((o) => !o.isDefault);
+
+  const handleStart = async (routine_slot_id?: string, planned_minutes?: number) => {
     setIsStarting(true);
     setStartError(null);
     try {
-      const result = await start(routine_slot_id ? { routine_slot_id } : undefined);
+      const data = {
+        ...(routine_slot_id && { routine_slot_id }),
+        ...(planned_minutes && { planned_minutes }),
+      };
+      const result = await start(Object.keys(data).length > 0 ? (data as any) : undefined);
       const error = describeStartFailure(result);
       setStartError(error);
     } finally {
@@ -206,9 +221,32 @@ export const TodayDashboard: React.FC = () => {
           </>
         ) : (
           <div className="flex flex-col items-center gap-3 w-full">
-            <Button variant="primary" size="lg" onClick={() => handleStart()} disabled={isStarting} className="min-h-[44px] px-10">
-              Empezar tanda
-            </Button>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Empezar tanda de</p>
+            {principal && (
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={() => handleStart(undefined, principal.minutes)}
+                disabled={isStarting}
+                className="min-h-[44px] px-10"
+              >
+                {principal.minutes} min
+              </Button>
+            )}
+            <div className="flex gap-2 justify-center">
+              {alternativas.map((option) => (
+                <Button
+                  key={option.minutes}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleStart(undefined, option.minutes)}
+                  disabled={isStarting}
+                  className="min-h-[44px]"
+                >
+                  {option.minutes} min
+                </Button>
+              ))}
+            </div>
             {startError && (
               <p className="text-sm text-amber-600 dark:text-amber-500" role="alert">
                 {startError}

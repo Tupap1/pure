@@ -1,6 +1,8 @@
-// Modelo de vista puro de Hoy (US1-AS8, US3-AS8). Sin dependencias de React ni del DOM, para
+// Modelo de vista puro de Hoy (US1-AS8, US3-AS8, US-T1-AS10/AS11). Sin dependencias de React ni del DOM, para
 // que sea testeable en el entorno 'node' de Vitest (Constitución, Principio IV); useToday.ts es
 // el único que lo llama desde un componente.
+
+import { TANDA_DURATION_OPTIONS, TANDA_MINUTES_DEFAULT } from './constants';
 
 /**
  * Offset entre el reloj del servidor y el del cliente, capturado una vez por cada respuesta de
@@ -45,27 +47,42 @@ export interface TodayFooterInput {
   pending_checks: { habit_id: string; label: string }[];
   tandas_today: number;
   day_fulfilled: boolean | null;
+  unidades_hoy?: number;
+  min_requerido?: number | null;
 }
 
 export interface TodayFooterView {
   /** Hábitos de hoy sin responder: TodayDashboard los pinta como filas Sí/No que desaparecen al
    * responder (desaparecen porque get_today deja de devolverlos, no por estado local). */
   checks: { habit_id: string; label: string }[];
-  /** "N tandas hoy", o null si todavía no hay ninguna (FR-018: nunca "0 tandas"). */
+  /** "N de M tandas" si hay programa (unidades de mínimo), "N tandas hoy" sin programa, o null si no hay ninguna (FR-018: nunca "0 tandas"). */
   tandasLine: string | null;
   /** "Día cumplido", o null si no aplica. */
   dayFulfilledLine: string | null;
 }
 
 /**
- * Modelo de vista del pie de Hoy (US3-AS8, FR-008/FR-018): a propósito solo expone estas tres
+ * Modelo de vista del pie de Hoy (US3-AS8, US-T1-AS10, FR-008/FR-018): a propósito solo expone estas tres
  * claves — nunca minutos totales, tandas faltantes, proyecciones de nota ni un selector de modo
  * de trabajo, aunque el backend los tuviera, porque este modelo nunca los recibe ni los calcula.
+ *
+ * US-T1-AS10: si `min_requerido` es numérico, devuelve "unidades de mínimo tandas" (ej. "6 de 3 tandas");
+ * sin programa, usa el formato antiguo "N tandas hoy". Siempre null si cero unidades.
  */
 export function buildTodayFooterView(input: TodayFooterInput): TodayFooterView {
+  let tandasLine: string | null = null;
+
+  if (input.min_requerido != null && input.unidades_hoy !== undefined) {
+    // Con programa: "unidades de mínimo tandas"
+    tandasLine = input.unidades_hoy > 0 ? `${input.unidades_hoy} de ${input.min_requerido} tandas` : null;
+  } else if (input.tandas_today > 0) {
+    // Sin programa: formato antiguo "N tandas hoy"
+    tandasLine = `${input.tandas_today} tanda${input.tandas_today === 1 ? '' : 's'} hoy`;
+  }
+
   return {
     checks: input.pending_checks,
-    tandasLine: input.tandas_today > 0 ? `${input.tandas_today} tanda${input.tandas_today === 1 ? '' : 's'} hoy` : null,
+    tandasLine,
     dayFulfilledLine: input.day_fulfilled ? 'Día cumplido' : null,
   };
 }
@@ -103,4 +120,16 @@ export function describeStartFailure(
  */
 export function formatLocalTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+/**
+ * US-T1-AS11: opciones de duración para iniciar una tanda (10, 25, 40, 60 minutos).
+ * Se usa en la pantalla Hoy para ofrecer los botones de duración.
+ * Derivada de TANDA_DURATION_OPTIONS, con el 10 marcado como opción primaria.
+ */
+export function tandaDurationOptions(): { minutes: number; isDefault: boolean }[] {
+  return TANDA_DURATION_OPTIONS.map((minutes) => ({
+    minutes,
+    isDefault: minutes === TANDA_MINUTES_DEFAULT,
+  }));
 }

@@ -77,7 +77,7 @@ export function useToday() {
   );
 
   const start = useCallback(
-    (data?: { subject_id?: string; routine_slot_id?: string }) => callTandas('start', data),
+    (data?: { subject_id?: string; routine_slot_id?: string; planned_minutes?: number }) => callTandas('start', data),
     [callTandas]
   );
   const finish = useCallback((id: string) => callTandas('finish', { id }), [callTandas]);

@@ -7,6 +7,7 @@ import {
   buildTodayFooterView,
   describeStartFailure,
   formatLocalTime,
+  tandaDurationOptions,
 } from '../../lib/execution/today-view';
 
 describe('[001] US1 — Tanda de 10 minutos en un toque', () => {
@@ -101,5 +102,70 @@ describe('[003] US-T3 — Inicio fallido visible e inicio con hora confirmada', 
   it('US-T3-AS1 · cuando status es success, describeStartFailure devuelve null', () => {
     const successResult = { status: 'success' };
     expect(describeStartFailure(successResult)).toBeNull();
+  });
+});
+
+describe('[003] US-T1 — Tandas de duración variable', () => {
+  it('US-T1-AS10 · el pie muestra "unidades de mínimo tandas" cuando hay programa, "tandas hoy" sin programa, y null con cero', () => {
+    // Con programa: una tanda de 60 minutos (6 unidades) y mínimo 3
+    const withProgram = buildTodayFooterView({
+      pending_checks: [],
+      tandas_today: 1,
+      day_fulfilled: null,
+      unidades_hoy: 6,
+      min_requerido: 3,
+    });
+    expect(withProgram.tandasLine).toBe('6 de 3 tandas');
+    expect(Object.keys(withProgram).sort()).toEqual(['checks', 'dayFulfilledLine', 'tandasLine']);
+
+    // Sin programa: mínimo ausente, vuelve al formato antiguo
+    const withoutProgram = buildTodayFooterView({
+      pending_checks: [],
+      tandas_today: 3,
+      day_fulfilled: null,
+      unidades_hoy: 3,
+      min_requerido: null,
+    });
+    expect(withoutProgram.tandasLine).toBe('3 tandas hoy');
+
+    // Sin programa: mínimo nulo, formato antiguo
+    const noMinRequired = buildTodayFooterView({
+      pending_checks: [],
+      tandas_today: 2,
+      day_fulfilled: null,
+      unidades_hoy: 2,
+    });
+    expect(noMinRequired.tandasLine).toBe('2 tandas hoy');
+
+    // Cero unidades: null (FR-018)
+    const noTandas = buildTodayFooterView({
+      pending_checks: [],
+      tandas_today: 0,
+      day_fulfilled: null,
+      unidades_hoy: 0,
+      min_requerido: 3,
+    });
+    expect(noTandas.tandasLine).toBeNull();
+  });
+
+  it('US-T1-AS11 · tandaDurationOptions devuelve exactamente [10, 25, 40, 60] con 10 como primaria', () => {
+    const options = tandaDurationOptions();
+
+    expect(options).toHaveLength(4);
+    expect(options[0]).toEqual({ minutes: 10, isDefault: true });
+    expect(options[1]).toEqual({ minutes: 25, isDefault: false });
+    expect(options[2]).toEqual({ minutes: 40, isDefault: false });
+    expect(options[3]).toEqual({ minutes: 60, isDefault: false });
+  });
+
+  it('US-T1-AS10 · el pie conserva el comportamiento con solo tandas_today (regresión)', () => {
+    const legacyInput = buildTodayFooterView({
+      pending_checks: [{ habit_id: 'test', label: 'Test' }],
+      tandas_today: 2,
+      day_fulfilled: null,
+    });
+    expect(legacyInput.tandasLine).toBe('2 tandas hoy');
+    expect(legacyInput.checks).toEqual([{ habit_id: 'test', label: 'Test' }]);
+    expect(Object.keys(legacyInput).sort()).toEqual(['checks', 'dayFulfilledLine', 'tandasLine']);
   });
 });
