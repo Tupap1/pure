@@ -26,7 +26,7 @@ Ideal para agentes que residen en la nube (ej. Claude Web / Cloud) que se conect
 
 ## 🛠️ Catálogo Completo de Herramientas MCP
 
-El servidor expone **4 herramientas (tools)** principales:
+Las cuatro primeras herramientas del dominio académico se documentan a continuación. El catálogo completo, de **34 herramientas**, está más abajo en "Catálogo de Herramientas (34 tools)":
 
 ### 1. `get_academic_overview`
 Retorna el resumen académico global del estudiante, incluyendo horas de tiempo libre neto disponible, universidades configuradas con sus promedios (GPA) y alertas urgentes.
@@ -164,9 +164,9 @@ URL de SSE para configurar en el cliente agente:
 
 ---
 
-## 🎯 Catálogo de Herramientas (31 tools)
+## 🎯 Catálogo de Herramientas (34 tools)
 
-El servidor expone **30 herramientas MCP** divididas en dos grupos:
+El servidor expone **34 herramientas MCP** divididas en dos grupos:
 
 ### Grupo 1: Dominio Académico (20 tools)
 Manejo de matrículas, universidades, docentes, asignaturas, horarios, entregas, temarios, sinergias y métricas DME. Documentadas en `mcp-server/README.md` (líneas actuales) bajo "Catálogo Completo de Herramientas MCP" (tools 1–4).
@@ -177,20 +177,23 @@ Esquema de respuesta:
 { "status": "error", "code": "ERROR_CODE", "message": "Descripción" }
 ```
 
-### Grupo 2: Módulo de Ejecución (11 tools) — US1–US9, US-B1–US-B5
+### Grupo 2: Módulo de Ejecución (14 tools) — US1–US9, US-B1–US-B5, US-T1–US-T2, US-F1–US-F5
 
-#### 5. `manage_tandas` — Tandas de 10 a 60 minutos (US1, US-T1, US-T2)
+#### 5. `manage_tandas` — Sesiones de foco: temporizador (10 a 180 minutos) o cronómetro (US1, US-T1, US-T2, US-F1, US-F4)
 | Acción | `data` | Respuesta |
 |---|---|---|
-| `start` | `subject_id?`, `planned_minutes?` (10–60, default 10) | `{ tanda, ends_at }` \| `TANDA_EN_CURSO` |
-| `finish` | `id` | Tanda completada (idempotente) \| `TANDA_NO_TERMINADA` |
+| `start` | `kind?` (`temporizador` \| `cronometro`, temporizador por defecto), `planned_minutes?` (10–180, default 10; solo temporizador: con `cronometro` → `DATOS_INVALIDOS`), `objective_id?`, `subject_id?`, `topic_id?`, `deliverable_id?`, `task_id?`, `routine_slot_id?` | `{ tanda, ends_at }` (`ends_at: null` en el cronómetro) \| `TANDA_EN_CURSO` \| `OBJETIVO_ARCHIVADO` \| `NO_ENCONTRADO` |
+| `finish` | `id` | Tanda completada (idempotente) \| `TANDA_NO_TERMINADA` (temporizador antes de tiempo) \| `CRONOMETRO_MUY_CORTO` (cronómetro con menos de 60 s) |
 | `interrupt` | `id`, `interrupt_reason` (1–140) | Tanda interrumpida \| `RAZON_REQUERIDA` |
-| `current` | — | `{ tanda \| null, seconds_left \| null, server_now }` |
-| `read` | `from?`, `to?` (YYYY-MM-DD), `subject_id?` | `{ tandas[], por_dia }` (por_dia incluye `unidades`) |
-| `update` | `id` + (`subject_id` \| `interrupt_reason` \| `mode`) | Tanda con `edited_after_lock` si aplica |
+| `current` | — | `{ tanda \| null, seconds_left \| null, elapsed_seconds \| null, server_now }` (`seconds_left` en el temporizador, `elapsed_seconds` en el cronómetro) |
+| `read` | `from?`, `to?` (YYYY-MM-DD), `subject_id?`, `objective_id?` | `{ tandas[], por_dia }` (`por_dia` incluye `completadas`, `unidades`, `interrumpidas` y `minutos`; un cronómetro que cruza la medianoche se reparte entre los días locales que abarca) |
+| `update` | `id` + (`subject_id` \| `topic_id` \| `deliverable_id` \| `task_id` \| `objective_id` \| `interrupt_reason` \| `mode`) | Tanda con `edited_after_lock` si aplica |
 | `log_late` | `subject_id`, `started_at`, `ended_at` (ISO, hoy local, `started_at` hasta 6h atrás, duración 10–60 min, sin solapes), `topic_id?`, `task_id?` | Tanda `completada` con `late_logged: true` (máx. 3/día local) \| `REGISTRO_TARDIO_INVALIDO` \| `LIMITE_REGISTRO_TARDIO` |
+| `correct` | `id`, `ended_at` (ISO), `reason` (1–140) | Tanda con `corrected: true`, `corrected_at`, `original_ended_at` y `original_minutes` \| `CORRECCION_INVALIDA` |
 
-`log_late` es la única acción del módulo que acepta instantes del cliente: una excepción deliberada y acotada al Principio III de la Constitución (todo lo demás sale del reloj del servidor), pensada para el caso de "olvidé darle iniciar", nunca para maquillar el reporte. No está en la lista blanca de `app/api/execution/route.ts`: solo un agente de IA puede dispararla.
+`log_late` y `correct` son las **dos únicas acciones del módulo que aceptan instantes del cliente**: dos excepciones deliberadas y acotadas al Principio III de la Constitución (todo lo demás sale del reloj del servidor). Ninguna está en la lista blanca de `app/api/execution/route.ts`: solo un agente de IA puede dispararlas.
+- `log_late` cubre el caso de "olvidé darle iniciar": registra una sesión ya estudiada, dentro de cotas estrictas, y se cuenta aparte en el reporte (`registros_tardios`), nunca para maquillarlo.
+- `correct` cubre el cronómetro olvidado y **solo acorta**: en una sesión cerrada el `ended_at` nuevo debe ser anterior al registrado y al menos 1 minuto posterior al inicio; en un cronómetro en curso lo cierra como `completada` con un fin entre inicio + 1 minuto y ahora; un temporizador en curso no se corrige (se usa `interrupt`). Fuera de esas cotas responde `CORRECCION_INVALIDA` y no cambia nada. Conserva el original y se cuenta en el reporte (`correcciones`).
 
 #### 6. `manage_daily_checks` — Registro de hábitos (US3)
 | Acción | `data` | Respuesta |
@@ -223,17 +226,22 @@ Parámetro `data?`: `{ at? }` (ISO, solo lectura). Respuesta:
   "server_now": "ISO string",
   "date": "YYYY-MM-DD",
   "week": { "number": N, "total": N, "phase": "string" } | null,
-  "running_tanda": { "id", "subject?", "started_at", "ends_at", "seconds_left" } | null,
+  "running_tanda": { "id", "subject_id", "kind": "temporizador" | "cronometro", "objective_id", "started_at", "ends_at" | null, "seconds_left" | null, "elapsed_seconds" | null } | null,
   "trigger": { "id", "cue_text", "action_text", "kind", "subject?" } | null,
   "pending_checks": [{ "habit_id", "label" }],
   "tandas_today": number,
+  "unidades_hoy": number,
   "day_fulfilled": boolean | null,
-  "evaluacion_dia": { "tandas_completadas", "min_requerido", "cumplio_tandas", "cumplio_habitos", "day_fulfilled" } | null
+  "evaluacion_dia": { "tandas_completadas", "min_requerido", "cumplio_tandas", "cumplio_habitos", "day_fulfilled" } | null,
+  "foco_semana_minutos": number,
+  "foco_12_semanas": [{ "date", "minutos", "nivel": 0 | 1 | 2 | 3 | 4 }],
+  "frase_del_dia": { "text", "translation", "source" } | null
 }
 ```
+`foco_semana_minutos` (de lunes a hoy) y `foco_12_semanas` (últimas 12 semanas) salen de la misma agregación que `get_focus_summary`. `frase_del_dia` es una frase latina por día local (rotación determinista sobre las frases activas de `manage_quotes`) o `null` si no hay ninguna activa.
 
 #### 10. `get_compliance_report` — Cumplimiento semanal (US6, US-T2)
-Parámetro `data?`: `{ from?, to?, program_week_id? }`. Respuesta: `dias[]` con `evaluacion_dia` (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled), `days_fulfilled`, `aperturas_plan: { libres_usadas, con_razon, total, razones[] }` (solo aperturas de semana, no planeación), hábitos como fracción (se omiten los que no tienen días activos en el rango), tandas por materia, disparadores respondidos, razones de interrupción, `dias_cumplidos_totales`, horizonte y `registros_tardios: { total, minutos }` (tandas `log_late` en el rango; `{ total: 0, minutos: 0 }` si no hubo ninguna).
+Parámetro `data?`: `{ from?, to?, program_week_id? }`. Respuesta: `dias[]` con `evaluacion_dia` (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled), `days_fulfilled`, `aperturas_plan: { libres_usadas, con_razon, total, razones[] }` (solo aperturas de semana, no planeación), hábitos como fracción (se omiten los que no tienen días activos en el rango), tandas por materia, disparadores respondidos, razones de interrupción, `dias_cumplidos_totales`, horizonte, `registros_tardios: { total, minutos }` (tandas `log_late` en el rango; `{ total: 0, minutos: 0 }` si no hubo ninguna) y `correcciones: { total, minutos_recortados }` (sesiones corregidas con `manage_tandas:correct`, contadas por la semana local de `corrected_at`; `{ total: 0, minutos_recortados: 0 }` si no hubo ninguna). El texto del reporte semanal agrega la línea `Correcciones: N (M min recortados)` solo cuando N > 0.
 
 #### 11. `get_grade_projection` — Proyección de notas (US5)
 Parámetro `data?`: `{ subject_id? }`. Respuesta:
@@ -284,6 +292,44 @@ Sin `program_week_id`, la semana se resuelve así: si hoy es domingo con una que
 
 Medidas: `sin_biometria`, `clave_larga`, `escala_grises`, `redes_fuera_home`, `app_desinstalada`. Máximo 2 simultáneas. Calificación semanal; dos semanas consecutivas ≥7 retiran automáticamente la más recientemente habilitada.
 
+#### 16. `manage_objectives` — Objetivos de foco (US-F2)
+Objetivos propios (LeetCode, Inglés, Proyecto personal) a los que se ligan las sesiones con `manage_tandas:start { objective_id }`. No se borran: se archivan. Web: las cuatro acciones.
+
+| Acción | `data` | Respuesta |
+|---|---|---|
+| `create` | `name` (1–60, único entre los activos sin distinguir mayúsculas ni espacios en los extremos), `subject_id?`, `weekly_target_minutes?` (entero 1–10080) | El objetivo \| `OBJETIVO_DUPLICADO` \| `NO_ENCONTRADO` (materia) |
+| `read` | `include_archived?` (false por defecto) | `{ objetivos[] }` ordenados por nombre |
+| `update` | `id`, `name?`, `subject_id?` (`null` la quita), `weekly_target_minutes?` (`null` la quita) | El objetivo \| `OBJETIVO_ARCHIVADO` \| `OBJETIVO_DUPLICADO` \| `NO_ENCONTRADO` |
+| `archive` | `id` | El objetivo (idempotente: archivar dos veces no es un error) |
+
+Una sesión de un objetivo **sin materia** suma minutos de foco pero no cuenta para el mínimo diario (salvo que la sesión tenga materia, tema, tarea o entrega propios); un objetivo con materia sí cuenta. Las sesiones de un objetivo archivado siguen sumando, pero ya no se puede empezar una nueva con él.
+
+#### 17. `get_focus_summary` — Tiempo enfocado (US-F3)
+Solo lectura. Parámetro `data?`: `{ weeks? (1–53, 52 por defecto), objective_id? \| subject_id? (no ambos: `DATOS_INVALIDOS`), at? }` (`at` solo para pruebas). El mismo resultado que `GET /api/execution/focus`. Suman las sesiones completadas e interrumpidas (las en curso no); un cronómetro que cruza la medianoche se reparte entre los días locales que abarca. Respuesta:
+```json
+{
+  "rango": { "desde": "YYYY-MM-DD", "hasta": "YYYY-MM-DD", "semanas": 52 },
+  "dias": [{ "date": "YYYY-MM-DD", "minutos": 0, "nivel": 0 }],
+  "semanas": [{ "lunes": "YYYY-MM-DD", "minutos": 0 }],
+  "total_semana": 0,
+  "por_objetivo": [{ "tipo": "objetivo" | "materia" | "sin_objetivo", "id", "nombre", "minutos", "meta": number | null, "archivado": boolean }]
+}
+```
+`nivel`: 0 sin foco, 1 de 1 a 30 minutos, 2 de 31 a 90, 3 de 91 a 180 y 4 con más de 180. `dias` trae un 0 explícito en los días vacíos. `por_objetivo` es de la semana actual y **no** lo afecta el filtro (que sí acota `dias`, `semanas` y `total_semana`): cada sesión cae en una sola fila (su objetivo; si no tiene, su materia; si no, "Sin objetivo") y los objetivos activos con meta aparecen aunque sumen 0.
+
+#### 18. `manage_quotes` — Frase del día (US-F5, solo MCP)
+Frases latinas que Hoy muestra una por día (`get_today.frase_del_dia`). Entran **solo por MCP**: ninguna acción está en la lista blanca de la web. Una frase tiene `text` (1–300), `translation?` (hasta 300) y `source?` (hasta 120).
+
+| Acción | `data` | Respuesta |
+|---|---|---|
+| `create` | `text`, `translation?`, `source?` | La frase; idempotente: si ya existe devuelve la existente |
+| `create_many` | `frases: [{ text, translation?, source? }]` (1–200) | `{ creadas, omitidas }`; todo o nada (una frase inválida rechaza el lote entero con `DATOS_INVALIDOS`) e idempotente |
+| `read` | `include_inactive?` (false por defecto) | `{ frases[] }` ordenadas por `id` |
+| `update` | `id`, `text?`, `translation?`, `source?`, `active?` | La frase (cambiar `text` no cambia el `id`) \| `NO_ENCONTRADO` |
+| `deactivate` | `id` | La frase con `active: false` (idempotente); sale de la rotación \| `NO_ENCONTRADO` |
+
+La comparación de duplicados ignora mayúsculas y espacios en los extremos del texto latino (el `id` es `frase-` + 16 hex del SHA-256 del texto normalizado). La carga inicial se hace una sola vez, con `create_many` y el contenido de `specs/004-foco-cronometro/frases.json` (50 frases): `{ creadas: 50, omitidas: 0 }`; repetirla da `{ creadas: 0, omitidas: 50 }`. La rotación es determinista por fecha local sobre las frases activas ordenadas por `id`: el mismo día da la misma frase y en N días seguidos sale cada una una vez.
+
 ---
 
 ## Códigos de Error Comunes
@@ -311,3 +357,7 @@ Medidas: `sin_biometria`, `clave_larga`, `escala_grises`, `redes_fuera_home`, `a
 | `PARTIR_TAREA` | Tarea con > 3 tandas |
 | `REGISTRO_TARDIO_INVALIDO` | `log_late` viola día local, ventana de 6h, duración 10–60 min o se solapa con otra tanda |
 | `LIMITE_REGISTRO_TARDIO` | Ya hay 3 registros tardíos hoy (día local) |
+| `CRONOMETRO_MUY_CORTO` | `finish` de un cronómetro con menos de 60 s transcurridos (usar `interrupt`) |
+| `OBJETIVO_DUPLICADO` | Ya hay un objetivo activo con ese nombre (sin distinguir mayúsculas ni espacios en los extremos) |
+| `OBJETIVO_ARCHIVADO` | Empezar una sesión con un objetivo archivado, o editar uno archivado |
+| `CORRECCION_INVALIDA` | `correct` viola las cotas: solo acorta, el fin nuevo debe quedar entre inicio + 1 minuto y el registrado (o ahora, en un cronómetro en curso), y un temporizador en curso no se corrige |

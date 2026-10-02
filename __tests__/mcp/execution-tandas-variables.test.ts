@@ -49,8 +49,11 @@ describe('[003] US-T1 — Tandas de duración variable', () => {
     expect(tanda.planned_minutes).toBe(10);
   });
 
-  // US-T1-AS3: start con 9 o 61 minutos se rechaza
-  it('US-T1-AS3 · start con 9 minutos se rechaza con DATOS_INVALIDOS', async () => {
+  // US-T1-AS3: start con 9 minutos se rechaza. La 004 reemplaza la cota superior (spec 004,
+  // "Lo que esta feature reemplaza"): el temporizador ahora llega a 180 (FR-F02), así que 61 se
+  // acepta y 181 se rechaza. La cota inferior (9) no cambia. log_late conserva su tope de 60
+  // (US-T2-AS4, en execution-tandas-registro-tardio.test.ts).
+  it('US-T1-AS3 · US-F1-AS3 · start con 9 minutos se rechaza con DATOS_INVALIDOS', async () => {
     const res = await handleManageTandas('start', { planned_minutes: 9 });
     expect(res.status).toBe('error');
     if (res.status === 'error') {
@@ -58,12 +61,20 @@ describe('[003] US-T1 — Tandas de duración variable', () => {
     }
   });
 
-  it('US-T1-AS3 · start con 61 minutos se rechaza con DATOS_INVALIDOS', async () => {
-    const res = await handleManageTandas('start', { planned_minutes: 61 });
-    expect(res.status).toBe('error');
-    if (res.status === 'error') {
-      expect(res.code).toBe('DATOS_INVALIDOS');
+  it('US-T1-AS3 · US-F1-AS3 · start con 61 minutos se acepta y con 181 se rechaza con DATOS_INVALIDOS', async () => {
+    vi.setSystemTime(new Date('2026-09-14T15:00:00.000Z'));
+
+    const tooLong = await handleManageTandas('start', { planned_minutes: 181 });
+    expect(tooLong.status).toBe('error');
+    if (tooLong.status === 'error') {
+      expect(tooLong.code).toBe('DATOS_INVALIDOS');
     }
+
+    const res = await handleManageTandas('start', { planned_minutes: 61 });
+    expect(res.status).toBe('success');
+    if (res.status !== 'success') return;
+    expect((res.data as any).tanda.planned_minutes).toBe(61);
+    expect((res.data as any).ends_at).toBe('2026-09-14T16:01:00.000Z');
   });
 
   // US-T1-AS5: día con tanda de 60 min cumple mínimo de 3

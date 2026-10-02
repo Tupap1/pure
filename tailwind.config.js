@@ -34,6 +34,14 @@ module.exports = {
           DEFAULT: 'var(--accent-synergy)',
           glow: 'rgba(82, 158, 114, 0.12)',
         },
+        // Mapa de calor de foco (004, FR-F17): tokens de app/globals.css, claro y oscuro.
+        heat: {
+          0: 'var(--heat-0)',
+          1: 'var(--heat-1)',
+          2: 'var(--heat-2)',
+          3: 'var(--heat-3)',
+          4: 'var(--heat-4)',
+        },
         obsidian: {
           950: '#161616',
           900: '#191919',

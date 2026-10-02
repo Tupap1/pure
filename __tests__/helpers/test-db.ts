@@ -90,6 +90,9 @@ export async function createTestDb(): Promise<TestDbHarness> {
         'routine_slots',
         'habits',
         'program_weeks',
+        // Módulo de Ejecución (migración 015-016): `objetivos` y `frases` padres de `tandas`.
+        'objetivos',
+        'frases',
         'oauth_access_tokens',
         'oauth_auth_codes',
         'oauth_clients',

@@ -1,13 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { clockOffset, secondsLeft, formatCountdown, resolveConnectionState } from '@/lib/execution/today-view';
+import {
+  clockOffset,
+  secondsLeft,
+  formatCountdown,
+  elapsedSeconds,
+  resolveConnectionState,
+} from '@/lib/execution/today-view';
 import type { TodayPayload } from '@/lib/execution/today';
 
+/** Datos de `manage_tandas start` que acepta la web (FR-F05, contracts/web-api.md). */
+export interface StartTandaInput {
+  /** Sin `kind` el servidor asume 'temporizador' (compatibilidad con los inicios de siempre). */
+  kind?: 'temporizador' | 'cronometro';
+  /** Solo temporizador (10–180); un cronómetro no lleva duración planeada. */
+  planned_minutes?: number;
+  objective_id?: string;
+  subject_id?: string;
+  routine_slot_id?: string;
+}
+
 /**
- * Hook de datos de Hoy (US1). Trae get_today, mantiene el offset de reloj capturado en cada
- * respuesta (US1-AS8: el conteo sigue siendo correcto aunque el reloj del teléfono esté
- * desfasado) y expone las acciones de manage_tandas que la web tiene permitido disparar
- * (contracts/web-api.md). Toda la lógica de presentación pura vive en
- * lib/execution/today-view.ts; este hook solo la conecta con fetch/estado de React.
+ * Hook de datos de Hoy (US1, US-F1). Trae get_today, mantiene el offset de reloj capturado en cada
+ * respuesta (US1-AS8, US-F1-AS9: el conteo —atrás en el temporizador, adelante en el cronómetro—
+ * sigue siendo correcto aunque el reloj del teléfono esté desfasado) y expone las acciones de
+ * manage_tandas que la web tiene permitido disparar (contracts/web-api.md). Toda la lógica de
+ * presentación pura vive en lib/execution/today-view.ts; este hook solo la conecta con
+ * fetch/estado de React.
  */
 export function useToday() {
   const [today, setToday] = useState<TodayPayload | null>(null);
@@ -44,8 +62,8 @@ export function useToday() {
     };
   }, [fetchToday]);
 
-  // Cronómetro visual: re-renderiza una vez por segundo mientras haya una tanda en curso, para
-  // que mm:ss avance sin esperar al siguiente fetch (cada 30s).
+  // Reloj visual: re-renderiza una vez por segundo mientras haya una sesión en curso (temporizador
+  // o cronómetro), para que mm:ss / h:mm:ss avance sin esperar al siguiente fetch (cada 30s).
   useEffect(() => {
     if (!today?.running_tanda) return;
     const tick = setInterval(() => forceTick((n) => n + 1), 1000);
@@ -76,10 +94,7 @@ export function useToday() {
     [callAction]
   );
 
-  const start = useCallback(
-    (data?: { subject_id?: string; routine_slot_id?: string; planned_minutes?: number }) => callTandas('start', data),
-    [callTandas]
-  );
+  const start = useCallback((data?: StartTandaInput) => callTandas('start', data), [callTandas]);
   const finish = useCallback((id: string) => callTandas('finish', { id }), [callTandas]);
   const interrupt = useCallback(
     (id: string, interrupt_reason: string) => callTandas('interrupt', { id, interrupt_reason }),
@@ -103,7 +118,11 @@ export function useToday() {
   );
 
   const running = today?.running_tanda ?? null;
+  // Temporizador: cuenta atrás hasta `ends_at`. Cronómetro (`ends_at` null): cuenta hacia arriba
+  // desde `started_at`. Ambos con el offset de reloj del último fetch (FR-F09).
   const secLeft = running ? secondsLeft(running.ends_at, offsetRef.current, Date.now()) : null;
+  const elapsed =
+    running && running.kind === 'cronometro' ? elapsedSeconds(running.started_at, offsetRef.current, Date.now()) : null;
 
   return {
     today,
@@ -111,6 +130,7 @@ export function useToday() {
     isOffline: connection === 'offline',
     secondsLeft: secLeft,
     countdown: secLeft != null ? formatCountdown(secLeft) : null,
+    elapsedSeconds: elapsed,
     refresh: fetchToday,
     start,
     finish,

@@ -25,6 +25,13 @@ html.light {
   --accent-aero: #337ea9;
   --accent-software: #9065b0;
   --accent-synergy: #448361;
+  /* Mapa de calor de foco (004, FR-F17): 5 tonos secuenciales sobre el verde synergy, parejos en
+     OKLab. El nivel 0 es la superficie neutra (con borde fino en la celda); el 4 es el acento. */
+  --heat-0: #f1f1ef;
+  --heat-1: #c9e0d3;
+  --heat-2: #9dc0ac;
+  --heat-3: #71a185;
+  --heat-4: #448361;
 }
 
 /* Dark Theme — warm charcoal, low-chroma (Notion-inspired) */
@@ -42,6 +49,12 @@ html.dark, :root {
   --accent-aero: #529cca;
   --accent-software: #9a6dd7;
   --accent-synergy: #529e72;
+  /* Mapa de calor de foco (004, FR-F17): la misma escala en oscuro. Nivel 0 = superficie neutra. */
+  --heat-0: #252525;
+  --heat-1: #254435;
+  --heat-2: #336149;
+  --heat-3: #427f5d;
+  --heat-4: #529e72;
 }
 
 body {

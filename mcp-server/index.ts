@@ -33,6 +33,7 @@ import {
   handleManageProgram,
   handleManageTandas,
   handleGetToday,
+  handleGetFocusSummary,
   handleManageRoutineSlots,
   handleManageDailyChecks,
   handleGetGradeProjection,
@@ -41,6 +42,8 @@ import {
   handleManageTasks,
   handlePlanWeek,
   handleManageFriction,
+  handleManageObjectives,
+  handleManageQuotes,
 } from './tools-handler';
 import { runExecutionTick } from '../lib/execution/tick';
 import { createZeptoMailer } from '../lib/execution/mailer';
@@ -308,24 +311,26 @@ export const TOOLS_LIST = [
   {
     name: 'manage_tandas',
     description:
-      'Módulo de Ejecución: tanda de estudio de 10 a 60 minutos (US1, US-T1), la unidad de ejecución de Pure. ' +
+      'Módulo de Ejecución: tanda de estudio temporizador (10–180 minutos, 10 por defecto) o cronómetro sin fin, la unidad de ejecución de Pure. ' +
       '"start" la empieza con la hora del servidor (rechaza started_at/ended_at del cliente: sin tandas retroactivas) y falla con TANDA_EN_CURSO si ya hay una en curso. ' +
-      '"finish" solo funciona si ya se cumplió el tiempo planeado; antes de eso usa "interrupt" con interrupt_reason (1-140 caracteres, obligatorio). ' +
-      '"current" devuelve la tanda en curso y los segundos restantes. "read" lista tandas con su resumen por día (incluye unidades). ' +
-      '"update" solo reclasifica una tanda ya cerrada (materia, tema, entregable, tarea, modo); nunca acepta tiempos. ' +
-      '"log_late" (US-T2) es la ÚNICA excepción del módulo que sí acepta started_at/ended_at del cliente: registra una sesión que se estudió sin darle iniciar, acotada a hoy (día local del servidor), hasta 6 horas atrás, 10-60 minutos, sin solaparse con otra tanda del día y máximo 3 por día; queda marcada late_logged=true y se cuenta aparte en el reporte semanal (registros_tardios). No está en la lista blanca de la web: solo se dispara por este agente.',
+      '"finish" en temporizador solo funciona si ya se cumplió el tiempo planeado; en cronómetro requiere ≥60 segundos transcurridos (antes rechaza con CRONOMETRO_MUY_CORTO); antes de eso usa "interrupt" con interrupt_reason (1-140 caracteres, obligatorio). ' +
+      '"current" devuelve los segundos restantes en temporizador (seconds_left) o los segundos transcurridos en cronómetro (elapsed_seconds). "read" lista tandas con su resumen por día, donde un cronómetro que cruza medianoche se reparte entre los días locales que abarca (incluye unidades y minutos). ' +
+      '"update" solo reclasifica una tanda ya cerrada (materia, tema, entregable, tarea, objetivo, modo); nunca acepta tiempos. ' +
+      '"log_late" (US-T2) es la primera de las dos excepciones del módulo (la otra es "correct") que aceptan instantes del cliente: acepta started_at/ended_at para registrar una sesión que se estudió sin darle iniciar, acotada a hoy (día local del servidor), hasta 6 horas atrás, 10-60 minutos, sin solaparse con otra tanda del día y máximo 3 por día; queda marcada late_logged=true y se cuenta aparte en el reporte semanal (registros_tardios). No está en la lista blanca de la web: solo se dispara por este agente. ' +
+      '"correct" (US-F4) corrige o cierra un cronómetro olvidado y es la SEGUNDA excepción acotada del módulo (después de log_late) que acepta un instante del cliente (ended_at). Solo acorta: en una sesión cerrada el fin nuevo debe ser anterior al registrado y al menos 1 minuto posterior al inicio; en un cronómetro en curso lo cierra como completado con un fin entre inicio + 1 minuto y ahora; un temporizador en curso no se corrige (para cortarlo usa "interrupt"). Fuera de esas cotas responde CORRECCION_INVALIDA y no cambia nada. Exige una razón de 1-140 caracteres, conserva el fin y los minutos originales de antes de la primera corrección (original_ended_at, original_minutes), marca corrected=true con corrected_at del servidor y se cuenta en el reporte (correcciones: { total, minutos_recortados }). Está disponible en cualquier momento, también después del cierre del día. No está en la lista blanca de la web: solo se dispara por este agente.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['start', 'finish', 'interrupt', 'current', 'read', 'update', 'log_late'] },
+        action: { type: 'string', enum: ['start', 'finish', 'interrupt', 'current', 'read', 'update', 'log_late', 'correct'] },
         data: {
           type: 'object',
           description:
-            'start: { subject_id?, topic_id?, deliverable_id?, task_id?, routine_slot_id?, planned_minutes? (10-60, 10 por defecto) }. ' +
+            'start: { kind? (temporizador|cronometro, temporizador por defecto), planned_minutes? (10-180 solo temporizador, 10 por defecto), objective_id?, subject_id?, topic_id?, deliverable_id?, task_id?, routine_slot_id? }. ' +
             'finish: { id }. interrupt: { id, interrupt_reason (1-140) }. current: sin data. ' +
-            'read: { from?, to? (YYYY-MM-DD), subject_id? }. ' +
-            'update: { id, subject_id?, topic_id?, deliverable_id?, task_id?, mode?, interrupt_reason? }. ' +
-            'log_late: { subject_id, started_at (ISO, hoy, hasta 6h atrás), ended_at (ISO, <= ahora, > started_at), topic_id?, task_id? } -> REGISTRO_TARDIO_INVALIDO | LIMITE_REGISTRO_TARDIO.',
+            'read: { from?, to? (YYYY-MM-DD), subject_id?, objective_id? }. ' +
+            'update: { id, subject_id?, topic_id?, deliverable_id?, task_id?, objective_id?, mode?, interrupt_reason? }. ' +
+            'log_late: { subject_id, started_at (ISO, hoy, hasta 6h atrás), ended_at (ISO, <= ahora, > started_at), topic_id?, task_id? } -> REGISTRO_TARDIO_INVALIDO | LIMITE_REGISTRO_TARDIO. ' +
+            'correct: { id, ended_at (ISO), reason (1-140) } -> CORRECCION_INVALIDA.',
         },
       },
       required: ['action'],
@@ -334,11 +339,26 @@ export const TOOLS_LIST = [
   {
     name: 'get_today',
     description:
-      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (con los segundos restantes), el disparador vigente si lo hay, los hábitos pendientes, si el día quedó cumplido y la evaluación desglosada del día (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled).',
+      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (running_tanda con kind temporizador|cronometro, objective_id, y seconds_left en el temporizador o elapsed_seconds en el cronómetro), el disparador vigente si lo hay, los hábitos pendientes, si el día quedó cumplido y la evaluación desglosada del día (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled). También foco_semana_minutos (minutos enfocados de lunes a hoy) y foco_12_semanas (días { date, minutos, nivel } de las últimas 12 semanas, el mismo nivel y los mismos minutos que get_focus_summary) y frase_del_dia ({ text, translation, source } o null si no hay frases activas: una frase latina por día, rotación determinista por fecha local sobre las frases activas de manage_quotes).',
     inputSchema: {
       type: 'object',
       properties: {
         data: { type: 'object', description: '{ at? } ISO, opcional: solo para pruebas o una consulta puntual en otro instante.' },
+      },
+    },
+  },
+  {
+    name: 'get_focus_summary',
+    description:
+      'Módulo de Ejecución: resumen de tiempo enfocado (US-F3), de solo lectura. Suma los minutos de las sesiones completadas e interrumpidas (las en curso no suman; un cronómetro que cruza la medianoche se reparte entre los días locales que abarca). Devuelve rango { desde, hasta, semanas } (desde = lunes de hace weeks-1 semanas, hasta = hoy), dias[] { date, minutos, nivel 0-4 } con 0 explícito en días vacíos, semanas[] { lunes, minutos } de lunes a domingo, total_semana (lunes a hoy) y por_objetivo[] { tipo: objetivo|materia|sin_objetivo, id, nombre, minutos, meta, archivado } de la semana actual sin filtro (cada sesión en una sola fila; los objetivos activos con meta aparecen aunque sumen 0). El filtro por objective_id o subject_id afecta a dias, semanas y total_semana, no a por_objetivo; el de materia incluye las sesiones de objetivos ligados a esa materia. El mismo resultado que GET /api/execution/focus.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description:
+            '{ weeks? (entero 1-53, 52 por defecto), objective_id? | subject_id? (no ambos: DATOS_INVALIDOS), at? (ISO, solo para pruebas) }.',
+        },
       },
     },
   },
@@ -403,7 +423,7 @@ export const TOOLS_LIST = [
   {
     name: 'get_compliance_report',
     description:
-      'Módulo de Ejecución: vista de salud del hábito para un rango de días o una semana del programa entera (US6), de solo lectura. Devuelve los días con su evaluación y desglose (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled), days_fulfilled, aperturas_plan { libres_usadas, con_razon, total, razones } (solo aperturas de la vista de semana; las de planeación no cuentan), los hábitos como fracción (sin los que tienen 0 días activos en el rango), las tandas (completadas/interrumpidas y por materia), los disparadores (hecho/no/sin_respuesta), las razones de interrupción, las ediciones tardías, los días cumplidos acumulados desde el inicio del programa y el horizonte del hábito (66 por defecto).',
+      'Módulo de Ejecución: vista de salud del hábito para un rango de días o una semana del programa entera (US6), de solo lectura. Devuelve los días con su evaluación y desglose (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled), days_fulfilled, aperturas_plan { libres_usadas, con_razon, total, razones } (solo aperturas de la vista de semana; las de planeación no cuentan), los hábitos como fracción (sin los que tienen 0 días activos en el rango), las tandas (completadas/interrumpidas y por materia: una sesión que cruza la medianoche cuenta en cada semana que toca, con solo los minutos de su tramo), los disparadores (hecho/no/sin_respuesta), las razones de interrupción, las ediciones tardías, registros_tardios { total, minutos } (sesiones registradas con log_late), correcciones { total, minutos_recortados } (sesiones corregidas con manage_tandas:correct, contadas por la semana local en que se hizo la corrección, no por la del inicio de la sesión), los días cumplidos acumulados desde el inicio del programa y el horizonte del hábito (66 por defecto).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -492,6 +512,52 @@ export const TOOLS_LIST = [
       required: ['action'],
     },
   },
+  {
+    name: 'manage_objectives',
+    description:
+      'Módulo de Ejecución: objetivos propios (LeetCode, Inglés, Proyecto personal) a los que se ligan las sesiones de foco (manage_tandas con objective_id). Un objetivo tiene nombre (1-60 caracteres, único entre los activos sin distinguir mayúsculas ni espacios en los extremos), materia opcional y meta semanal opcional en minutos (entero de 1 a 10080). ' +
+      'Una sesión de un objetivo SIN materia suma minutos de foco pero no cuenta para el mínimo diario (salvo que la sesión tenga materia, tema, tarea o entrega propios); un objetivo con materia sí cuenta. ' +
+      '"create" falla con OBJETIVO_DUPLICADO si el nombre ya está en uso por un objetivo activo y con NO_ENCONTRADO si la materia no existe. "read" lista los activos ordenados por nombre (include_archived los incluye). ' +
+      '"update" aplica las mismas validaciones que create y rechaza uno archivado con OBJETIVO_ARCHIVADO. "archive" es idempotente: no se borran, se archivan; sus sesiones viejas siguen sumando y ya no se puede empezar una sesión con él.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'archive'] },
+        data: {
+          type: 'object',
+          description:
+            'create: { name (1-60), subject_id?, weekly_target_minutes? (entero 1-10080) }. ' +
+            'read: { include_archived? (false por defecto) } -> { objetivos[] } ordenados por nombre. ' +
+            'update: { id, name?, subject_id? (string | null para quitarla), weekly_target_minutes? (entero 1-10080 | null para quitarla) }. ' +
+            'archive: { id }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_quotes',
+    description:
+      'Módulo de Ejecución: frases latinas de la línea del día en Hoy (US-F5). SOLO MCP: la web no puede crearlas ni modificarlas. Una frase tiene texto latino (1-300 caracteres), traducción opcional (hasta 300) y fuente opcional (hasta 120); get_today devuelve una por día (frase_del_dia) con rotación determinista por fecha local sobre las frases activas. ' +
+      'Carga inicial: una sola vez, con "create_many" y el contenido de specs/004-foco-cronometro/frases.json (50 frases); responde { creadas, omitidas }. "create_many" (1 a 200 frases) es todo o nada: una frase inválida rechaza el lote entero con DATOS_INVALIDOS y no escribe ninguna; es idempotente, repetir la carga da { creadas: 0, omitidas: 50 }. ' +
+      'La comparación ignora mayúsculas y espacios en los extremos del texto latino. "create" también es idempotente: si la frase ya existe devuelve la existente. "read" lista las activas ordenadas por id (include_inactive incluye las desactivadas). "update" cambia texto, traducción, fuente o active sin cambiar el id; "deactivate" saca la frase de la rotación (idempotente).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'create_many', 'read', 'update', 'deactivate'] },
+        data: {
+          type: 'object',
+          description:
+            'create: { text (1-300), translation? (hasta 300), source? (hasta 120) } -> la frase (la existente si ya estaba). ' +
+            'create_many: { frases: [{ text, translation?, source? }] } (1 a 200, todo o nada) -> { creadas, omitidas }. ' +
+            'read: { include_inactive? (false por defecto) } -> { frases[] } ordenadas por id. ' +
+            'update: { id, text?, translation?, source?, active? } (cambiar text no cambia el id). ' +
+            'deactivate: { id }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -507,7 +573,7 @@ export function createMcpServerInstance() {
     }
   );
 
-  // Register all 10 tools using modern McpServer tool() API
+  // Register all tools using modern McpServer tool() API
   mcpServer.tool('get_academic_overview', 'Retorna el resumen académico global, tiempo libre neto y promedios por carrera.', {}, async () => {
     const res = await handleGetAcademicOverview();
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
@@ -706,9 +772,9 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'manage_tandas',
-    'Módulo de Ejecución: tanda de estudio de 10 a 60 minutos (US1, US-T1). start/finish/interrupt/current/read/update/log_late. La hora siempre la fija el servidor; sin tandas retroactivas; interrupt exige una razón de 1-140 caracteres. log_late (US-T2) es la única excepción acotada que acepta started_at/ended_at del cliente (hoy, hasta 6h atrás, máx. 3/día, marcada late_logged y contada aparte en el reporte); no está disponible desde la web.',
+    'Módulo de Ejecución: tanda temporizador (10–180 minutos, 10 por defecto) o cronómetro sin fin. start/finish/interrupt/current/read/update/log_late/correct. La hora siempre la fija el servidor; sin tandas retroactivas. Temporizador exige tiempo planeado en finish; cronómetro requiere ≥60 segundos transcurridos. interrupt exige una razón de 1-140 caracteres. current devuelve seconds_left (temporizador) o elapsed_seconds (cronómetro). read trae resumen por día (unidades, minutos); cronómetro que cruza medianoche se reparte. log_late y correct son las dos excepciones acotadas que aceptan instantes del cliente; ninguna está disponible desde la web. log_late: started_at/ended_at (hoy, hasta 6h atrás, 10-60 min, máx. 3/día, marcada late_logged y contada aparte en el reporte). correct (US-F4, la segunda excepción, después de log_late): corrige o cierra un cronómetro olvidado con { id, ended_at ISO, reason 1-140 }; solo acorta (fin anterior al registrado, o entre inicio + 1 min y ahora si el cronómetro sigue en curso; un temporizador en curso no se corrige, usa interrupt), exige razón, conserva el fin y los minutos originales y se cuenta en el reporte (correcciones); fuera de cotas, CORRECCION_INVALIDA.',
     {
-      action: z.enum(['start', 'finish', 'interrupt', 'current', 'read', 'update', 'log_late']),
+      action: z.enum(['start', 'finish', 'interrupt', 'current', 'read', 'update', 'log_late', 'correct']),
       data: z.any().optional(),
     },
     async ({ action, data }) => {
@@ -719,12 +785,24 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'get_today',
-    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso, disparador vigente, hábitos pendientes, día cumplido, evaluación desglosada con tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled). Solo lectura.',
+    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso con kind temporizador|cronometro, objective_id, seconds_left o elapsed_seconds, disparador vigente, hábitos pendientes, día cumplido, evaluación desglosada con tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled, foco_semana_minutos, foco_12_semanas con los días { date, minutos, nivel } de las últimas 12 semanas y frase_del_dia { text, translation, source } | null). Solo lectura.',
     {
       data: z.any().optional(),
     },
     async ({ data }) => {
       const res = await handleGetToday(data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'get_focus_summary',
+    'Módulo de Ejecución: resumen de tiempo enfocado (US-F3). data: { weeks? (1-53, 52 por defecto), objective_id? | subject_id? (no ambos: DATOS_INVALIDOS), at? }. Devuelve rango, dias[] { date, minutos, nivel 0-4 } con 0 explícito, semanas[] { lunes, minutos }, total_semana y por_objetivo[] de la semana actual. Suman las sesiones completadas e interrumpidas; las en curso no. Solo lectura; el mismo resultado que GET /api/execution/focus.',
+    {
+      data: z.any().optional(),
+    },
+    async ({ data }) => {
+      const res = await handleGetFocusSummary(data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );
@@ -769,7 +847,7 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'get_compliance_report',
-    'Módulo de Ejecución: vista de salud del hábito (US6), de solo lectura. Días con evaluación desglosada (tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled), days_fulfilled, aperturas_plan (solo semana, no planeación), hábitos por fracción (sin los de 0 días activos), tandas, disparadores, razones de interrupción, ediciones tardías, días cumplidos acumulados y horizonte.',
+    'Módulo de Ejecución: vista de salud del hábito (US6), de solo lectura. Días con evaluación desglosada (tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled), days_fulfilled, aperturas_plan (solo semana, no planeación), hábitos por fracción (sin los de 0 días activos), tandas (por materia, con solo los minutos de los tramos dentro del rango), disparadores, razones de interrupción, ediciones tardías, registros_tardios { total, minutos }, correcciones { total, minutos_recortados } (contadas por la semana local de la corrección), días cumplidos acumulados y horizonte.',
     {
       data: z.any().optional(),
     },
@@ -827,6 +905,32 @@ export function createMcpServerInstance() {
     },
     async ({ action, data }) => {
       const res = await handleManageFriction(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_objectives',
+    'Módulo de Ejecución: objetivos propios (LeetCode, Inglés...) a los que se ligan las sesiones de foco (US-F2). create/read/update/archive. Nombre único entre activos (OBJETIVO_DUPLICADO), materia y meta semanal opcionales; no se borran, se archivan (archive es idempotente; un archivado no se edita ni admite sesiones nuevas: OBJETIVO_ARCHIVADO). Una sesión de un objetivo sin materia suma minutos de foco pero no cuenta para el mínimo diario.',
+    {
+      action: z.enum(['create', 'read', 'update', 'archive']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageObjectives(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_quotes',
+    'Módulo de Ejecución: frases latinas de la línea del día en Hoy (US-F5). Solo MCP. create/create_many/read/update/deactivate. Carga inicial una sola vez con create_many y el contenido de specs/004-foco-cronometro/frases.json: todo o nada e idempotente por texto latino (sin distinguir mayúsculas ni espacios en los extremos), responde { creadas, omitidas }. create devuelve la existente si ya estaba; read lista las activas (include_inactive las desactivadas); update no cambia el id; deactivate saca la frase de la rotación de frase_del_dia en get_today.',
+    {
+      action: z.enum(['create', 'create_many', 'read', 'update', 'deactivate']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageQuotes(action, data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );

@@ -2,13 +2,50 @@
 // (lib/validations/schemas.ts) como en los servicios (lib/execution/*), para no repetir los
 // números mágicos de spec.md en dos lugares distintos.
 
-/** FR-T01: la pantalla de inicio usa 10 minutos; el rango 10-60 permite tandas más largas.
+/** FR-T01 / FR-F02: la pantalla de inicio usa 10 minutos; el temporizador acepta de 10 a 180.
+ * El tope pasó de 60 a 180 en la 004 (FR-F02); `log_late` tiene sus propias cotas (LATE_LOG_*).
  * TANDA_DURATION_OPTIONS se usa en la UI (10, 25, 40, 60 minutos, cada uno iniciando la tanda). */
 export const TANDA_MINUTES_DEFAULT = 10;
 export const TANDA_MINUTES_MIN = 10;
-export const TANDA_MINUTES_MAX = 60;
+export const TANDA_MINUTES_MAX = 180;
 export const TANDA_UNIT_MINUTES = 10;
 export const TANDA_DURATION_OPTIONS = [10, 25, 40, 60] as const;
+
+/** FR-T11/US-T2 (003): cotas propias de `log_late`, separadas de TANDA_MINUTES_* para que subir
+ * el tope del temporizador en la 004 no las afecte. Sin cambios en la 004. */
+export const LATE_LOG_MIN_MINUTES = 10;
+export const LATE_LOG_MAX_MINUTES = 60;
+
+/** US-F1: tiempo mínimo que debe transcurrir en el cronómetro para poder cerrarlo (1 min). */
+export const CRONOMETRO_MIN_FINISH_SECONDS = 60;
+
+/** US-F4: razón obligatoria de una corrección de cronómetro. */
+export const CORRECTION_REASON_MIN = 1;
+export const CORRECTION_REASON_MAX = 140;
+
+/** US-F2: nombre del objetivo. */
+export const OBJECTIVE_NAME_MAX = 60;
+
+/** US-F2: meta semanal de minutos de foco. */
+export const WEEKLY_TARGET_MAX_MINUTES = 10080;
+
+/** US-F5: límites de un latín y su traducción/fuente. */
+export const QUOTE_TEXT_MAX = 300;
+export const QUOTE_TRANSLATION_MAX = 300;
+export const QUOTE_SOURCE_MAX = 120;
+
+/** US-F5: tamaño máximo de un lote de frases. */
+export const QUOTE_BATCH_MAX = 200;
+
+/** US-F3: rango de semanas para el resumen de foco. */
+export const FOCUS_WEEKS_DEFAULT = 52;
+export const FOCUS_WEEKS_MAX = 53;
+
+/** US-F3: semanas mostradas en Hoy. */
+export const TODAY_HEATMAP_WEEKS = 12;
+
+/** US-F3: límites de minutos para cada nivel del mapa de calor. */
+export const HEAT_LEVEL_BOUNDS = [30, 90, 180] as const;
 
 /** FR-T11/US-T2: `log_late` solo acepta sesiones que empezaron dentro de esta ventana hacia
  * atrás (horas), contada desde el reloj del servidor. Es la única entrada del módulo que acepta
