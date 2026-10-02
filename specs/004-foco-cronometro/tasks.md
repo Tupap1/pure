@@ -818,21 +818,21 @@ al final.
 
 ## Phase 9: Convergence
 
-- [ ] T053 Hacer que el solapamiento de `logLateTanda` (`lib/execution/tandas.ts`, ~L565-588)
+- [x] T053 Hacer que el solapamiento de `logLateTanda` (`lib/execution/tandas.ts`, ~L565-588)
       considere toda tanda cuyo tramo `[started_at, ended_at ?? now]` intersecte el tramo pedido,
       no solo las de `local_date === hoy`, para que un cronómetro iniciado ayer, en curso o que
       cruzó la medianoche, cuente como ocupado. Escribir antes, en
       `__tests__/mcp/execution-tandas-registro-tardio.test.ts`, un test en rojo
       `US-T2-AS5 · … cronómetro iniciado ayer` y verificar que `US-T2-AS1..AS9` siguen en
       verde. Según FR-F14a / FR-T11 (partial).
-- [ ] T054 Reemplazar en `getCompliance` (`lib/execution/compliance.ts`, ~L213-230) el filtro
+- [x] T054 Reemplazar en `getCompliance` (`lib/execution/compliance.ts`, ~L213-230) el filtro
       `tandasInRange` por `local_date`. Debe incluir toda sesión con algún tramo
       (`sessionShares` + `cachedSplitByLocalDay`) en `[from, to]`. `por_materia.minutes` debe
       sumar solo los minutos de los tramos dentro del rango. Escribir antes, en
       `__tests__/mcp/execution-foco-sesiones.test.ts`, un test en rojo `US-F1-AS10 · …
       cronómetro de domingo 23:00 a lunes 01:00 reparte 60 + 60 en por_materia de cada
       semana`. Según FR-F14a (partial).
-- [ ] T055 Actualizar en `mcp-server/index.ts` la descripción de `get_compliance_report`, en el
+- [x] T055 Actualizar en `mcp-server/index.ts` la descripción de `get_compliance_report`, en el
       descriptor de `TOOLS_LIST` y en el `mcpServer.tool`, para que mencione
       `registros_tardios: { total, minutos }` y `correcciones: { total, minutos_recortados }`,
       contadas por la semana de la corrección. Según contracts/mcp-tools.md §

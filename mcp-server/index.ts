@@ -423,7 +423,7 @@ export const TOOLS_LIST = [
   {
     name: 'get_compliance_report',
     description:
-      'Módulo de Ejecución: vista de salud del hábito para un rango de días o una semana del programa entera (US6), de solo lectura. Devuelve los días con su evaluación y desglose (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled), days_fulfilled, aperturas_plan { libres_usadas, con_razon, total, razones } (solo aperturas de la vista de semana; las de planeación no cuentan), los hábitos como fracción (sin los que tienen 0 días activos en el rango), las tandas (completadas/interrumpidas y por materia), los disparadores (hecho/no/sin_respuesta), las razones de interrupción, las ediciones tardías, los días cumplidos acumulados desde el inicio del programa y el horizonte del hábito (66 por defecto).',
+      'Módulo de Ejecución: vista de salud del hábito para un rango de días o una semana del programa entera (US6), de solo lectura. Devuelve los días con su evaluación y desglose (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled), days_fulfilled, aperturas_plan { libres_usadas, con_razon, total, razones } (solo aperturas de la vista de semana; las de planeación no cuentan), los hábitos como fracción (sin los que tienen 0 días activos en el rango), las tandas (completadas/interrumpidas y por materia: una sesión que cruza la medianoche cuenta en cada semana que toca, con solo los minutos de su tramo), los disparadores (hecho/no/sin_respuesta), las razones de interrupción, las ediciones tardías, registros_tardios { total, minutos } (sesiones registradas con log_late), correcciones { total, minutos_recortados } (sesiones corregidas con manage_tandas:correct, contadas por la semana local en que se hizo la corrección, no por la del inicio de la sesión), los días cumplidos acumulados desde el inicio del programa y el horizonte del hábito (66 por defecto).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -847,7 +847,7 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'get_compliance_report',
-    'Módulo de Ejecución: vista de salud del hábito (US6), de solo lectura. Días con evaluación desglosada (tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled), days_fulfilled, aperturas_plan (solo semana, no planeación), hábitos por fracción (sin los de 0 días activos), tandas, disparadores, razones de interrupción, ediciones tardías, días cumplidos acumulados y horizonte.',
+    'Módulo de Ejecución: vista de salud del hábito (US6), de solo lectura. Días con evaluación desglosada (tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled), days_fulfilled, aperturas_plan (solo semana, no planeación), hábitos por fracción (sin los de 0 días activos), tandas (por materia, con solo los minutos de los tramos dentro del rango), disparadores, razones de interrupción, ediciones tardías, registros_tardios { total, minutos }, correcciones { total, minutos_recortados } (contadas por la semana local de la corrección), días cumplidos acumulados y horizonte.',
     {
       data: z.any().optional(),
     },

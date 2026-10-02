@@ -165,6 +165,73 @@ describe('[003] US-T2 — Registro tardío acotado y visible', () => {
     if (res.status === 'error') expect(res.code).toBe('REGISTRO_TARDIO_INVALIDO');
   });
 
+  it('US-T2-AS5 · un cronómetro iniciado ayer y todavía en curso ocupa hasta ahora: un registro de hoy 00:30-01:00 se rechaza', async () => {
+    // 004 (FR-F14a / FR-T11): el cronómetro empezó AYER (local_date = 2026-09-20), pero sigue
+    // corriendo a la 01:00 de hoy, así que ocupa [ayer 22:00, ahora]. Un solapamiento calculado solo
+    // sobre las tandas de hoy lo dejaría pasar.
+    vi.setSystemTime(new Date('2026-09-21T03:00:00.000Z')); // domingo 20 22:00 local
+    const start = await handleManageTandas('start', { kind: 'cronometro' });
+    expect(start.status).toBe('success');
+    if (start.status !== 'success') return;
+    expect((start.data as any).tanda.local_date).toBe('2026-09-20');
+
+    vi.setSystemTime(new Date('2026-09-21T06:00:00.000Z')); // lunes 21 01:00 local, el cronómetro sigue en curso
+    const res = await handleManageTandas('log_late', {
+      subject_id: 'sub-fisica',
+      started_at: '2026-09-21T05:30:00.000Z', // 00:30 local
+      ended_at: '2026-09-21T06:00:00.000Z', // 01:00 local
+    });
+    expect(res.status).toBe('error');
+    if (res.status === 'error') expect(res.code).toBe('REGISTRO_TARDIO_INVALIDO');
+
+    const read = await handleManageTandas('read', {});
+    expect(read.status).toBe('success');
+    if (read.status === 'success') expect((read.data as any).tandas).toHaveLength(1); // solo el cronómetro: no se creó nada
+  });
+
+  it('US-T2-AS5 · un cronómetro de ayer 23:00 a hoy 00:40 ya cerrado ocupa su tramo: un registro de hoy 00:20-00:50 se rechaza', async () => {
+    vi.setSystemTime(new Date('2026-09-21T04:00:00.000Z')); // domingo 20 23:00 local
+    const start = await handleManageTandas('start', { kind: 'cronometro' });
+    expect(start.status).toBe('success');
+    if (start.status !== 'success') return;
+
+    vi.setSystemTime(new Date('2026-09-21T05:40:00.000Z')); // lunes 21 00:40 local
+    const finish = await handleManageTandas('finish', { id: (start.data as any).tanda.id });
+    expect(finish.status).toBe('success');
+
+    vi.setSystemTime(new Date('2026-09-21T06:00:00.000Z')); // lunes 21 01:00 local
+    const res = await handleManageTandas('log_late', {
+      subject_id: 'sub-fisica',
+      started_at: '2026-09-21T05:20:00.000Z', // 00:20 local: dentro del cronómetro, que terminó a las 00:40
+      ended_at: '2026-09-21T05:50:00.000Z', // 00:50 local
+    });
+    expect(res.status).toBe('error');
+    if (res.status === 'error') expect(res.code).toBe('REGISTRO_TARDIO_INVALIDO');
+
+    const read = await handleManageTandas('read', {});
+    expect(read.status).toBe('success');
+    if (read.status === 'success') expect((read.data as any).tandas).toHaveLength(1);
+  });
+
+  it('US-T2-AS5 · un cronómetro de ayer ya cerrado no bloquea un registro de hoy que empieza justo cuando él terminó [regresión]', async () => {
+    vi.setSystemTime(new Date('2026-09-21T04:00:00.000Z')); // domingo 20 23:00 local
+    const start = await handleManageTandas('start', { kind: 'cronometro' });
+    expect(start.status).toBe('success');
+    if (start.status !== 'success') return;
+
+    vi.setSystemTime(new Date('2026-09-21T05:40:00.000Z')); // lunes 21 00:40 local
+    const finish = await handleManageTandas('finish', { id: (start.data as any).tanda.id });
+    expect(finish.status).toBe('success');
+
+    vi.setSystemTime(new Date('2026-09-21T06:00:00.000Z')); // lunes 21 01:00 local
+    const res = await handleManageTandas('log_late', {
+      subject_id: 'sub-fisica',
+      started_at: '2026-09-21T05:40:00.000Z', // 00:40 local: empieza exactamente cuando termina el cronómetro
+      ended_at: '2026-09-21T05:55:00.000Z', // 00:55 local
+    });
+    expect(res.status).toBe('success');
+  });
+
   it('US-T2-AS5 · que una tanda termine exactamente cuando otra empieza no cuenta como solapamiento', async () => {
     vi.setSystemTime(HOY_18H);
 

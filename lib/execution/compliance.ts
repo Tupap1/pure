@@ -31,7 +31,7 @@ import {
   DayEvaluation,
   DayBreakdown,
 } from '../domain/execution';
-import { tallyDay, type FocusObjectiveInput, type SplitByLocalDay } from '../domain/focus';
+import { sessionShares, tallyDay, type FocusObjectiveInput, type SplitByLocalDay } from '../domain/focus';
 
 export interface ComplianceInput {
   /** YYYY-MM-DD, inicio del rango que se quiere reportar (p. ej. el lunes de la semana). */
@@ -210,16 +210,27 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
     })
     .filter((h) => h.total > 0);
 
-  const tandasInRange = tandasBeforeCutoff.filter((t) => t.local_date >= input.from && t.local_date <= input.to);
+  // 004 (FR-F14a): una sesión cuenta en el rango si algún TRAMO suyo cae en él, no por su
+  // `local_date` (el día de inicio): un cronómetro del domingo 23:00 al lunes 01:00 aparece en la
+  // semana que termina Y en la que empieza, y en cada una aporta solo los minutos de su tramo. Un
+  // temporizador tiene un único tramo en su día de inicio, así que para él nada cambia. Los conteos
+  // de abajo cuentan sesiones con algún tramo en el rango; los minutos, solo los de esos tramos.
+  const sessionsInRange: Array<{ tanda: TandaRecord; minutes: number }> = [];
+  for (const t of tandasBeforeCutoff) {
+    const tramos = sessionShares(t, split).filter((s) => s.date >= input.from && s.date <= input.to);
+    if (tramos.length === 0) continue;
+    sessionsInRange.push({ tanda: t, minutes: tramos.reduce((sum, s) => sum + s.minutes, 0) });
+  }
+  const tandasInRange = sessionsInRange.map((s) => s.tanda);
   const completadas = tandasInRange.filter((t) => t.status === 'completada').length;
   const interrumpidas = tandasInRange.filter((t) => t.status === 'interrumpida').length;
 
   const porMateriaMap = new Map<string, ComplianceSubjectTandas>();
-  for (const t of tandasInRange) {
+  for (const { tanda: t, minutes } of sessionsInRange) {
     const key = t.subject_id ?? 'sin-materia';
     const bucket = porMateriaMap.get(key) ?? { subject_id: t.subject_id ?? null, count: 0, minutes: 0 };
     bucket.count += 1;
-    bucket.minutes += t.actual_minutes ?? 0;
+    bucket.minutes += minutes;
     porMateriaMap.set(key, bucket);
   }
 

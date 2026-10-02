@@ -504,8 +504,8 @@ export interface TandaLogLateInput {
  * que `now`. 4) ended_at <= now y ended_at > started_at. 5) started_at no más de
  * LATE_LOG_MAX_HOURS_BACK horas atrás. 6) duración (redondeada hacia abajo a minutos) entre
  * TANDA_MINUTES_MIN y TANDA_MINUTES_MAX. 7) límite de LATE_LOG_MAX_PER_DAY registros tardíos por
- * día local. 8) solapamiento con cualquier otra tanda del mismo día (una en curso ocupa desde su
- * inicio hasta ahora).
+ * día local. 8) solapamiento con cualquier otra sesión, de cualquier día (una en curso ocupa desde
+ * su inicio hasta ahora; un cronómetro iniciado ayer cuenta si su tramo llega a hoy).
  */
 export async function logLateTanda(
   input: TandaLogLateInput,
@@ -575,7 +575,11 @@ export async function logLateTanda(
 
   const newStartMs = startedAtDate.getTime();
   const newEndMs = endedAtDate.getTime();
-  const overlaps = sameDay.some((t) => {
+  // 004 (FR-F14a / FR-T11): el solapamiento mira TODAS las tandas, no solo las de hoy. Un cronómetro
+  // iniciado ayer que sigue en curso (ocupa hasta ahora) o que cruzó la medianoche ocupa tiempo de
+  // hoy aunque su `local_date` sea el día de inicio. El tope de registros tardíos de arriba sigue
+  // contando solo las `late_logged` de hoy.
+  const overlaps = all.some((t) => {
     const existingStartMs = new Date(t.started_at).getTime();
     const existingEndMs = t.status === 'en_curso' ? now.getTime() : new Date(t.ended_at ?? t.started_at).getTime();
     // Se cruzan si ambos intervalos comparten algún instante; tocarse en el borde no cuenta.
@@ -585,7 +589,7 @@ export async function logLateTanda(
     return {
       status: 'error',
       code: 'REGISTRO_TARDIO_INVALIDO',
-      message: 'Ese tramo se solapa con otra tanda de hoy: revisa la hora de inicio y fin.',
+      message: 'Ese tramo se solapa con otra sesión: revisa la hora de inicio y fin.',
     };
   }
 

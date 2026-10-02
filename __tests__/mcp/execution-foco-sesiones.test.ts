@@ -6,6 +6,7 @@ import {
   handleGetToday,
   handleGetComplianceReport,
 } from '../../lib/execution/handlers';
+import { handleManageUniversities, handleManageSubjects } from '../../mcp-server/tools-handler';
 import { runExecutionTick, type Pusher } from '../../lib/execution/tick';
 import type { Mailer, MailerPayload } from '../../lib/execution/mailer';
 
@@ -317,6 +318,47 @@ describe('[004] US-F1 — Temporizador libre y cronómetro', () => {
     const before = await handleManageTandas('read', { from: '2026-09-12', to: '2026-09-13' });
     expect(before.status).toBe('success');
     if (before.status === 'success') expect((before.data as any).tandas).toHaveLength(0);
+  });
+
+  it('US-F1-AS10 · un cronómetro de domingo 23:00 a lunes 01:00 reparte 60 + 60 en por_materia de cada semana', async () => {
+    // 004 (FR-F14a): el cronómetro con materia cruza el cambio de semana. Cada reporte cuenta solo
+    // los minutos de su tramo: ni los 120 enteros en la semana de inicio ni nada en la siguiente.
+    vi.setSystemTime(new Date('2026-09-21T04:00:00.000Z')); // domingo 20 23:00 local
+    await handleManageUniversities('create', { id: 'uni-1', name: 'UdeA', scale_max: 5, passing_grade: 3.0 });
+    await handleManageSubjects('create', { id: 'sub-calculo', university_id: 'uni-1', name: 'Cálculo' });
+    const start = await handleManageTandas('start', { kind: 'cronometro', subject_id: 'sub-calculo' });
+    expect(start.status).toBe('success');
+    if (start.status !== 'success') return;
+    expect((start.data as any).tanda.local_date).toBe('2026-09-20');
+
+    vi.setSystemTime(new Date('2026-09-21T06:00:00.000Z')); // lunes 21 01:00 local
+    const finish = await handleManageTandas('finish', { id: (start.data as any).tanda.id });
+    expect(finish.status).toBe('success');
+    if (finish.status !== 'success') return;
+    expect((finish.data as any).actual_minutes).toBe(120);
+
+    const semanaQueTermina = await handleGetComplianceReport({ from: '2026-09-14', to: '2026-09-20' });
+    expect(semanaQueTermina.status).toBe('success');
+    if (semanaQueTermina.status !== 'success') return;
+    expect((semanaQueTermina.data as any).tandas.completadas).toBe(1);
+    expect((semanaQueTermina.data as any).tandas.por_materia).toEqual([
+      { subject_id: 'sub-calculo', count: 1, minutes: 60 },
+    ]);
+
+    const semanaQueEmpieza = await handleGetComplianceReport({ from: '2026-09-21', to: '2026-09-27' });
+    expect(semanaQueEmpieza.status).toBe('success');
+    if (semanaQueEmpieza.status !== 'success') return;
+    expect((semanaQueEmpieza.data as any).tandas.completadas).toBe(1);
+    expect((semanaQueEmpieza.data as any).tandas.por_materia).toEqual([
+      { subject_id: 'sub-calculo', count: 1, minutes: 60 },
+    ]);
+
+    // Una semana que no toca el cronómetro no lo cuenta.
+    const semanaAjena = await handleGetComplianceReport({ from: '2026-09-28', to: '2026-10-04' });
+    expect(semanaAjena.status).toBe('success');
+    if (semanaAjena.status !== 'success') return;
+    expect((semanaAjena.data as any).tandas.completadas).toBe(0);
+    expect((semanaAjena.data as any).tandas.por_materia).toEqual([]);
   });
 
   it('US-F1-AS10 · un cronómetro del lunes 22:00 al miércoles 02:00 se reparte en 120, 1440 y 120 minutos', async () => {
