@@ -1,4 +1,9 @@
--- 012_friction.sql — US-B5 (002): medidas de fricción del teléfono y calificación semanal de irritación
+-- 017_friction.sql — US-B5 (002): medidas de fricción del teléfono y calificación semanal de irritación
+--
+-- Nació como 012_friction.sql, pero 012_oauth_refresh_tokens.sql ya tenía ese número y el runner
+-- identifica las migraciones solo por número: en una base que ya registró la 12 (producción, desde
+-- 2026-09-15) esta se saltaba para siempre. En producción se aplicó a mano el 2026-10-02 sin
+-- registrarla; como todo es CREATE TABLE IF NOT EXISTS, aquí corre sin efecto y queda registrada.
 
 CREATE TABLE IF NOT EXISTS friction_measures (
   id TEXT PRIMARY KEY,           -- measure_key

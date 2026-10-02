@@ -73,7 +73,7 @@ export async function createTestDb(): Promise<TestDbHarness> {
     pool,
     reset: async () => {
       const tables = [
-        // Módulo de Ejecución (migración 012): tablas de fricción, hijas primero.
+        // Módulo de Ejecución (migración 017): tablas de fricción, hijas primero.
         'friction_ratings',
         'friction_measures',
         // Módulo de Ejecución (migración 008): hijas primero, igual que el resto de la lista.

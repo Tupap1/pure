@@ -40,6 +40,20 @@ export async function runPostgresMigrations(customPool?: Pool) {
       .filter((f) => f.endsWith('.sql'))
       .sort();
 
+    // 4. Rechazar números de versión repetidos: como se registra solo el número, el segundo
+    //    archivo se saltaría en silencio para siempre (pasó con dos 012).
+    const filesByVersion = new Map<number, string>();
+    for (const file of files) {
+      const match = file.match(/^(\d+)_/);
+      if (!match) continue;
+      const version = parseInt(match[1], 10);
+      const previous = filesByVersion.get(version);
+      if (previous) {
+        throw new Error(`Migraciones con el mismo número [${version}]: ${previous} y ${file}`);
+      }
+      filesByVersion.set(version, file);
+    }
+
     let appliedCount = 0;
 
     for (const file of files) {

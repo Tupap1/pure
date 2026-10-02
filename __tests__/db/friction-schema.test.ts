@@ -2,11 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { createTestDb, TestDbHarness } from '../helpers/test-db';
 
 /**
- * La migración 012 corre sobre pg-mem (Constitución, Principio III): si el SQL usara
+ * La migración 017 (nació como 012) corre sobre pg-mem (Constitución, Principio III): si el SQL usara
  * plpgsql, `AT TIME ZONE` o un índice único parcial, este archivo fallaría en pg-mem
  * en lugar de hacerlo silenciosamente en producción.
  */
-describe('[002] Migración 012 — fricción del teléfono (US-B5)', () => {
+describe('[002] Migración 017 — fricción del teléfono (US-B5)', () => {
   let harness: TestDbHarness;
 
   beforeAll(async () => {
