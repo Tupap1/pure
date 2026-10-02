@@ -730,9 +730,9 @@ misma frase el mismo día.
       - agregar su `describe('[004] …')`, igual que el de la 003.
 
       Verde solo si los 48 escenarios tienen test y ningún test cita un ID inexistente.
-- [ ] T047 C VERIFY — `npm run test:all`, `npm run lint` y `npm run build` en verde. Comparar el
+- [x] T047 C VERIFY (2026-10-02: test:all 81 archivos, 704 tests; lint solo el warning previo de useToday.ts:71; build OK) — `npm run test:all`, `npm run lint` y `npm run build` en verde. Comparar el
       número de tests con la línea base de T001.
-- [ ] T048 C VERIFY — Auditoría contra la spec (`/speckit-converge`). Cada FR-F01..FR-F27 tiene
+- [x] T048 C VERIFY (2026-10-02: /speckit-converge → 3 tareas parciales en la Fase 9, ninguna crítica) — Auditoría contra la spec (`/speckit-converge`). Cada FR-F01..FR-F27 tiene
       código y test, y `tasks.md` queda marcado.
 - [ ] T049 C VERIFY — Servidor MCP local:
       - `npm run mcp:start:http`;
@@ -813,3 +813,27 @@ P4 (Sonnet): T027 → T030 → T031 → T032 → T033 → T042 → T043   (mapa 
 
 Cada checkpoint deja `npm run test:all` en verde y un commit `feat(004): …`. `main` recibe el PR
 al final.
+
+---
+
+## Phase 9: Convergence
+
+- [ ] T053 Hacer que el solapamiento de `logLateTanda` (`lib/execution/tandas.ts`, ~L565-588)
+      considere toda tanda cuyo tramo `[started_at, ended_at ?? now]` intersecte el tramo pedido,
+      no solo las de `local_date === hoy`, para que un cronómetro iniciado ayer, en curso o que
+      cruzó la medianoche, cuente como ocupado. Escribir antes, en
+      `__tests__/mcp/execution-tandas-registro-tardio.test.ts`, un test en rojo
+      `US-T2-AS5 · … cronómetro iniciado ayer` y verificar que `US-T2-AS1..AS9` siguen en
+      verde. Según FR-F14a / FR-T11 (partial).
+- [ ] T054 Reemplazar en `getCompliance` (`lib/execution/compliance.ts`, ~L213-230) el filtro
+      `tandasInRange` por `local_date`. Debe incluir toda sesión con algún tramo
+      (`sessionShares` + `cachedSplitByLocalDay`) en `[from, to]`. `por_materia.minutes` debe
+      sumar solo los minutos de los tramos dentro del rango. Escribir antes, en
+      `__tests__/mcp/execution-foco-sesiones.test.ts`, un test en rojo `US-F1-AS10 · …
+      cronómetro de domingo 23:00 a lunes 01:00 reparte 60 + 60 en por_materia de cada
+      semana`. Según FR-F14a (partial).
+- [ ] T055 Actualizar en `mcp-server/index.ts` la descripción de `get_compliance_report`, en el
+      descriptor de `TOOLS_LIST` y en el `mcpServer.tool`, para que mencione
+      `registros_tardios: { total, minutos }` y `correcciones: { total, minutos_recortados }`,
+      contadas por la semana de la corrección. Según contracts/mcp-tools.md §
+      get_compliance_report (partial).
