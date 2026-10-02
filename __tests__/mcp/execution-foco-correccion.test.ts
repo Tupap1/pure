@@ -409,7 +409,7 @@ describe('[004] US-F4 — Corregir un cronómetro olvidado', () => {
       return { a, b };
     }
 
-    it('get_compliance_report trae correcciones { total: 2, minutos_recortados: 440 } en la semana en que se corrigió y { 0, 0 } en una sin correcciones', async () => {
+    it('US-F4-AS8 · get_compliance_report trae correcciones { total: 2, minutos_recortados: 440 } en la semana en que se corrigió y { 0, 0 } en una sin correcciones', async () => {
       await setupProgram(3, 2);
       await seedTwoCorrections();
 
@@ -423,7 +423,7 @@ describe('[004] US-F4 — Corregir un cronómetro olvidado', () => {
       expect(elsewhere.correcciones).toEqual({ total: 0, minutos_recortados: 0 });
     });
 
-    it('el payload de vista previa del reporte semanal trae correcciones, y la línea de texto solo cuando hubo alguna', async () => {
+    it('US-F4-AS8 · el payload de vista previa del reporte semanal trae correcciones, y la línea de texto solo cuando hubo alguna', async () => {
       await setupProgram(3, 2);
       await seedTwoCorrections();
 
@@ -436,7 +436,7 @@ describe('[004] US-F4 — Corregir un cronómetro olvidado', () => {
       expect(week2.text).not.toContain('Correcciones');
     });
 
-    it('la corrección se cuenta por la semana en que se hizo, no por la del inicio de la sesión', async () => {
+    it('US-F4-AS8 · la corrección se cuenta por la semana en que se hizo, no por la del inicio de la sesión', async () => {
       await setupProgram(3, 2);
       // Domingo 20: 10:00-14:00 locales (240 min). Se corrige el lunes 21 a las 10:00 locales.
       const closed = await closedCronometro('2026-09-20T15:00:00.000Z', '2026-09-20T19:00:00.000Z');
@@ -450,7 +450,7 @@ describe('[004] US-F4 — Corregir un cronómetro olvidado', () => {
       expect(week2.correcciones).toEqual({ total: 1, minutos_recortados: 180 });
     });
 
-    it('el payload congelado trae correcciones hasta el corte; una corrección posterior no lo reescribe pero sí aparece en el reporte de cumplimiento', async () => {
+    it('US-F4-AS8 · el payload congelado trae correcciones hasta el corte; una corrección posterior no lo reescribe pero sí aparece en el reporte de cumplimiento', async () => {
       await setupProgram(3, 1);
       await handleManageWeeklyReport('set_partner', {
         name: 'Andrés',
@@ -480,7 +480,7 @@ describe('[004] US-F4 — Corregir un cronómetro olvidado', () => {
       expect(live.correcciones).toEqual({ total: 3, minutos_recortados: 620 });
     });
 
-    it('un payload congelado sin sesiones corregidas trae { total: 0, minutos_recortados: 0 } y ninguna línea de texto', async () => {
+    it('US-F4-AS8 · un payload congelado sin sesiones corregidas trae { total: 0, minutos_recortados: 0 } y ninguna línea de texto', async () => {
       await setupProgram(3, 1);
       vi.setSystemTime(new Date('2026-09-21T00:00:30.000Z'));
       const tick = await runExecutionTick(new Date(), { mailer: makeFakeMailer(), pusher: makeFakePusher() });

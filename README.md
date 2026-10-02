@@ -77,6 +77,12 @@ PURE OS está estructurado en 5 módulos core accesible desde la barra de navega
   - **Docentes**: Directorio de profesores vinculados a cada institución con correo institucional.
   - **Mantenimiento**: Botones para **Ingestar Matrícula Demo vía MCP** o **Resetear Base de Datos Local IndexedDB**.
 
+### Foco (pantalla Hoy del Módulo de Ejecución)
+- **Temporizador y cronómetro**: una sesión de foco es un temporizador de 10 a 180 minutos o un cronómetro sin duración planeada, que corre hasta que lo detienes (cierra con al menos 60 s). Un cronómetro que cruza la medianoche reparte sus minutos entre los días locales que abarca, y uno olvidado se corrige después con `manage_tandas:correct`, que solo acorta y conserva el original.
+- **Objetivos propios**: etiquetas como LeetCode, Inglés o Proyecto personal, con materia y meta semanal opcionales (`manage_objectives`). Una sesión de un objetivo sin materia suma minutos de foco, pero no cuenta para el mínimo diario.
+- **Mapa de calor**: minutos enfocados por día, por semana y por objetivo (`get_focus_summary`), con cinco niveles fijos.
+- **Frase del día**: una frase latina por día en una línea de texto plano, por rotación determinista sobre las frases activas. Se cargan solo por MCP (`manage_quotes`, con las 50 de `specs/004-foco-cronometro/frases.json`); sin frases activas, no se muestra nada.
+
 ---
 
 ## 🧮 Algoritmos de Eficiencia Académica
@@ -129,7 +135,7 @@ PURE OS incluye un servidor MCP (Model Context Protocol) nativo en Node 22 LTS b
 | `parse_and_ingest_syllabus` | `subject_id`, `raw_text` | Convierte el texto de un temario en un árbol jerárquico de unidades y temas. |
 | `find_cross_subject_synergies` | Ninguno | Escanea temarios entre carreras e identifica coincidencias conceptuales para reducir horas de estudio. |
 
-> 📌 **Documentación Completa del Servidor MCP**: Consulta la guía técnica extendida en [`mcp-server/README.md`](file:///c:/Proyectos/Pure/mcp-server/README.md).
+> 📌 **Documentación Completa del Servidor MCP**: Consulta la guía técnica extendida, con el catálogo completo de 34 herramientas, en [`mcp-server/README.md`](file:///c:/Proyectos/Pure/mcp-server/README.md).
 
 ---
 

@@ -496,7 +496,7 @@ describe('[004] US-F2 — Objetivos', () => {
       return { status: response.status, json: await response.json() };
     }
 
-    it('create, read, update y archive por POST /api/execution dan los mismos resultados y errores que el handler', async () => {
+    it('US-F2-AS11 · create, read, update y archive por POST /api/execution dan los mismos resultados y errores que el handler', async () => {
       const created = await post({
         tool: 'manage_objectives',
         action: 'create',
@@ -556,13 +556,13 @@ describe('[004] US-F2 — Objetivos', () => {
       expect(updateArchived.json.code).toBe('OBJETIVO_ARCHIVADO');
     });
 
-    it('una acción de manage_objectives fuera de la lista blanca se rechaza con 400 DATOS_INVALIDOS', async () => {
+    it('US-F2-AS11 · una acción de manage_objectives fuera de la lista blanca se rechaza con 400 DATOS_INVALIDOS', async () => {
       const res = await post({ tool: 'manage_objectives', action: 'delete', data: { id: 'objetivo-x' } });
       expect(res.status).toBe(400);
       expect(res.json.code).toBe('DATOS_INVALIDOS');
     });
 
-    it('manage_tandas:start desde la web acepta objective_id con las mismas reglas (activo liga, archivado se rechaza)', async () => {
+    it('US-F2-AS11 · manage_tandas:start desde la web acepta objective_id con las mismas reglas (activo liga, archivado se rechaza)', async () => {
       const objective = (await post({ tool: 'manage_objectives', action: 'create', data: { name: 'Inglés' } })).json.data;
 
       const started = await post({ tool: 'manage_tandas', action: 'start', data: { kind: 'cronometro', objective_id: objective.id } });

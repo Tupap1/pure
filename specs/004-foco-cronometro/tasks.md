@@ -660,7 +660,7 @@ misma frase el mismo día.
 
 ### Tests (RED)
 
-- [ ] T039 [P] [US-F5] P3 TEST — Crear `__tests__/mcp/execution-foco-frases.test.ts`:
+- [x] T039 [P] [US-F5] P3 TEST — Crear `__tests__/mcp/execution-foco-frases.test.ts`:
       - `US-F5-AS1`: `create_many` con el contenido real de `specs/004-foco-cronometro/frases.json`
         (leído con `fs`) → `{ creadas: 50, omitidas: 0 }`; repetirlo → `{ 0, 50 }`; una variante
         con mayúsculas o espacios distintos se omite; `create` individual de una frase ya
@@ -674,7 +674,7 @@ misma frase el mismo día.
 
 ### Implementation (GREEN)
 
-- [ ] T040 [US-F5] P3 IMPL — Crear `lib/execution/quotes.ts`:
+- [x] T040 [US-F5] P3 IMPL — Crear `lib/execution/quotes.ts`:
       - id `frase-` + 16 hex de `sha256(lower(trim(text)))` con `crypto` (R4);
       - `createQuote` idempotente;
       - `createManyQuotes`: valida todo con Zod, lee los ids existentes, calcula en TypeScript
@@ -685,7 +685,7 @@ misma frase el mismo día.
       `lib/execution/handlers.ts`: `handleManageQuotes`, que no va a `ALLOWED_ACTIONS`. Registrar
       `manage_quotes` en los **4 sitios** de `mcp-server/`. `all-tools.test.ts` pasa a 34.
       `instructions.md`: catálogo y cómo cargar `frases.json`.
-- [ ] T041 [US-F5] P2 IMPL — `lib/execution/today.ts`: `frase_del_dia = quoteOfDay(dateKey,
+- [x] T041 [US-F5] P2 IMPL — `lib/execution/today.ts`: `frase_del_dia = quoteOfDay(dateKey,
       frasesActivas)`, con `fetchQuotesFromDb` y la forma `{ text, translation, source } | null`.
       Se hace en serie después de T040. T039 en verde. P3, en serie: actualizar la descripción
       de `get_today` en `mcp-server/index.ts` (descriptor y `mcpServer.tool`) con
@@ -713,7 +713,7 @@ misma frase el mismo día.
 
 ## Phase 8: Polish & cierre
 
-- [ ] T044 [P] P3 IMPL — `mcp-server/README.md` y `mcp-server/instructions.md`: catálogo final
+- [x] T044 [P] P3 IMPL — `mcp-server/README.md` y `mcp-server/instructions.md`: catálogo final
       (34 herramientas), con `correct` y `log_late` como las dos excepciones acotadas al
       Principio III.
 
@@ -721,10 +721,10 @@ misma frase el mismo día.
 
       `CLAUDE.md`: en "Execution Module", agregar `objetivos` y `frases` a la lista de tablas solo
       de Postgres.
-- [ ] T045 P2 VERIFY — Recorrer con `grep` que no quede ningún cálculo de unidades fuera de
+- [x] T045 P2 VERIFY — Recorrer con `grep` que no quede ningún cálculo de unidades fuera de
       `lib/domain/focus.ts`: en `lib/` no debe haber más llamadas a `tandaUnits(` que la de
       `sessionUnits`. Que `TANDA_MINUTES_MAX` ya no se use en `logLateTanda`.
-- [ ] T046 C TEST — `__tests__/build/spec-traceability.test.ts`:
+- [x] T046 C TEST — `__tests__/build/spec-traceability.test.ts`:
       - agregar la entrada `{ feature: '004', spec: specs/004-foco-cronometro/spec.md, idRe:
         /US-F\d+-AS\d+/, manualExclusions: new Set(['US-F3-AS10']), expectedCount: 48 }`;
       - agregar su `describe('[004] …')`, igual que el de la 003.
