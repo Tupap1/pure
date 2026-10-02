@@ -15,6 +15,7 @@ import {
   objectiveSelectorOptions,
   startTargetFromSelection,
   OBJECTIVE_NONE_VALUE,
+  quoteLineView,
 } from '../../lib/execution/today-view';
 
 describe('[001] US1 — Tanda de 10 minutos en un toque', () => {
@@ -362,5 +363,68 @@ describe('[004] US-F2 — Selector de objetivo en Hoy', () => {
     expect(startTargetFromSelection(OBJECTIVE_NONE_VALUE, options)).toEqual({});
     // Un valor que ya no está en la lista (p. ej. el objetivo se archivó mientras tanto) se trata como "Sin objetivo".
     expect(startTargetFromSelection('objetivo:desaparecido', options)).toEqual({});
+  });
+});
+
+describe('[004] US-F5 — Frase del día en Hoy', () => {
+  it('US-F5-AS7 · una frase con traducción y fuente muestra el latín y debajo "traducción · fuente"', () => {
+    // Frase real de specs/004-foco-cronometro/frases.json.
+    const frase = {
+      text: 'Fortes fortuna adiuvat',
+      translation: 'La suerte sonríe a los valientes.',
+      source: 'Terencio, Formión',
+    };
+    expect(quoteLineView(frase)).toEqual({
+      latin: 'Fortes fortuna adiuvat',
+      detail: 'La suerte sonríe a los valientes. · Terencio, Formión',
+    });
+  });
+
+  it('US-F5-AS7 · sin traducción muestra el latín y la fuente; sin fuente, el latín y la traducción', () => {
+    expect(quoteLineView({ text: 'Carpe diem', translation: null, source: 'Horacio, Odas' })).toEqual({
+      latin: 'Carpe diem',
+      detail: 'Horacio, Odas',
+    });
+    expect(quoteLineView({ text: 'Carpe diem', translation: 'Aprovecha el día.', source: null })).toEqual({
+      latin: 'Carpe diem',
+      detail: 'Aprovecha el día.',
+    });
+  });
+
+  it('US-F5-AS7 · sin traducción ni fuente muestra solo el latín (detail es null); un texto en blanco cuenta como ausente', () => {
+    expect(quoteLineView({ text: 'Festina lente', translation: null, source: null })).toEqual({
+      latin: 'Festina lente',
+      detail: null,
+    });
+    // Cadenas vacías o solo espacios no dejan un separador suelto ni una línea vacía.
+    expect(quoteLineView({ text: 'Festina lente', translation: '   ', source: '' })).toEqual({
+      latin: 'Festina lente',
+      detail: null,
+    });
+    expect(quoteLineView({ text: 'Festina lente', translation: '', source: 'Atribuida a Augusto (Suetonio)' })).toEqual({
+      latin: 'Festina lente',
+      detail: 'Atribuida a Augusto (Suetonio)',
+    });
+  });
+
+  it('US-F5-AS4 · sin frase del día (null o undefined) no hay línea: la pantalla no muestra nada en su lugar', () => {
+    expect(quoteLineView(null)).toBeNull();
+    expect(quoteLineView(undefined)).toBeNull();
+    // Un texto vacío tampoco produce una línea (nunca un contenedor vacío).
+    expect(quoteLineView({ text: '   ', translation: 'Algo', source: 'Alguien' })).toBeNull();
+  });
+
+  it('US-F5-AS7 · recorta los espacios de cada parte y no muta la frase recibida', () => {
+    const frase = {
+      text: '  Quidquid agis, prudenter agas et respice finem ',
+      translation: ' Hagas lo que hagas, hazlo con prudencia y mira el final. ',
+      source: '  Gesta Romanorum ',
+    };
+    const copia = { ...frase };
+    expect(quoteLineView(frase)).toEqual({
+      latin: 'Quidquid agis, prudenter agas et respice finem',
+      detail: 'Hagas lo que hagas, hazlo con prudencia y mira el final. · Gesta Romanorum',
+    });
+    expect(frase).toEqual(copia);
   });
 });

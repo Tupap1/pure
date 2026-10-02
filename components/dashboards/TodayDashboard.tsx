@@ -9,7 +9,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { FocusDuration, FocusHeatmap } from '@/components/ui/FocusHeatmap';
 import { buildFocusStripView } from '@/lib/domain/focus-heatmap';
-import type { TodayRunningTanda } from '@/lib/execution/today';
+import type { TodayPayload, TodayRunningTanda } from '@/lib/execution/today';
+import type { QuoteOfDay } from '@/lib/domain/focus';
 import {
   buildTodayFooterView,
   describeFinishFailure,
@@ -19,6 +20,7 @@ import {
   objectiveSelectorOptions,
   OBJECTIVE_NONE_VALUE,
   parseFreeMinutes,
+  quoteLineView,
   startTargetFromSelection,
   tandaDurationOptions,
 } from '@/lib/execution/today-view';
@@ -49,7 +51,8 @@ const SESSION_MODES: { id: SessionMode; label: string }[] = [
  * (una acción, Empezar; cuenta hacia arriba). Con US-F2 un selector opcional de objetivo ("Sin
  * objetivo" por defecto) liga la sesión a un objetivo o a una materia. Empezar sigue siendo un
  * toque (FR-008). Con US-F3 (FR-F18) Hoy muestra, más abajo, el total de minutos enfocados de la
- * semana y el mapa de 12 semanas; sin metas, minutos que faltan ni rachas (research R10).
+ * semana y el mapa de 12 semanas; sin metas, minutos que faltan ni rachas (research R10). Con
+ * US-F5 (FR-F27), al final de la pantalla va la frase del día en texto plano, o nada si no hay.
  */
 export const TodayDashboard: React.FC = () => {
   const {
@@ -153,6 +156,9 @@ export const TodayDashboard: React.FC = () => {
   }
 
   const running = today.running_tanda;
+  // US-F5 (FR-F27): lectura tolerante de `frase_del_dia`. El backend (T041) todavía no la declara en
+  // `TodayPayload`; cuando lo haga, este cast sobra. Sin frase, `quote` es null y no se pinta nada.
+  const quote = quoteLineView((today as TodayPayload & { frase_del_dia?: QuoteOfDay | null }).frase_del_dia);
   const isCronometro = running?.kind === 'cronometro';
   // aria-live: el texto solo cambia una vez por minuto (un entero de minutos), nunca por segundo.
   const minutesLeft = running && secondsLeft != null ? Math.ceil(secondsLeft / 60) : null;
@@ -670,6 +676,18 @@ export const TodayDashboard: React.FC = () => {
             <p className="text-xs text-red-600 dark:text-red-400">No se pudo enviar</p>
           )}
         </Card>
+      )}
+
+      {/* Frase del día (US-F5-AS7, FR-F27, Constitución 1.1.0): texto plano dentro del flujo, al final
+          de Hoy para no interponerse entre el usuario y Empezar. Sin ícono, comillas, animación,
+          color de acento ni tarjeta propia. Sin frase (US-F5-AS4) no se renderiza nada. */}
+      {quote && (
+        <div className="px-4 pt-2 text-center space-y-1">
+          <p lang="la" className="text-sm italic text-slate-600 dark:text-slate-300">
+            {quote.latin}
+          </p>
+          {quote.detail && <p className="text-xs text-slate-500 dark:text-slate-400">{quote.detail}</p>}
+        </div>
       )}
 
       {showSundayPlanning && <SundayPlanning onClose={() => setShowSundayPlanning(false)} />}

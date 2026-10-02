@@ -1,8 +1,9 @@
-// Modelo de vista puro de Hoy (US1-AS8, US3-AS8, US-T1-AS10/AS11, US-F1-AS8/AS9, US-F2-AS9). Sin dependencias de React ni del DOM, para
+// Modelo de vista puro de Hoy (US1-AS8, US3-AS8, US-T1-AS10/AS11, US-F1-AS8/AS9, US-F2-AS9, US-F5-AS7). Sin dependencias de React ni del DOM, para
 // que sea testeable en el entorno 'node' de Vitest (Constitución, Principio IV); useToday.ts es
 // el único que lo llama desde un componente.
 
 import { TANDA_DURATION_OPTIONS, TANDA_MINUTES_DEFAULT, TANDA_MINUTES_MAX, TANDA_MINUTES_MIN } from './constants';
+import type { QuoteOfDay } from '../domain/focus';
 
 /**
  * Offset entre el reloj del servidor y el del cliente, capturado una vez por cada respuesta de
@@ -276,4 +277,34 @@ export function startTargetFromSelection(
   const option = options.find((o) => o.value === value);
   if (!option || option.id === null) return {};
   return option.kind === 'objetivo' ? { objective_id: option.id } : { subject_id: option.id };
+}
+
+/** Lo que `quoteLineView` necesita de la frase del día (`TodayPayload.frase_del_dia`). */
+export type QuoteLineInput = Pick<QuoteOfDay, 'text'> & Partial<Pick<QuoteOfDay, 'translation' | 'source'>>;
+
+/** La frase del día lista para pintar: el latín y, si hay, la línea de abajo. */
+export interface QuoteLineView {
+  latin: string;
+  /** "traducción · fuente"; solo la traducción o solo la fuente si falta la otra; null si faltan ambas. */
+  detail: string | null;
+}
+
+/**
+ * US-F5-AS7 (FR-F27): arma la línea de la frase del día en Hoy. El latín va solo y debajo, en
+ * `detail`, "traducción · fuente" (si falta una de las dos va la otra sin separador; si faltan
+ * ambas, `detail` es null). Cada parte se recorta y una parte en blanco cuenta como ausente. Sin
+ * frase —o con el texto en blanco— devuelve null (US-F5-AS4): Hoy no pinta nada, ni contenedor
+ * vacío. Es solo formato de texto: no añade comillas, iconos ni énfasis (Constitución 1.1.0).
+ */
+export function quoteLineView(frase: QuoteLineInput | null | undefined): QuoteLineView | null {
+  if (!frase) return null;
+  const latin = typeof frase.text === 'string' ? frase.text.trim() : '';
+  if (latin === '') return null;
+
+  const detail = [frase.translation, frase.source]
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter((part) => part !== '')
+    .join(' · ');
+
+  return { latin, detail: detail === '' ? null : detail };
 }
