@@ -4,7 +4,7 @@
 
 import { localParts } from './time';
 import { readProgram } from './program';
-import { currentTanda, readTandas, cachedSplitByLocalDay } from './tandas';
+import { currentTanda, readTandas, cachedSplitByLocalDay, loadObjectivesById } from './tandas';
 import { resolveTodayTrigger } from './routine';
 import { fetchHabitsFromDb, fetchDailyChecksFromDb, HabitRecord, DailyCheckRecord } from '../db/execution-pg';
 import { isHabitActive, evaluateDay, describeDay, CurrentTrigger, DayBreakdown } from '../domain/execution';
@@ -85,10 +85,11 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
   //
   // 004 (FR-F04, FR-F13, FR-F14a): completadas y unidades salen de tallyDay, la única regla de
   // unidades del sistema; con él un cronómetro que cruza la medianoche solo aporta a hoy los
-  // minutos del tramo de hoy. El mapa de objetivos va vacío por ahora (T021 lo conecta).
+  // minutos del tramo de hoy. Con el mapa real de objetivos (FR-F13, I1), una sesión de un objetivo
+  // sin materia no cuenta en `tandas_today` ni en las unidades del mínimo.
   const readRes = await readTandas({ from: dateKey, to: dateKey }, now);
   const todayTandas = readRes.status === 'success' ? readRes.data!.tandas : [];
-  const tally = tallyDay(dateKey, todayTandas, new Map(), cachedSplitByLocalDay());
+  const tally = tallyDay(dateKey, todayTandas, await loadObjectivesById(), cachedSplitByLocalDay());
   const completedToday = tally.completadas;
   // FR-T05: unidades de hoy, ahora según el tipo de sesión (FR-F04).
   const completedUnitsToday = tally.unidades;

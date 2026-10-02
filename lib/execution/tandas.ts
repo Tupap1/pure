@@ -25,7 +25,7 @@ import {
   LATE_LOG_MAX_MINUTES,
 } from './constants';
 import { sessionShares, tallyDay, type SplitByLocalDay } from '../domain/focus';
-import type { ExecutionResult } from '../validations/schemas';
+import type { ExecutionResult, ExecutionErrorResult } from '../validations/schemas';
 import {
   fetchTandasFromDb,
   saveTandaToDb,
@@ -33,6 +33,8 @@ import {
   fetchRoutineSlotsFromDb,
   saveSlotOutcomeToDb,
   RoutineSlotRecord,
+  fetchObjectivesFromDb,
+  ObjectiveRecord,
 } from '../db/execution-pg';
 
 /** true si `error` es la violación de la restricción UNIQUE de `running_lock` (pg y pg-mem
@@ -52,6 +54,43 @@ async function findRunningTanda(): Promise<TandaRecord | null> {
 async function findTandaById(id: string): Promise<TandaRecord | null> {
   const raw = await fetchTandasFromDb(id);
   return (Array.isArray(raw) ? raw[0] : raw) as TandaRecord | null;
+}
+
+async function findObjectiveById(id: string): Promise<ObjectiveRecord | null> {
+  const raw = await fetchObjectivesFromDb(id);
+  return ((Array.isArray(raw) ? raw[0] : raw) ?? null) as ObjectiveRecord | null;
+}
+
+/**
+ * Todos los objetivos por id, para `tallyDay` (FR-F13: decide con `objetivo.subject_id` si una
+ * sesión cuenta para el mínimo). Incluye los archivados, porque sus sesiones viejas siguen contando
+ * igual que antes de archivarlos. Una sola lectura por llamada de lectura (readTandas, getToday,
+ * getCompliance): son pocas filas y se reutiliza el mapa para todos los días evaluados.
+ */
+export async function loadObjectivesById(): Promise<Map<string, ObjectiveRecord>> {
+  const raw = await fetchObjectivesFromDb();
+  const list = (Array.isArray(raw) ? raw : []) as ObjectiveRecord[];
+  return new Map(list.map((objective) => [objective.id, objective]));
+}
+
+/** NO_ENCONTRADO si el objetivo no existe; con `rejectArchived`, OBJETIVO_ARCHIVADO si está archivado.
+ * `null` si es válido (US-F2-AS3). */
+async function checkObjective(
+  objectiveId: string,
+  opts: { rejectArchived: boolean }
+): Promise<ExecutionErrorResult | null> {
+  const objective = await findObjectiveById(objectiveId);
+  if (!objective) {
+    return { status: 'error', code: 'NO_ENCONTRADO', message: `No existe el objetivo ${objectiveId}.` };
+  }
+  if (opts.rejectArchived && objective.archived) {
+    return {
+      status: 'error',
+      code: 'OBJETIVO_ARCHIVADO',
+      message: `El objetivo ${objective.name} está archivado: elige uno activo para empezar la sesión.`,
+    };
+  }
+  return null;
 }
 
 /** Instante previsto de fin (ms), o null en un cronómetro, que no tiene fin previsto (FR-F01). */
@@ -111,8 +150,7 @@ export interface TandaStartInput {
   routine_slot_id?: string;
   /** 004: 'temporizador' por defecto; 'cronometro' no tiene duración planeada. */
   kind?: 'temporizador' | 'cronometro';
-  /** 004, T021: lo valida (existe, no está archivado) y lo guarda startTanda en la historia US-F2.
-   * Hasta entonces el esquema lo acepta pero este servicio todavía no lo persiste. */
+  /** 004 (US-F2-AS3): objetivo al que se liga la sesión; debe existir y no estar archivado. */
   objective_id?: string;
   planned_minutes?: number;
 }
@@ -131,6 +169,12 @@ export async function startTanda(
   now: Date = new Date()
 ): Promise<ExecutionResult<{ tanda: TandaRecord; ends_at: string | null }>> {
   await finalizeElapsed(now);
+
+  // US-F2-AS3: el objetivo se valida antes de tocar nada, para que un rechazo no cree filas.
+  if (input.objective_id) {
+    const rejected = await checkObjective(input.objective_id, { rejectArchived: true });
+    if (rejected) return rejected;
+  }
 
   let subjectId = input.subject_id;
   if (input.routine_slot_id && !subjectId) {
@@ -152,6 +196,7 @@ export async function startTanda(
       deliverable_id: input.deliverable_id,
       task_id: input.task_id,
       routine_slot_id: input.routine_slot_id,
+      objective_id: input.objective_id,
       local_date: local.dateKey,
       started_at: now.toISOString(),
       kind,
@@ -314,6 +359,8 @@ export interface TandaReadInput {
   from?: string;
   to?: string;
   subject_id?: string;
+  /** 004 (US-F2): solo las sesiones ligadas a este objetivo. */
+  objective_id?: string;
 }
 
 export interface TandaDayResumen {
@@ -331,7 +378,9 @@ export interface TandaDayResumen {
  * empezó antes de `from` y cuyo tramo cae dentro entra aunque su `local_date` sea anterior. El
  * agregado de cada día sale de `tallyDay` (la única regla de unidades y de minutos por día): sus
  * `unidades` y `completadas` solo cuentan lo que cumple el mínimo y `minutos` es el foco total del
- * día (completadas + interrumpidas). Todavía sin objetivos (mapa vacío): conectarlos es T021. */
+ * día (completadas + interrumpidas). Los objetivos se leen una vez por llamada (FR-F13): una sesión
+ * de un objetivo sin materia suma minutos pero no unidades. `objective_id` filtra por objetivo y,
+ * como `subject_id`, el agregado por día se calcula solo con las tandas filtradas. */
 export async function readTandas(
   input: TandaReadInput = {},
   now: Date = new Date()
@@ -341,6 +390,7 @@ export async function readTandas(
   const allRaw = await fetchTandasFromDb();
   const all = (Array.isArray(allRaw) ? allRaw : []) as TandaRecord[];
 
+  const objetivosById = await loadObjectivesById();
   const split = cachedSplitByLocalDay();
   const inRange = (date: string) => !((input.from && date < input.from) || (input.to && date > input.to));
 
@@ -348,6 +398,7 @@ export async function readTandas(
   const daysWithSessions = new Set<string>();
   for (const t of all) {
     if (input.subject_id && t.subject_id !== input.subject_id) continue;
+    if (input.objective_id && t.objective_id !== input.objective_id) continue;
     const datesInRange = sessionShares(t, split)
       .map((share) => share.date)
       .filter(inRange);
@@ -359,7 +410,7 @@ export async function readTandas(
   const por_dia: TandaDayResumen[] = Array.from(daysWithSessions)
     .sort((a, b) => a.localeCompare(b))
     .map((date) => {
-      const tally = tallyDay(date, filtered, new Map(), split);
+      const tally = tallyDay(date, filtered, objetivosById, split);
       return {
         date,
         completadas: tally.completadas,
@@ -378,6 +429,9 @@ export interface TandaUpdateInput {
   topic_id?: string;
   deliverable_id?: string;
   task_id?: string;
+  /** 004 (US-F2-AS10): debe existir, pero puede estar archivado (reclasificar una sesión vieja
+   * hacia un objetivo archivado es legítimo). */
+  objective_id?: string;
   mode?: string;
   interrupt_reason?: string;
 }
@@ -403,11 +457,17 @@ export async function updateTanda(
     };
   }
 
+  if (input.objective_id) {
+    const rejected = await checkObjective(input.objective_id, { rejectArchived: false });
+    if (rejected) return rejected;
+  }
+
   const editedAfterLock = existing.edited_after_lock || now.getTime() > new Date(existing.locked_at).getTime();
 
   const updated = await saveTandaToDb({
     ...existing,
     subject_id: input.subject_id ?? existing.subject_id,
+    objective_id: input.objective_id ?? existing.objective_id,
     topic_id: input.topic_id ?? existing.topic_id,
     deliverable_id: input.deliverable_id ?? existing.deliverable_id,
     task_id: input.task_id ?? existing.task_id,

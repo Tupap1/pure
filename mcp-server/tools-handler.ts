@@ -12,6 +12,7 @@ import {
   handleManageTasks,
   handlePlanWeek,
   handleManageFriction,
+  handleManageObjectives,
 } from '../lib/execution/handlers';
 
 // Módulo de Ejecución: los handlers viven en lib/execution/handlers.ts (Principio I, una sola
@@ -29,6 +30,7 @@ export {
   handleManageTasks,
   handlePlanWeek,
   handleManageFriction,
+  handleManageObjectives,
 };
 import {
   fetchAcademicOverviewFromDb,

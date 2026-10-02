@@ -393,7 +393,7 @@ sesión en cada uno; solo la segunda cumple el mínimo.
 
 ### Tests (RED)
 
-- [ ] T020 [P] [US-F2] P3 TEST — Crear `__tests__/mcp/execution-foco-objetivos.test.ts`:
+- [x] T020 [P] [US-F2] P3 TEST — Crear `__tests__/mcp/execution-foco-objetivos.test.ts`:
       - `US-F2-AS1`: `create` + `read`;
       - `US-F2-AS2`: `" leetcode "` duplicado → `OBJETIVO_DUPLICADO`; materia inexistente →
         `NO_ENCONTRADO`; meta 0, -5 y 10081 → `DATOS_INVALIDOS`; ninguna fila nueva;
@@ -422,7 +422,7 @@ sesión en cada uno; solo la segunda cumple el mínimo.
 
 ### Implementation (GREEN)
 
-- [ ] T021 [US-F2] P2 IMPL — `lib/execution/tandas.ts`:
+- [x] T021 [US-F2] P2 IMPL — `lib/execution/tandas.ts`:
       - `startTanda` valida `objective_id`: inexistente → `NO_ENCONTRADO`; `archived` →
         `OBJETIVO_ARCHIVADO`; se valida antes del INSERT;
       - `updateTanda` acepta `objective_id` (debe existir; puede estar archivado);
@@ -431,7 +431,7 @@ sesión en cada uno; solo la segunda cumple el mínimo.
         llamada y pasan el mapa real a `tallyDay`.
 
       US-F2-AS3, AS4, AS5 y AS10 en verde.
-- [ ] T022 [US-F2] P3 IMPL — Crear `lib/execution/objectives.ts`:
+- [x] T022 [US-F2] P3 IMPL — Crear `lib/execution/objectives.ts`:
       - `createObjective`, `readObjectives`, `updateObjective` y `archiveObjective`;
       - id `objetivo-<uuid>`;
       - `active_name_key = lower(trim(name))`, con comprobación previa en TypeScript y, ante
@@ -442,7 +442,7 @@ sesión en cada uno; solo la segunda cumple el mínimo.
 
       `lib/execution/handlers.ts`: `handleManageObjectives(action, data, now)` con try/catch,
       igual que los demás.
-- [ ] T023 [US-F2] P3 IMPL — Exponer la herramienta:
+- [x] T023 [US-F2] P3 IMPL — Exponer la herramienta:
       - `app/api/execution/route.ts`: `manage_objectives: ['create','read','update','archive']`
         en `ALLOWED_ACTIONS` y su `case` en `dispatch`;
       - registrar `manage_objectives` en los **4 sitios** de `mcp-server/`;
@@ -453,11 +453,11 @@ sesión en cada uno; solo la segunda cumple el mínimo.
 
 ### UI (P4)
 
-- [ ] T024 [P] [US-F2] P4 TEST — En `__tests__/domain/today-view.test.ts`, agregar `US-F2-AS9`:
+- [x] T024 [P] [US-F2] P4 TEST — En `__tests__/domain/today-view.test.ts`, agregar `US-F2-AS9`:
       `objectiveSelectorOptions(objetivos, materias)` → "Sin objetivo" (valor por defecto),
       luego los activos en orden alfabético (con `localeCompare` 'es'), luego las materias; los
       archivados no aparecen.
-- [ ] T025 [US-F2] P4 IMPL — Implementar `objectiveSelectorOptions` en `lib/execution/today-view.ts`.
+- [x] T025 [US-F2] P4 IMPL — Implementar `objectiveSelectorOptions` en `lib/execution/today-view.ts`.
       Crear `lib/hooks/useObjectives.ts` (read/create/update/archive contra `/api/execution`).
 
       En `TodayDashboard.tsx`:

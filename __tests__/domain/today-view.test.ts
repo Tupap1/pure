@@ -12,6 +12,9 @@ import {
   elapsedSeconds,
   formatElapsed,
   describeFinishFailure,
+  objectiveSelectorOptions,
+  startTargetFromSelection,
+  OBJECTIVE_NONE_VALUE,
 } from '../../lib/execution/today-view';
 
 describe('[001] US1 — Tanda de 10 minutos en un toque', () => {
@@ -265,5 +268,99 @@ describe('[004] US-F1 — Temporizador y cronómetro en Hoy', () => {
     expect(describeFinishFailure({ status: 'error', code: 'SIN_CONEXION', message: 'Sin conexión con Pure.' })).toBe(offline);
     expect(describeFinishFailure(null)).toBe(offline);
     expect(describeFinishFailure({ status: 'error', code: 'ERROR_DESCONOCIDO' })).toBe(offline);
+  });
+});
+
+describe('[004] US-F2 — Selector de objetivo en Hoy', () => {
+  const objetivos = [
+    { id: 'obj-z', name: 'Zoología de campo', subject_id: null, weekly_target_minutes: null, archived: false },
+    { id: 'obj-old', name: 'Álgebra vieja', subject_id: 'sub-1', weekly_target_minutes: 120, archived: true },
+    { id: 'obj-ingles', name: 'inglés técnico', subject_id: null, weekly_target_minutes: 90, archived: false },
+    { id: 'obj-calculo', name: 'Cálculo', subject_id: 'sub-2', weekly_target_minutes: null, archived: false },
+    { id: 'obj-nube', name: 'Ñandú y nubes', subject_id: null, weekly_target_minutes: null, archived: false },
+  ];
+  const materias = [
+    { id: 'sub-2', name: 'Física II' },
+    { id: 'sub-1', name: 'Álgebra lineal' },
+    { id: 'sub-3', name: 'Programación' },
+  ];
+
+  it('US-F2-AS9 · lista "Sin objetivo" primero (valor por defecto), luego los objetivos activos en orden alfabético y luego las materias', () => {
+    const options = objectiveSelectorOptions(objetivos, materias);
+
+    // Primero "Sin objetivo": es el valor por defecto, no apunta a ningún id.
+    expect(options[0]).toEqual({ value: OBJECTIVE_NONE_VALUE, label: 'Sin objetivo', kind: 'none', id: null });
+
+    // Luego los objetivos activos, alfabéticos en español sin distinguir mayúsculas ni tildes
+    // ("Cálculo" < "inglés técnico" < "Ñandú y nubes" < "Zoología de campo").
+    const objectiveLabels = options.filter((o) => o.kind === 'objetivo').map((o) => o.label);
+    expect(objectiveLabels).toEqual(['Cálculo', 'inglés técnico', 'Ñandú y nubes', 'Zoología de campo']);
+
+    // Después las materias, también alfabéticas.
+    const subjectLabels = options.filter((o) => o.kind === 'materia').map((o) => o.label);
+    expect(subjectLabels).toEqual(['Álgebra lineal', 'Física II', 'Programación']);
+
+    // El orden global es: none, todos los objetivos, todas las materias.
+    expect(options.map((o) => o.kind)).toEqual([
+      'none',
+      'objetivo', 'objetivo', 'objetivo', 'objetivo',
+      'materia', 'materia', 'materia',
+    ]);
+  });
+
+  it('US-F2-AS9 · los objetivos archivados no aparecen en el selector', () => {
+    const options = objectiveSelectorOptions(objetivos, materias);
+    expect(options.some((o) => o.id === 'obj-old')).toBe(false);
+    expect(options.some((o) => o.label === 'Álgebra vieja')).toBe(false);
+
+    // Aunque todos estén archivados, solo quedan "Sin objetivo" y las materias.
+    const allArchived = objetivos.map((o) => ({ ...o, archived: true }));
+    const onlySubjects = objectiveSelectorOptions(allArchived, materias);
+    expect(onlySubjects.map((o) => o.kind)).toEqual(['none', 'materia', 'materia', 'materia']);
+  });
+
+  it('US-F2-AS9 · sin objetivos ni materias solo existe "Sin objetivo"; sin objetivos (p. ej. sin conexión) siguen las materias', () => {
+    expect(objectiveSelectorOptions([], [])).toEqual([
+      { value: OBJECTIVE_NONE_VALUE, label: 'Sin objetivo', kind: 'none', id: null },
+    ]);
+
+    const soloMaterias = objectiveSelectorOptions([], materias);
+    expect(soloMaterias.map((o) => o.label)).toEqual(['Sin objetivo', 'Álgebra lineal', 'Física II', 'Programación']);
+  });
+
+  it('US-F2-AS9 · una materia sin id no se ofrece (no habría a qué ligar la sesión) y las entradas no se mutan', () => {
+    const entradaMaterias = [{ name: 'Sin id' }, { id: 'sub-9', name: 'Con id' }];
+    const options = objectiveSelectorOptions([], entradaMaterias);
+    expect(options.map((o) => o.label)).toEqual(['Sin objetivo', 'Con id']);
+
+    const copiaObjetivos = objetivos.map((o) => ({ ...o }));
+    const copiaMaterias = materias.map((m) => ({ ...m }));
+    objectiveSelectorOptions(copiaObjetivos, copiaMaterias);
+    expect(copiaObjetivos).toEqual(objetivos);
+    expect(copiaMaterias).toEqual(materias);
+  });
+
+  it('US-F2-AS9 · un objetivo y una materia con el mismo id tienen valores distintos, para que el selector sepa a cuál se refiere', () => {
+    const options = objectiveSelectorOptions(
+      [{ id: 'x1', name: 'Cálculo', subject_id: null, weekly_target_minutes: null, archived: false }],
+      [{ id: 'x1', name: 'Cálculo' }]
+    );
+    const values = options.map((o) => o.value);
+    expect(new Set(values).size).toBe(values.length);
+  });
+
+  it('US-F2-AS9 · el valor elegido viaja como objective_id, como subject_id o no viaja (Sin objetivo)', () => {
+    const options = objectiveSelectorOptions(objetivos, materias);
+    const objetivo = options.find((o) => o.kind === 'objetivo' && o.id === 'obj-calculo');
+    const materia = options.find((o) => o.kind === 'materia' && o.id === 'sub-3');
+    expect(objetivo).toBeDefined();
+    expect(materia).toBeDefined();
+
+    expect(startTargetFromSelection(objetivo!.value, options)).toEqual({ objective_id: 'obj-calculo' });
+    expect(startTargetFromSelection(materia!.value, options)).toEqual({ subject_id: 'sub-3' });
+    // Empezar sigue siendo un toque: por defecto no se manda ni objetivo ni materia.
+    expect(startTargetFromSelection(OBJECTIVE_NONE_VALUE, options)).toEqual({});
+    // Un valor que ya no está en la lista (p. ej. el objetivo se archivó mientras tanto) se trata como "Sin objetivo".
+    expect(startTargetFromSelection('objetivo:desaparecido', options)).toEqual({});
   });
 });

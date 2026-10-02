@@ -25,8 +25,8 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite (con pg-mem
     await harness.reset();
   });
 
-  it('should have registered all 31 MCP tools in TOOLS_LIST', () => {
-    expect(TOOLS_LIST.length).toBe(31);
+  it('should have registered all 32 MCP tools in TOOLS_LIST', () => {
+    expect(TOOLS_LIST.length).toBe(32);
     const toolNames = TOOLS_LIST.map((t) => t.name);
     expect(toolNames).toContain('get_academic_overview');
     expect(toolNames).toContain('ingest_academic_enrollment');
@@ -41,6 +41,7 @@ describe('Exhaustive MCP Server Endpoints & Tools Verification Suite (con pg-mem
     expect(toolNames).toContain('manage_syllabus_topics');
     expect(toolNames).toContain('get_class_context');
     expect(toolNames).toContain('manage_friction');
+    expect(toolNames).toContain('manage_objectives');
   });
 
   describe('1. get_academic_overview', () => {

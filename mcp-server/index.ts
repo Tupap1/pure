@@ -41,6 +41,7 @@ import {
   handleManageTasks,
   handlePlanWeek,
   handleManageFriction,
+  handleManageObjectives,
 } from './tools-handler';
 import { runExecutionTick } from '../lib/execution/tick';
 import { createZeptoMailer } from '../lib/execution/mailer';
@@ -492,6 +493,29 @@ export const TOOLS_LIST = [
       required: ['action'],
     },
   },
+  {
+    name: 'manage_objectives',
+    description:
+      'Módulo de Ejecución: objetivos propios (LeetCode, Inglés, Proyecto personal) a los que se ligan las sesiones de foco (manage_tandas con objective_id). Un objetivo tiene nombre (1-60 caracteres, único entre los activos sin distinguir mayúsculas ni espacios en los extremos), materia opcional y meta semanal opcional en minutos (entero de 1 a 10080). ' +
+      'Una sesión de un objetivo SIN materia suma minutos de foco pero no cuenta para el mínimo diario (salvo que la sesión tenga materia, tema, tarea o entrega propios); un objetivo con materia sí cuenta. ' +
+      '"create" falla con OBJETIVO_DUPLICADO si el nombre ya está en uso por un objetivo activo y con NO_ENCONTRADO si la materia no existe. "read" lista los activos ordenados por nombre (include_archived los incluye). ' +
+      '"update" aplica las mismas validaciones que create y rechaza uno archivado con OBJETIVO_ARCHIVADO. "archive" es idempotente: no se borran, se archivan; sus sesiones viejas siguen sumando y ya no se puede empezar una sesión con él.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'read', 'update', 'archive'] },
+        data: {
+          type: 'object',
+          description:
+            'create: { name (1-60), subject_id?, weekly_target_minutes? (entero 1-10080) }. ' +
+            'read: { include_archived? (false por defecto) } -> { objetivos[] } ordenados por nombre. ' +
+            'update: { id, name?, subject_id? (string | null para quitarla), weekly_target_minutes? (entero 1-10080 | null para quitarla) }. ' +
+            'archive: { id }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -827,6 +851,19 @@ export function createMcpServerInstance() {
     },
     async ({ action, data }) => {
       const res = await handleManageFriction(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_objectives',
+    'Módulo de Ejecución: objetivos propios (LeetCode, Inglés...) a los que se ligan las sesiones de foco (US-F2). create/read/update/archive. Nombre único entre activos (OBJETIVO_DUPLICADO), materia y meta semanal opcionales; no se borran, se archivan (archive es idempotente; un archivado no se edita ni admite sesiones nuevas: OBJETIVO_ARCHIVADO). Una sesión de un objetivo sin materia suma minutos de foco pero no cuenta para el mínimo diario.',
+    {
+      action: z.enum(['create', 'read', 'update', 'archive']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageObjectives(action, data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );

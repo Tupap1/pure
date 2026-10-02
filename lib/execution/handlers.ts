@@ -41,11 +41,16 @@ import {
   PlanWeekOpenViewSchema,
   FrictionMeasureSchema,
   FrictionRateSchema,
+  ObjectiveCreateSchema,
+  ObjectiveReadSchema,
+  ObjectiveUpdateSchema,
+  ObjectiveArchiveSchema,
   zodErrorToExecutionResult,
   type ExecutionResult,
 } from '../validations/schemas';
 import { initProgram, readProgram, updateProgramWeek, upsertHabit, retireHabit } from './program';
 import { startTanda, finishTanda, interruptTanda, currentTanda, readTandas, updateTanda, logLateTanda } from './tandas';
+import { createObjective, readObjectives, updateObjective, archiveObjective } from './objectives';
 import { getToday } from './today';
 import {
   upsertRoutineSlot,
@@ -778,6 +783,58 @@ export async function handleManageFriction(
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: 'Error inesperado en manage_friction',
+    };
+  }
+}
+
+export type ManageObjectivesAction = 'create' | 'read' | 'update' | 'archive';
+
+/**
+ * `manage_objectives` (US-F2): objetivos propios con materia y meta semanal opcionales, a los que
+ * se ligan las sesiones de foco. Acciones: create, read, update, archive (no se borran). Es el
+ * único handler: lo llaman el MCP y, con la lista blanca de app/api/execution/route.ts, la web
+ * (FR-F11, US-F2-AS11). `read` no lleva `data` obligatoria.
+ */
+export async function handleManageObjectives(
+  action: ManageObjectivesAction,
+  data?: unknown,
+  now: Date = new Date()
+): Promise<ExecutionResult> {
+  try {
+    switch (action) {
+      case 'create': {
+        const parsed = ObjectiveCreateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await createObjective(parsed.data);
+      }
+      case 'read': {
+        const parsed = ObjectiveReadSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await readObjectives(parsed.data);
+      }
+      case 'update': {
+        const parsed = ObjectiveUpdateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await updateObjective(parsed.data);
+      }
+      case 'archive': {
+        const parsed = ObjectiveArchiveSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await archiveObjective(parsed.data, now);
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para manage_objectives: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_objectives:', error);
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: 'Error inesperado en manage_objectives',
     };
   }
 }

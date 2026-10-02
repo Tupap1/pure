@@ -1,4 +1,4 @@
-// Modelo de vista puro de Hoy (US1-AS8, US3-AS8, US-T1-AS10/AS11, US-F1-AS8/AS9). Sin dependencias de React ni del DOM, para
+// Modelo de vista puro de Hoy (US1-AS8, US3-AS8, US-T1-AS10/AS11, US-F1-AS8/AS9, US-F2-AS9). Sin dependencias de React ni del DOM, para
 // que sea testeable en el entorno 'node' de Vitest (Constitución, Principio IV); useToday.ts es
 // el único que lo llama desde un componente.
 
@@ -203,4 +203,77 @@ export function parseFreeMinutes(raw: string): FreeMinutesResult {
     return { ok: false, error: `Los minutos van de ${range}.` };
   }
   return { ok: true, minutes };
+}
+
+/** Valor del `<select>` de objetivo para "Sin objetivo" (la opción por defecto, FR-008). */
+export const OBJECTIVE_NONE_VALUE = 'none';
+
+/** Lo que `objectiveSelectorOptions` necesita de un objetivo de `manage_objectives read`. */
+export interface ObjectiveSelectorObjective {
+  id: string;
+  name: string;
+  archived?: boolean;
+  // El resto de la forma que devuelve `read`; el selector no lo usa, pero se acepta tal cual.
+  subject_id?: string | null;
+  weekly_target_minutes?: number | null;
+}
+
+/** Lo que necesita de una materia (las de Dexie traen `id` opcional). */
+export interface ObjectiveSelectorSubject {
+  id?: string;
+  name: string;
+}
+
+export interface ObjectiveSelectorOption {
+  /** Valor del `<option>`: `none`, `objetivo:<id>` o `materia:<id>` (el prefijo evita que un id de objetivo choque con el de una materia). */
+  value: string;
+  label: string;
+  /** Tipo de opción: define si la sesión viaja con `objective_id` (objetivo) o `subject_id` (materia). */
+  kind: 'none' | 'objetivo' | 'materia';
+  id: string | null;
+}
+
+const compareNames = (a: string, b: string): number => a.localeCompare(b, 'es', { sensitivity: 'base' });
+
+/**
+ * US-F2-AS9 (FR-008 de la 001): opciones del selector de objetivo de Hoy. Primero "Sin objetivo"
+ * (valor por defecto, para que empezar siga siendo un toque), luego los objetivos activos en orden
+ * alfabético en español (sin distinguir mayúsculas ni tildes) y luego las materias, también en
+ * orden alfabético. Los objetivos archivados no se ofrecen. Una materia sin `id` se omite: no
+ * habría a qué ligar la sesión. No muta sus entradas.
+ */
+export function objectiveSelectorOptions(
+  objetivos: readonly ObjectiveSelectorObjective[],
+  materias: readonly ObjectiveSelectorSubject[]
+): ObjectiveSelectorOption[] {
+  const objectiveOptions: ObjectiveSelectorOption[] = objetivos
+    .filter((o) => o.archived !== true)
+    .map((o) => ({ value: `objetivo:${o.id}`, label: o.name, kind: 'objetivo' as const, id: o.id }))
+    .sort((a, b) => compareNames(a.label, b.label));
+
+  const subjectOptions: ObjectiveSelectorOption[] = materias
+    .filter((m): m is ObjectiveSelectorSubject & { id: string } => !!m.id)
+    .map((m) => ({ value: `materia:${m.id}`, label: m.name, kind: 'materia' as const, id: m.id }))
+    .sort((a, b) => compareNames(a.label, b.label));
+
+  return [
+    { value: OBJECTIVE_NONE_VALUE, label: 'Sin objetivo', kind: 'none', id: null },
+    ...objectiveOptions,
+    ...subjectOptions,
+  ];
+}
+
+/**
+ * US-F2-AS9: traduce el valor elegido en el selector a los campos que `manage_tandas start`
+ * acepta: `objective_id` para un objetivo, `subject_id` para una materia, nada para "Sin objetivo".
+ * Un valor que ya no está entre las opciones (p. ej. el objetivo se archivó mientras estaba
+ * elegido) cuenta como "Sin objetivo": empezar nunca se bloquea por esto.
+ */
+export function startTargetFromSelection(
+  value: string,
+  options: readonly ObjectiveSelectorOption[]
+): { objective_id?: string; subject_id?: string } {
+  const option = options.find((o) => o.value === value);
+  if (!option || option.id === null) return {};
+  return option.kind === 'objetivo' ? { objective_id: option.id } : { subject_id: option.id };
 }

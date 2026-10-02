@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useToday, type StartTandaInput } from '@/lib/hooks/useToday';
 import { usePureData } from '@/lib/hooks/usePureData';
+import { useObjectives } from '@/lib/hooks/useObjectives';
 import { useWeeklyReport } from '@/lib/hooks/useWeeklyReport';
 import { usePushNotifications } from '@/lib/hooks/usePushNotifications';
 import { cn } from '@/lib/utils';
@@ -13,7 +14,10 @@ import {
   describeStartFailure,
   formatElapsed,
   formatLocalTime,
+  objectiveSelectorOptions,
+  OBJECTIVE_NONE_VALUE,
   parseFreeMinutes,
+  startTargetFromSelection,
   tandaDurationOptions,
 } from '@/lib/execution/today-view';
 import { TANDA_MINUTES_MAX, TANDA_MINUTES_MIN } from '@/lib/execution/constants';
@@ -40,7 +44,9 @@ const SESSION_MODES: { id: SessionMode; label: string }[] = [
  * toque (US1), el único disparador si-entonces vigente (US2) y los checks de hábitos del día con
  * el pie "N tandas hoy · Día cumplido" (US3). Desde la 004 (US-F1, FR-F05/FR-F09) la sesión puede
  * ser un temporizador (10, 25, 40, 60 o un campo libre de 10 a 180, cuenta atrás) o un cronómetro
- * (una acción, Empezar; cuenta hacia arriba). Empezar sigue siendo un toque (FR-008).
+ * (una acción, Empezar; cuenta hacia arriba). Con US-F2 un selector opcional de objetivo ("Sin
+ * objetivo" por defecto) liga la sesión a un objetivo o a una materia. Empezar sigue siendo un
+ * toque (FR-008).
  */
 export const TodayDashboard: React.FC = () => {
   const {
@@ -59,10 +65,12 @@ export const TodayDashboard: React.FC = () => {
     setCheck,
   } = useToday();
   const { subjects } = usePureData();
+  const { objectives, refresh: refreshObjectives } = useObjectives();
   const { report, setNote } = useWeeklyReport();
   const { state: pushState, subscribe: subscribeToPush } = usePushNotifications();
 
   const [mode, setMode] = useState<SessionMode>('temporizador');
+  const [objectiveValue, setObjectiveValue] = useState(OBJECTIVE_NONE_VALUE);
   const [freeMinutes, setFreeMinutes] = useState('');
   const [freeError, setFreeError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
@@ -94,6 +102,16 @@ export const TodayDashboard: React.FC = () => {
   useEffect(() => {
     setFinishError(null);
   }, [elapsedMinute]);
+
+  // US-F2-AS9: opciones del selector de objetivo. Sin conexión con la lista de objetivos (o sin
+  // ninguno) siguen "Sin objetivo" y las materias de Dexie: el selector nunca bloquea empezar.
+  const objectiveOptions = useMemo(() => objectiveSelectorOptions(objectives, subjects), [objectives, subjects]);
+  const selectedObjectiveValue = objectiveOptions.some((o) => o.value === objectiveValue)
+    ? objectiveValue
+    : OBJECTIVE_NONE_VALUE; // el elegido se archivó o desapareció: vuelve a "Sin objetivo"
+  const startTarget = startTargetFromSelection(selectedObjectiveValue, objectiveOptions);
+  const objectiveGroup = objectiveOptions.filter((o) => o.kind === 'objetivo');
+  const subjectGroup = objectiveOptions.filter((o) => o.kind === 'materia');
 
   if (isOffline) {
     return (
@@ -144,6 +162,9 @@ export const TodayDashboard: React.FC = () => {
       const result = await start(input);
       const error = describeStartFailure(result);
       setStartError(error);
+      // Si el servidor rechazó el inicio (p. ej. el objetivo elegido ya está archivado), se vuelve
+      // a leer la lista para que el selector no siga ofreciendo una opción que ya no vale.
+      if (error !== null) void refreshObjectives();
       return error === null;
     } finally {
       setIsStarting(false);
@@ -159,7 +180,7 @@ export const TodayDashboard: React.FC = () => {
       return;
     }
     setFreeError(null);
-    const started = await handleStart({ kind: 'temporizador', planned_minutes: parsed.minutes });
+    const started = await handleStart({ kind: 'temporizador', planned_minutes: parsed.minutes, ...startTarget });
     if (started) setFreeMinutes('');
   };
 
@@ -343,6 +364,47 @@ export const TodayDashboard: React.FC = () => {
               })}
             </div>
 
+            {/* Selector de objetivo (US-F2-AS9): opcional, "Sin objetivo" por defecto. Es un
+                <select> nativo con etiqueta visible; no bloquea ni añade un paso para empezar. */}
+            <div className="flex items-center justify-center gap-2 w-full">
+              <label htmlFor="today-objective" className="text-sm text-slate-600 dark:text-slate-300">
+                Objetivo
+              </label>
+              <select
+                id="today-objective"
+                value={selectedObjectiveValue}
+                onChange={(e) => setObjectiveValue(e.target.value)}
+                disabled={isStarting}
+                className="min-w-0 w-48 min-h-[44px] px-3 py-2 rounded-lg border border-surface-border bg-surface text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400"
+              >
+                <option value={OBJECTIVE_NONE_VALUE}>Sin objetivo</option>
+                {objectiveGroup.length > 0 && subjectGroup.length > 0 ? (
+                  <>
+                    <optgroup label="Objetivos">
+                      {objectiveGroup.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Materias">
+                      {subjectGroup.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </>
+                ) : (
+                  [...objectiveGroup, ...subjectGroup].map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
             {mode === 'temporizador' ? (
               <>
                 <p className="text-sm text-slate-600 dark:text-slate-300">Empezar tanda de</p>
@@ -350,7 +412,7 @@ export const TodayDashboard: React.FC = () => {
                   <Button
                     variant="primary"
                     size="lg"
-                    onClick={() => handleStart({ kind: 'temporizador', planned_minutes: principal.minutes })}
+                    onClick={() => handleStart({ kind: 'temporizador', planned_minutes: principal.minutes, ...startTarget })}
                     disabled={isStarting}
                     className="min-h-[44px] px-10"
                   >
@@ -363,7 +425,7 @@ export const TodayDashboard: React.FC = () => {
                       key={option.minutes}
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleStart({ kind: 'temporizador', planned_minutes: option.minutes })}
+                      onClick={() => handleStart({ kind: 'temporizador', planned_minutes: option.minutes, ...startTarget })}
                       disabled={isStarting}
                       className="min-h-[44px]"
                     >
@@ -395,7 +457,7 @@ export const TodayDashboard: React.FC = () => {
               <Button
                 variant="primary"
                 size="lg"
-                onClick={() => handleStart({ kind: 'cronometro' })}
+                onClick={() => handleStart({ kind: 'cronometro', ...startTarget })}
                 disabled={isStarting}
                 className="min-h-[44px] px-10"
               >
