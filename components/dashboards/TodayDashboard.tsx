@@ -7,6 +7,8 @@ import { usePushNotifications } from '@/lib/hooks/usePushNotifications';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { FocusDuration, FocusHeatmap } from '@/components/ui/FocusHeatmap';
+import { buildFocusStripView } from '@/lib/domain/focus-heatmap';
 import type { TodayRunningTanda } from '@/lib/execution/today';
 import {
   buildTodayFooterView,
@@ -46,7 +48,8 @@ const SESSION_MODES: { id: SessionMode; label: string }[] = [
  * ser un temporizador (10, 25, 40, 60 o un campo libre de 10 a 180, cuenta atrás) o un cronómetro
  * (una acción, Empezar; cuenta hacia arriba). Con US-F2 un selector opcional de objetivo ("Sin
  * objetivo" por defecto) liga la sesión a un objetivo o a una materia. Empezar sigue siendo un
- * toque (FR-008).
+ * toque (FR-008). Con US-F3 (FR-F18) Hoy muestra, más abajo, el total de minutos enfocados de la
+ * semana y el mapa de 12 semanas; sin metas, minutos que faltan ni rachas (research R10).
  */
 export const TodayDashboard: React.FC = () => {
   const {
@@ -102,6 +105,22 @@ export const TodayDashboard: React.FC = () => {
   useEffect(() => {
     setFinishError(null);
   }, [elapsedMinute]);
+
+  // FR-F18: franja de foco de Hoy (total de la semana + mapa de 12 semanas), armada a partir del
+  // mismo payload de Hoy, sin pedido extra. `today` solo cambia cuando llega un fetch, así que la
+  // rejilla no se rearma en cada segundo del reloj de la sesión en curso. Con un servidor que aún
+  // no manda los campos de foco, `buildFocusStripView` devuelve null y la franja no se pinta.
+  const focusStrip = useMemo(
+    () =>
+      today
+        ? buildFocusStripView({
+            date: today.date,
+            foco_semana_minutos: today.foco_semana_minutos,
+            foco_12_semanas: today.foco_12_semanas,
+          })
+        : null,
+    [today]
+  );
 
   // US-F2-AS9: opciones del selector de objetivo. Sin conexión con la lista de objetivos (o sin
   // ninguno) siguen "Sin objetivo" y las materias de Dexie: el selector nunca bloquea empezar.
@@ -578,6 +597,15 @@ export const TodayDashboard: React.FC = () => {
           {footer.tandasLine && footer.dayFulfilledLine ? ' · ' : ''}
           {footer.dayFulfilledLine}
         </p>
+      )}
+
+      {focusStrip && (
+        <Card className="space-y-3">
+          <p className="text-sm text-slate-700 dark:text-slate-300">
+            {focusStrip.weekLabel} · <FocusDuration text={focusStrip.totalText} />
+          </p>
+          <FocusHeatmap grid={focusStrip.grid} ariaLabel="Minutos enfocados por día, últimas 12 semanas" />
+        </Card>
       )}
 
       {report && (

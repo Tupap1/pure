@@ -45,6 +45,7 @@ import {
   ObjectiveReadSchema,
   ObjectiveUpdateSchema,
   ObjectiveArchiveSchema,
+  FocusSummarySchema,
   zodErrorToExecutionResult,
   type ExecutionResult,
 } from '../validations/schemas';
@@ -52,6 +53,7 @@ import { initProgram, readProgram, updateProgramWeek, upsertHabit, retireHabit }
 import { startTanda, finishTanda, interruptTanda, currentTanda, readTandas, updateTanda, logLateTanda } from './tandas';
 import { createObjective, readObjectives, updateObjective, archiveObjective } from './objectives';
 import { getToday } from './today';
+import { getFocusSummary } from './focus';
 import {
   upsertRoutineSlot,
   readRoutineSlots,
@@ -237,6 +239,30 @@ export async function handleGetToday(data?: unknown, now: Date = new Date()): Pr
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: 'Error inesperado en get_today',
+    };
+  }
+}
+
+/**
+ * `get_focus_summary` (US-F3): tiempo enfocado por día, semana y objetivo para el mapa de calor.
+ * Es de solo lectura y el único handler: lo llaman la herramienta MCP y `GET /api/execution/focus`
+ * (FR-F19, US-F3-AS9). `data?.at` (ISO) es un escape hatch para pruebas o una consulta puntual,
+ * igual que en `get_today`; la ruta web nunca lo reenvía. `objective_id` y `subject_id` juntos →
+ * DATOS_INVALIDOS (lo rechaza el esquema).
+ */
+export async function handleGetFocusSummary(data?: unknown, now: Date = new Date()): Promise<ExecutionResult> {
+  try {
+    const parsed = FocusSummarySchema.safeParse(data ?? {});
+    if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+
+    const { at, ...input } = parsed.data;
+    return await getFocusSummary(input, at ? new Date(at) : now);
+  } catch (error: any) {
+    console.error('[execution] Error inesperado en get_focus_summary:', error);
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: 'Error inesperado en get_focus_summary',
     };
   }
 }

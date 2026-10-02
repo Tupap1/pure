@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { MultiProgressRing } from '@/components/ui/ProgressRing';
 import { SemesterProgressChart } from '@/components/ui/SemesterProgressChart';
-import { StudyHeatmap } from '@/components/ui/StudyHeatmap';
+import { FocusDuration, FocusHeatmap } from '@/components/ui/FocusHeatmap';
 import { DailyLoadStackedBar } from '@/components/ui/DailyLoadStackedBar';
 import { SubjectTelemetryTable } from '@/components/ui/SubjectTelemetryTable';
 import {
@@ -14,29 +14,176 @@ import {
   CalendarDays,
   GraduationCap,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  Timer
 } from 'lucide-react';
 import { buildDailyLoad } from '@/lib/algorithms/academic-load';
-import { computeStudyHeatmap } from '@/lib/domain/study-heatmap';
+import { buildHeatmapGrid, formatFocusMinutes } from '@/lib/domain/focus-heatmap';
+import { objectiveSelectorOptions } from '@/lib/execution/today-view';
+import { useFocusSummary, type FocusSummaryFilter } from '@/lib/hooks/useFocusSummary';
+import { useObjectives } from '@/lib/hooks/useObjectives';
 import { saveDeliverable } from '@/lib/db/repository';
 import { formatDeliverableDate } from '@/lib/domain/deliverable';
 import { useAcademicLoad } from '@/lib/hooks/useAcademicLoad';
 
+/** Valor del `<select>` de filtro para "Todos" (sin filtro). */
+const FOCUS_FILTER_ALL = 'todos';
+
+/**
+ * Tiempo enfocado (004, US-F3, FR-F18): mapa de calor de 52 semanas con filtro por objetivo o
+ * materia y, debajo, la tabla "Objetivo · Esta semana · Meta". Reemplaza al mapa de 28 días de la
+ * 001. La tabla con metas vive solo aquí (Hoy no muestra metas). Sin rachas ni "días activos".
+ * Tiene sus propios hooks, así que solo corre cuando Command Center ya cargó sus datos.
+ */
+const FocusPanel: React.FC<{ subjects: { id?: string; name: string }[] }> = ({ subjects }) => {
+  const { objectives } = useObjectives();
+  const [filterValue, setFilterValue] = React.useState(FOCUS_FILTER_ALL);
+
+  // Mismas opciones que el selector de Hoy (objetivos activos y luego materias, en orden
+  // alfabético), sin "Sin objetivo": aquí la primera opción es "Todos".
+  const filterOptions = React.useMemo(
+    () => objectiveSelectorOptions(objectives, subjects).filter((option) => option.kind !== 'none'),
+    [objectives, subjects]
+  );
+  // Si el filtro elegido se archivó o desapareció, vuelve a "Todos".
+  const selected = filterOptions.find((option) => option.value === filterValue) ?? null;
+  const filter: FocusSummaryFilter = selected
+    ? selected.kind === 'objetivo'
+      ? { objective_id: selected.id as string }
+      : { subject_id: selected.id as string }
+    : null;
+  const objectiveGroup = filterOptions.filter((option) => option.kind === 'objetivo');
+  const subjectGroup = filterOptions.filter((option) => option.kind === 'materia');
+
+  const { summary, isLoading, isOffline, refresh } = useFocusSummary({ weeks: 52, filter });
+  const grid = React.useMemo(
+    () => (summary ? buildHeatmapGrid(summary.dias, summary.rango.semanas, summary.rango.hasta) : null),
+    [summary]
+  );
+
+  return (
+    <Card className="p-5 space-y-5 lg:col-span-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+        <h3 className="text-sm font-heading font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
+          <Timer className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+          Tiempo enfocado · últimas 52 semanas
+        </h3>
+        <div className="flex items-center gap-2">
+          <label htmlFor="focus-filter" className="text-xs text-slate-500 dark:text-slate-400">
+            Filtro
+          </label>
+          <select
+            id="focus-filter"
+            value={selected ? selected.value : FOCUS_FILTER_ALL}
+            onChange={(e) => setFilterValue(e.target.value)}
+            className="min-w-0 max-w-[14rem] min-h-[44px] sm:min-h-0 px-3 py-2 sm:py-1.5 rounded-lg border border-surface-border bg-surface text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400"
+          >
+            <option value={FOCUS_FILTER_ALL}>Todos</option>
+            {objectiveGroup.length > 0 && subjectGroup.length > 0 ? (
+              <>
+                <optgroup label="Objetivos">
+                  {objectiveGroup.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Materias">
+                  {subjectGroup.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
+              </>
+            ) : (
+              [...objectiveGroup, ...subjectGroup].map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+      </div>
+
+      {!summary && isOffline ? (
+        <div className="py-6 text-center space-y-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">No hay conexión con Pure</p>
+          <Button variant="ghost" size="sm" onClick={() => refresh()} className="min-h-[44px]">
+            Reintentar
+          </Button>
+        </div>
+      ) : !summary || !grid ? (
+        <div
+          className="h-40 rounded-lg bg-slate-100 dark:bg-white/[0.03] border border-surface-border animate-pulse"
+          role="status"
+          aria-label="Cargando el tiempo enfocado"
+        />
+      ) : (
+        <>
+          {isOffline && (
+            <p className="text-xs text-amber-600 dark:text-amber-500" role="status">
+              Sin conexión con Pure: se muestra el último resumen que se pudo leer.{' '}
+              <button type="button" onClick={() => refresh()} className="underline underline-offset-2">
+                Reintentar
+              </button>
+            </p>
+          )}
+
+          <div className={isLoading ? 'opacity-60 transition-opacity' : 'transition-opacity'} aria-busy={isLoading}>
+            <FocusHeatmap grid={grid} ariaLabel="Minutos enfocados por día, últimas 52 semanas" />
+          </div>
+
+          {summary.por_objetivo.length === 0 ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400">Sin sesiones de foco esta semana.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-slate-500 dark:text-slate-400">
+                    <th scope="col" className="py-2 pr-3 font-medium">Objetivo</th>
+                    <th scope="col" className="py-2 px-3 font-medium text-right whitespace-nowrap">Esta semana</th>
+                    <th scope="col" className="py-2 pl-3 font-medium text-right">Meta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.por_objetivo.map((row) => (
+                    <tr key={`${row.tipo}:${row.id ?? 'sin'}`} className="border-t border-surface-border">
+                      <td className="py-2 pr-3 text-slate-800 dark:text-slate-200">
+                        {row.nombre}
+                        {row.tipo === 'materia' && (
+                          <span className="text-xs text-slate-500 dark:text-slate-400"> · materia</span>
+                        )}
+                        {row.archivado && (
+                          <span className="text-xs text-slate-500 dark:text-slate-400"> · archivado</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-right whitespace-nowrap text-slate-800 dark:text-slate-200">
+                        <FocusDuration text={formatFocusMinutes(row.minutos)} />
+                      </td>
+                      <td className="py-2 pl-3 text-right whitespace-nowrap text-slate-500 dark:text-slate-400">
+                        {row.meta != null ? <FocusDuration text={formatFocusMinutes(row.meta)} /> : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+};
+
 export const CommandCenter: React.FC = () => {
-  const { isLoaded, universities, subjects, deliverables, schedules, professors, studySessions } = usePureData();
+  const { isLoaded, universities, subjects, deliverables, schedules, professors } = usePureData();
   const academicLoad = useAcademicLoad();
 
   const dailyLoadData = React.useMemo(
     () => buildDailyLoad(schedules, subjects, universities, academicLoad.normativeIndependentHours),
     [schedules, subjects, universities, academicLoad.normativeIndependentHours]
-  );
-
-  // Heatmap de las sesiones de estudio realmente completadas (ver lib/domain/study-heatmap.ts).
-  // Debe declararse antes del retorno temprano: un hook detrás de un `return` condicional
-  // se salta mientras los datos cargan y rompe el orden de hooks entre renders.
-  const realHeatmapDays = React.useMemo(
-    () => computeStudyHeatmap(studySessions),
-    [studySessions]
   );
 
   if (!isLoaded) {
@@ -300,13 +447,11 @@ export const CommandCenter: React.FC = () => {
             </div>
           </div>
 
-          {/* Heatmap & Historical GPA Analytics Section */}
+          {/* Tiempo enfocado (mapa de 52 semanas + tabla por objetivo) & Historical GPA Analytics Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-5 space-y-4">
-              <StudyHeatmap days={realHeatmapDays} />
-            </Card>
+            <FocusPanel subjects={subjects} />
 
-            <Card className="p-5 space-y-4">
+            <Card className="p-5 space-y-4 lg:col-span-2">
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                 <h3 className="text-sm font-heading font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
                   <BarChart3 className="w-4 h-4 text-slate-500 dark:text-slate-400" />

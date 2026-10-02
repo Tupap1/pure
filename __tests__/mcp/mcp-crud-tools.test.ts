@@ -23,8 +23,8 @@ describe('MCP Server - Suite de Herramientas CRUD y Parsing Dinámico (con pg-me
     await harness.reset();
   });
 
-  it('debe listar las 32 herramientas registradas en el catálogo de herramientas', () => {
-    expect(TOOLS_LIST.length).toBe(32);
+  it('debe listar las 33 herramientas registradas en el catálogo de herramientas', () => {
+    expect(TOOLS_LIST.length).toBe(33);
     const names = TOOLS_LIST.map((t) => t.name);
     expect(names).toContain('manage_universities');
     expect(names).toContain('manage_professors');
@@ -35,6 +35,7 @@ describe('MCP Server - Suite de Herramientas CRUD y Parsing Dinámico (con pg-me
     expect(names).toContain('ingest_academic_enrollment');
     expect(names).toContain('manage_friction');
     expect(names).toContain('manage_objectives');
+    expect(names).toContain('get_focus_summary');
   });
 
   describe('CRUD de Universidades (manage_universities)', () => {

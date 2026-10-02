@@ -49,7 +49,7 @@ PURE OS está estructurado en 5 módulos core accesible desde la barra de navega
 ### 1. Dashboard (Centro de Mando & Balance de Tiempo)
 - **MultiProgressRing**: Medidor de anillos concéntricos SVG que visualiza la proporción de **Tiempo Libre Neto**, **Trabajo Independiente** y **Horario de Clases**.
 - **DailyLoadStackedBar**: Histograma de distribución de carga horaria por día de la semana (Lunes a Sábado A/B).
-- **StudyHeatmap**: Mapa de calor interactivo tipo GitHub para registrar la consistencia de bloques de estudio.
+- **FocusHeatmap**: Mapa de calor de tiempo enfocado (una columna por semana, una fila por día), de 12 semanas en Hoy y de 52 en el Command Center, con cinco niveles fijos y leyenda en minutos.
 - **SemesterProgressChart**: Gráfica SVG interactiva que traza la curva de evolución del Promedio Académico (GPA) acumulado frente a la Nota Meta (4.50).
 - **Tarjetas de Asignatura con Anillos de Nota Target**: Muestra el progreso actual hacia la nota objetivo y las horas recomendadas de DME semanal por materia.
 
@@ -158,7 +158,7 @@ Pure/
 │       ├── Modal.tsx           # Modales flotantes con React.createPortal
 │       ├── ProgressRing.tsx    # Anillos concéntricos SVG y simples
 │       ├── DailyLoadStackedBar.tsx # Histograma de carga diaria
-│       ├── StudyHeatmap.tsx    # Mapa de calor estilo GitHub
+│       ├── FocusHeatmap.tsx    # Mapa de calor de foco (12 y 52 semanas)
 │       └── SemesterProgressChart.tsx # Gráfica de evolución de GPA
 ├── lib/                        # Lógica de Dominio, Base de Datos y Algoritmos
 │   ├── algorithms/             # Motor Algorítmico (DME, Conflictos, Transformer)

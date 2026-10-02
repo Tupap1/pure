@@ -33,6 +33,7 @@ import {
   handleManageProgram,
   handleManageTandas,
   handleGetToday,
+  handleGetFocusSummary,
   handleManageRoutineSlots,
   handleManageDailyChecks,
   handleGetGradeProjection,
@@ -335,11 +336,26 @@ export const TOOLS_LIST = [
   {
     name: 'get_today',
     description:
-      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (con los segundos restantes), el disparador vigente si lo hay, los hábitos pendientes, si el día quedó cumplido y la evaluación desglosada del día (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled).',
+      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (con los segundos restantes), el disparador vigente si lo hay, los hábitos pendientes, si el día quedó cumplido y la evaluación desglosada del día (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled). También foco_semana_minutos (minutos enfocados de lunes a hoy) y foco_12_semanas (días { date, minutos, nivel } de las últimas 12 semanas, el mismo nivel y los mismos minutos que get_focus_summary).',
     inputSchema: {
       type: 'object',
       properties: {
         data: { type: 'object', description: '{ at? } ISO, opcional: solo para pruebas o una consulta puntual en otro instante.' },
+      },
+    },
+  },
+  {
+    name: 'get_focus_summary',
+    description:
+      'Módulo de Ejecución: resumen de tiempo enfocado (US-F3), de solo lectura. Suma los minutos de las sesiones completadas e interrumpidas (las en curso no suman; un cronómetro que cruza la medianoche se reparte entre los días locales que abarca). Devuelve rango { desde, hasta, semanas } (desde = lunes de hace weeks-1 semanas, hasta = hoy), dias[] { date, minutos, nivel 0-4 } con 0 explícito en días vacíos, semanas[] { lunes, minutos } de lunes a domingo, total_semana (lunes a hoy) y por_objetivo[] { tipo: objetivo|materia|sin_objetivo, id, nombre, minutos, meta, archivado } de la semana actual sin filtro (cada sesión en una sola fila; los objetivos activos con meta aparecen aunque sumen 0). El filtro por objective_id o subject_id afecta a dias, semanas y total_semana, no a por_objetivo; el de materia incluye las sesiones de objetivos ligados a esa materia. El mismo resultado que GET /api/execution/focus.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description:
+            '{ weeks? (entero 1-53, 52 por defecto), objective_id? | subject_id? (no ambos: DATOS_INVALIDOS), at? (ISO, solo para pruebas) }.',
+        },
       },
     },
   },
@@ -743,12 +759,24 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'get_today',
-    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso, disparador vigente, hábitos pendientes, día cumplido, evaluación desglosada con tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled). Solo lectura.',
+    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso, disparador vigente, hábitos pendientes, día cumplido, evaluación desglosada con tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled, foco_semana_minutos y foco_12_semanas con los días { date, minutos, nivel } de las últimas 12 semanas). Solo lectura.',
     {
       data: z.any().optional(),
     },
     async ({ data }) => {
       const res = await handleGetToday(data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'get_focus_summary',
+    'Módulo de Ejecución: resumen de tiempo enfocado (US-F3). data: { weeks? (1-53, 52 por defecto), objective_id? | subject_id? (no ambos: DATOS_INVALIDOS), at? }. Devuelve rango, dias[] { date, minutos, nivel 0-4 } con 0 explícito, semanas[] { lunes, minutos }, total_semana y por_objetivo[] de la semana actual. Suman las sesiones completadas e interrumpidas; las en curso no. Solo lectura; el mismo resultado que GET /api/execution/focus.',
+    {
+      data: z.any().optional(),
+    },
+    async ({ data }) => {
+      const res = await handleGetFocusSummary(data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );

@@ -481,7 +481,7 @@ cuadra a mano y coincide con `GET /api/execution/focus`.
 
 ### Tests (RED)
 
-- [ ] T026 [P] [US-F3] P3 TEST — Crear `__tests__/mcp/execution-foco-resumen.test.ts`, vía
+- [x] T026 [P] [US-F3] P3 TEST — Crear `__tests__/mcp/execution-foco-resumen.test.ts`, vía
       `handleGetFocusSummary` con `at`:
       - `US-F3-AS1`: un día da 82;
       - `US-F3-AS2`: la semana de lunes a domingo excluye el domingo anterior, y un temporizador de
@@ -499,7 +499,7 @@ cuadra a mano y coincide con `GET /api/execution/focus`.
         mismo `weeks` y filtro; también comprobar `dynamic === 'force-dynamic'`;
       - `US-F3-AS11`: un cronómetro de domingo 23:00 a lunes 01:00 da 60 y 60, cada uno en su
         semana, y un resumen que empieza el lunes incluye los 60 del lunes.
-- [ ] T027 [P] [US-F3] P4 TEST — Crear `__tests__/domain/focus-heatmap.test.ts`, con
+- [x] T027 [P] [US-F3] P4 TEST — Crear `__tests__/domain/focus-heatmap.test.ts`, con
       `US-F3-AS8`:
       - `buildHeatmapGrid(dias, weeks, todayKey)` → columnas = semanas de lunes a domingo y filas
         L…D;
@@ -512,7 +512,7 @@ cuadra a mano y coincide con `GET /api/execution/focus`.
 
 ### Implementation (GREEN)
 
-- [ ] T028 [US-F3] P3 IMPL — Crear `lib/execution/focus.ts` con `getFocusSummary(input, now)`
+- [x] T028 [US-F3] P3 IMPL — Crear `lib/execution/focus.ts` con `getFocusSummary(input, now)`
       según [data-model.md](./data-model.md) § "Resumen de foco":
       - `fetchTandasFromDb`, `fetchObjectivesFromDb` y `fetchSubjectsFromDb` una vez cada uno;
       - tramos con `splitByLocalDay`;
@@ -529,15 +529,15 @@ cuadra a mano y coincide con `GET /api/execution/focus`.
 
       Registrar `get_focus_summary` en los **4 sitios** de `mcp-server/`. `all-tools.test.ts` pasa
       a 33. T026 en verde.
-- [ ] T029a [US-F3] P3 TEST — En `__tests__/mcp/execution-foco-resumen.test.ts` (en serie,
+- [x] T029a [US-F3] P3 TEST — En `__tests__/mcp/execution-foco-resumen.test.ts` (en serie,
       después de T028), test `US-F3-AS2 · get_today.foco_semana_minutos coincide con
       get_focus_summary.total_semana` y `foco_12_semanas` tiene 84 días, o menos si la semana en
       curso no terminó, con el mismo `nivel`. Debe fallar (RED).
-- [ ] T029b [US-F3] P2 IMPL — `lib/execution/today.ts` agrega `foco_semana_minutos` (lunes a hoy)
+- [x] T029b [US-F3] P2 IMPL — `lib/execution/today.ts` agrega `foco_semana_minutos` (lunes a hoy)
       y `foco_12_semanas` (`{ date, minutos, nivel }[]`) con `focusDays` de
       `lib/execution/focus.ts` (T028), sin duplicar la agregación. Se hace en serie después de
       T029a. T029a en verde.
-- [ ] T030 [US-F3] P4 IMPL — Crear `lib/domain/focus-heatmap.ts` (`buildHeatmapGrid`,
+- [x] T030 [US-F3] P4 IMPL — Crear `lib/domain/focus-heatmap.ts` (`buildHeatmapGrid`,
       `formatFocusMinutes`, `buildFocusStripView` para Hoy, solo con total y rejilla, **sin meta
       ni faltantes**, R10). T027 en verde.
 
@@ -546,7 +546,7 @@ cuadra a mano y coincide con `GET /api/execution/focus`.
         de `DESIGN.md` (`#529e72` oscuro / `#448361` claro);
       - nivel 0 = superficie neutra con borde fino;
       - sin sombras ni glow.
-- [ ] T031 [US-F3] P4 IMPL — Crear `components/ui/FocusHeatmap.tsx`:
+- [x] T031 [US-F3] P4 IMPL — Crear `components/ui/FocusHeatmap.tsx`:
       - rejilla CSS de celdas de 10–12 px con `title`/`aria-label` "5 oct · 45 min";
       - leyenda con las cifras de los niveles ("0 · 1–30 · 31–90 · 91–180 · >180 min");
       - con 52 semanas, contenedor con `overflow-x-auto` sin desbordar la página;
@@ -555,7 +555,7 @@ cuadra a mano y coincide con `GET /api/execution/focus`.
 
       Crear `lib/hooks/useFocusSummary.ts`, que hace `GET /api/execution/focus` y refresca al
       montar y al volver visible.
-- [ ] T032 [US-F3] P4 IMPL — `components/dashboards/TodayDashboard.tsx`: franja de foco bajo la
+- [x] T032 [US-F3] P4 IMPL — `components/dashboards/TodayDashboard.tsx`: franja de foco bajo la
       zona de inicio, con "Esta semana · 6 h 40 m" + `FocusHeatmap` de 12 semanas desde
       `today.foco_12_semanas`, sin pedido extra.
 
@@ -567,7 +567,7 @@ cuadra a mano y coincide con `GET /api/execution/focus`.
         `formatFocusMinutes`, sin barras);
       - si `usePureData().studySessions` queda sin uso en CommandCenter, quitarlo de la
         desestructuración.
-- [ ] T033 [US-F3] P4 IMPL — Retirar `components/ui/StudyHeatmap.tsx`, `lib/domain/study-heatmap.ts`
+- [x] T033 [US-F3] P4 IMPL — Retirar `components/ui/StudyHeatmap.tsx`, `lib/domain/study-heatmap.ts`
       y `__tests__/domain/study-heatmap.test.ts`, si `grep` confirma que no quedan usos. Actualizar
       la mención en `README.md`.
 - [ ] T034 [US-F3] P4 MANUAL/VERIFY — `US-F3-AS10` (manual). Con `preview_start`, a 375 px y en

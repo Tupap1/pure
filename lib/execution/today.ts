@@ -2,10 +2,12 @@
 // del servidor, la semana del programa, la tanda en curso, cuántas tandas van hoy, el disparador
 // vigente (US2) y los checks pendientes junto con si el día quedó cumplido (US3).
 
-import { localParts } from './time';
+import { localParts, addDays, mondayOf } from './time';
+import { TODAY_HEATMAP_WEEKS } from './constants';
 import { readProgram } from './program';
 import { currentTanda, readTandas, cachedSplitByLocalDay, loadObjectivesById } from './tandas';
 import { resolveTodayTrigger } from './routine';
+import { focusDays, sumFocusMinutes, type FocusDay } from './focus';
 import { fetchHabitsFromDb, fetchDailyChecksFromDb, HabitRecord, DailyCheckRecord } from '../db/execution-pg';
 import { isHabitActive, evaluateDay, describeDay, CurrentTrigger, DayBreakdown } from '../domain/execution';
 import { tallyDay } from '../domain/focus';
@@ -43,6 +45,11 @@ export interface TodayPayload {
   unidades_hoy: number;
   day_fulfilled: boolean | null;
   evaluacion_dia: DayBreakdown | null;
+  /** 004 (US-F3, FR-F18): minutos enfocados de la semana actual, de lunes a hoy. */
+  foco_semana_minutos: number;
+  /** 004 (US-F3, FR-F18): días del mapa de las últimas 12 semanas (del lunes de hace 11 semanas a
+   * hoy; menos de 84 si la semana en curso no terminó), con el mismo nivel que `get_focus_summary`. */
+  foco_12_semanas: FocusDay[];
 }
 
 export async function getToday(now: Date = new Date()): Promise<ExecutionResult<TodayPayload>> {
@@ -87,12 +94,21 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
   // unidades del sistema; con él un cronómetro que cruza la medianoche solo aporta a hoy los
   // minutos del tramo de hoy. Con el mapa real de objetivos (FR-F13, I1), una sesión de un objetivo
   // sin materia no cuenta en `tandas_today` ni en las unidades del mínimo.
-  const readRes = await readTandas({ from: dateKey, to: dateKey }, now);
-  const todayTandas = readRes.status === 'success' ? readRes.data!.tandas : [];
-  const tally = tallyDay(dateKey, todayTandas, await loadObjectivesById(), cachedSplitByLocalDay());
+  //
+  // 004 (US-F3): una sola lectura de las sesiones de las últimas 12 semanas sirve para el recuento
+  // de hoy (tallyDay solo mira los tramos de `dateKey`) y para el mapa (`focusDays`, la misma
+  // agregación de get_focus_summary, sin repetirla aquí).
+  const heatmapFrom = addDays(mondayOf(dateKey), -(TODAY_HEATMAP_WEEKS - 1) * 7);
+  const readRes = await readTandas({ from: heatmapFrom, to: dateKey }, now);
+  const windowTandas = readRes.status === 'success' ? readRes.data!.tandas : [];
+  const objetivosById = await loadObjectivesById();
+  const split = cachedSplitByLocalDay();
+  const tally = tallyDay(dateKey, windowTandas, objetivosById, split);
   const completedToday = tally.completadas;
   // FR-T05: unidades de hoy, ahora según el tipo de sesión (FR-F04).
   const completedUnitsToday = tally.unidades;
+  const foco_12_semanas = focusDays(windowTandas, objetivosById, heatmapFrom, dateKey, {}, split);
+  const foco_semana_minutos = sumFocusMinutes(foco_12_semanas, mondayOf(dateKey));
 
   const trigger = await resolveTodayTrigger(now);
 
@@ -133,6 +149,8 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
       unidades_hoy: completedUnitsToday,
       day_fulfilled: evaluation ? evaluation.fulfilled : null,
       evaluacion_dia,
+      foco_semana_minutos,
+      foco_12_semanas,
     },
   };
 }
