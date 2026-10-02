@@ -12,6 +12,8 @@ import {
   type ManageTasksAction,
   handlePlanWeek,
   type ManagePlanWeekAction,
+  handleManageObjectives,
+  type ManageObjectivesAction,
 } from '@/lib/execution/handlers';
 
 // Ruta delgada del Módulo de Ejecución (contracts/web-api.md): valida contra una lista blanca y
@@ -37,6 +39,9 @@ const ALLOWED_ACTIONS: Record<string, readonly string[]> = {
   // US8-US9: el asistente del domingo (preview/set_intentions) y la compuerta de la vista de
   // semana (open_view, FR-037).
   plan_week: ['preview', 'set_intentions', 'open_view'],
+  // 004 (US-F2-AS11): los objetivos se crean, leen, editan y archivan desde la web con el mismo
+  // handler que el MCP. No se borran (solo se archivan), así que no hay 'delete'.
+  manage_objectives: ['create', 'read', 'update', 'archive'],
 };
 
 async function dispatch(tool: string, action: string, data: unknown) {
@@ -53,6 +58,8 @@ async function dispatch(tool: string, action: string, data: unknown) {
       return handleManageTasks(action as ManageTasksAction, data);
     case 'plan_week':
       return handlePlanWeek(action as ManagePlanWeekAction, data);
+    case 'manage_objectives':
+      return handleManageObjectives(action as ManageObjectivesAction, data);
     default:
       // No debería alcanzarse: `tool` ya pasó el filtro de ALLOWED_ACTIONS.
       throw new Error(`Herramienta no soportada: ${tool}`);

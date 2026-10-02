@@ -121,3 +121,48 @@ export function mondayOf(dateKey: string): string {
   base.setUTCDate(base.getUTCDate() - (isoDayOfWeek - 1));
   return dateKeyFromUtcDate(base);
 }
+
+/** Tramo de una sesión en un día local: minutos enteros que le tocan a `date` ('YYYY-MM-DD'). */
+export interface DayShareSplit {
+  date: string;
+  minutes: number;
+}
+
+/**
+ * FR-F14a / research R6: reparte el intervalo [startIso, endIso] entre los días locales de
+ * `PURE_TZ` que toca, cortando en cada medianoche local. Se usa solo con un cronómetro cerrado;
+ * el temporizador nunca se reparte (lib/domain/focus.ts:sessionShares).
+ *
+ * Los minutos de cada tramo son acumulados con piso:
+ * `floor((límite_k − inicio) / 60 s) − floor((límite_{k−1} − inicio) / 60 s)`, con el último
+ * límite igual al fin. Así la suma de los tramos es exactamente `floor((fin − inicio) / 60 s)`
+ * (el `actual_minutes` de la sesión) y no se pierde un minuto por redondear cada tramo por su
+ * cuenta: 23:00:30 → 00:10:40 da 59 + 11 = 70, no 59 + 10 = 69.
+ *
+ * Un día aparece si el intervalo tiene longitud positiva dentro de él, aunque el piso le deje 0
+ * minutos (23:59:30 → 00:01:00 da 0 + 1). Un fin exactamente en una medianoche no abre un tramo
+ * vacío en el día siguiente. Una sesión de duración cero (o con el fin antes del inicio) da un
+ * único tramo de 0 minutos en su día de inicio. Los límites salen de `localDateTimeToInstant`,
+ * exacto para el offset fijo de America/Bogota; no se pide nada a SQL (Principio III).
+ */
+export function splitByLocalDay(startIso: string, endIso: string): DayShareSplit[] {
+  const MINUTE_MS = 60_000;
+  const startMs = new Date(startIso).getTime();
+  const endMs = new Date(endIso).getTime();
+  const startDate = localParts(new Date(startMs)).dateKey;
+  if (!(endMs > startMs)) return [{ date: startDate, minutes: 0 }];
+
+  const shares: DayShareSplit[] = [];
+  let date = startDate;
+  let flooredSoFar = 0; // floor((límite anterior − inicio) / 60 s)
+  for (;;) {
+    const nextDate = addDays(date, 1);
+    const boundaryMs = localDateTimeToInstant(nextDate, '00:00').getTime();
+    const limitMs = Math.min(boundaryMs, endMs);
+    const floored = Math.floor((limitMs - startMs) / MINUTE_MS);
+    shares.push({ date, minutes: floored - flooredSoFar });
+    if (boundaryMs >= endMs) return shares;
+    flooredSoFar = floored;
+    date = nextDate;
+  }
+}

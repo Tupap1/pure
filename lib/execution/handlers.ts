@@ -18,6 +18,7 @@ import {
   TandaReadSchema,
   TandaUpdateSchema,
   TandaLogLateSchema,
+  TandaCorrectSchema,
   RoutineSlotSchema,
   RoutineSlotReadSchema,
   RoutineSlotDeleteSchema,
@@ -41,12 +42,34 @@ import {
   PlanWeekOpenViewSchema,
   FrictionMeasureSchema,
   FrictionRateSchema,
+  ObjectiveCreateSchema,
+  ObjectiveReadSchema,
+  ObjectiveUpdateSchema,
+  ObjectiveArchiveSchema,
+  FocusSummarySchema,
+  QuoteCreateSchema,
+  QuoteCreateManySchema,
+  QuoteReadSchema,
+  QuoteUpdateSchema,
+  QuoteDeactivateSchema,
   zodErrorToExecutionResult,
   type ExecutionResult,
 } from '../validations/schemas';
 import { initProgram, readProgram, updateProgramWeek, upsertHabit, retireHabit } from './program';
-import { startTanda, finishTanda, interruptTanda, currentTanda, readTandas, updateTanda, logLateTanda } from './tandas';
+import {
+  startTanda,
+  finishTanda,
+  interruptTanda,
+  currentTanda,
+  readTandas,
+  updateTanda,
+  logLateTanda,
+  correctTanda,
+} from './tandas';
+import { createObjective, readObjectives, updateObjective, archiveObjective } from './objectives';
+import { createQuote, createManyQuotes, readQuotes, updateQuote, deactivateQuote } from './quotes';
 import { getToday } from './today';
+import { getFocusSummary } from './focus';
 import {
   upsertRoutineSlot,
   readRoutineSlots,
@@ -144,15 +167,16 @@ export async function handleManageProgram(
   }
 }
 
-export type ManageTandasAction = 'start' | 'finish' | 'interrupt' | 'current' | 'read' | 'update' | 'log_late';
+export type ManageTandasAction = 'start' | 'finish' | 'interrupt' | 'current' | 'read' | 'update' | 'log_late' | 'correct';
 
 /**
  * `manage_tandas` (US1, US-T1, US-T2): la tanda de estudio, de 10 a 60 minutos. `start`/`finish`/
  * `interrupt`/`update` validan su forma con los esquemas Zod estrictos de schemas.ts (que ya
  * rechazan `started_at`/`ended_at` del cliente por ser claves no reconocidas) y delegan las
  * reglas de negocio en lib/execution/tandas.ts. `current` no tiene esquema propio: no recibe
- * `data`. `log_late` (US-T2) es la única excepción acotada que sí acepta instantes del cliente;
- * no entra en la lista blanca de app/api/execution/route.ts (FR-T15): solo se dispara por MCP.
+ * `data`. `log_late` (US-T2) y `correct` (US-F4, corrige o cierra un cronómetro olvidado) son las
+ * dos excepciones acotadas que aceptan instantes del cliente; ninguna entra en la lista blanca de
+ * app/api/execution/route.ts (FR-T15, FR-F20): solo se disparan por MCP.
  */
 export async function handleManageTandas(
   action: ManageTandasAction,
@@ -200,6 +224,11 @@ export async function handleManageTandas(
         if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
         return await logLateTanda(parsed.data, now);
       }
+      case 'correct': {
+        const parsed = TandaCorrectSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await correctTanda(parsed.data, now);
+      }
       default:
         return {
           status: 'error',
@@ -232,6 +261,30 @@ export async function handleGetToday(data?: unknown, now: Date = new Date()): Pr
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: 'Error inesperado en get_today',
+    };
+  }
+}
+
+/**
+ * `get_focus_summary` (US-F3): tiempo enfocado por día, semana y objetivo para el mapa de calor.
+ * Es de solo lectura y el único handler: lo llaman la herramienta MCP y `GET /api/execution/focus`
+ * (FR-F19, US-F3-AS9). `data?.at` (ISO) es un escape hatch para pruebas o una consulta puntual,
+ * igual que en `get_today`; la ruta web nunca lo reenvía. `objective_id` y `subject_id` juntos →
+ * DATOS_INVALIDOS (lo rechaza el esquema).
+ */
+export async function handleGetFocusSummary(data?: unknown, now: Date = new Date()): Promise<ExecutionResult> {
+  try {
+    const parsed = FocusSummarySchema.safeParse(data ?? {});
+    if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+
+    const { at, ...input } = parsed.data;
+    return await getFocusSummary(input, at ? new Date(at) : now);
+  } catch (error: any) {
+    console.error('[execution] Error inesperado en get_focus_summary:', error);
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: 'Error inesperado en get_focus_summary',
     };
   }
 }
@@ -414,6 +467,7 @@ async function assembleReportInput(
     aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
     friccion_retiradas: friccionRetiradas,
     registros_tardios: compliance.registros_tardios,
+    correcciones: compliance.correcciones,
   };
 }
 
@@ -778,6 +832,112 @@ export async function handleManageFriction(
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: 'Error inesperado en manage_friction',
+    };
+  }
+}
+
+export type ManageObjectivesAction = 'create' | 'read' | 'update' | 'archive';
+
+/**
+ * `manage_objectives` (US-F2): objetivos propios con materia y meta semanal opcionales, a los que
+ * se ligan las sesiones de foco. Acciones: create, read, update, archive (no se borran). Es el
+ * único handler: lo llaman el MCP y, con la lista blanca de app/api/execution/route.ts, la web
+ * (FR-F11, US-F2-AS11). `read` no lleva `data` obligatoria.
+ */
+export async function handleManageObjectives(
+  action: ManageObjectivesAction,
+  data?: unknown,
+  now: Date = new Date()
+): Promise<ExecutionResult> {
+  try {
+    switch (action) {
+      case 'create': {
+        const parsed = ObjectiveCreateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await createObjective(parsed.data);
+      }
+      case 'read': {
+        const parsed = ObjectiveReadSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await readObjectives(parsed.data);
+      }
+      case 'update': {
+        const parsed = ObjectiveUpdateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await updateObjective(parsed.data);
+      }
+      case 'archive': {
+        const parsed = ObjectiveArchiveSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await archiveObjective(parsed.data, now);
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para manage_objectives: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_objectives:', error);
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: 'Error inesperado en manage_objectives',
+    };
+  }
+}
+
+export type ManageQuotesAction = 'create' | 'create_many' | 'read' | 'update' | 'deactivate';
+
+/**
+ * `manage_quotes` (US-F5): frases latinas de la línea del día en Hoy. Acciones: create (idempotente
+ * por texto normalizado: devuelve la existente), create_many (lote de 1 a 200, todo o nada e
+ * idempotente: `{ creadas, omitidas }`), read, update y deactivate. Solo MCP: NO está en
+ * `ALLOWED_ACTIONS` de app/api/execution/route.ts, así que la web no puede crear ni modificar frases
+ * (FR-F25, US-F5-AS6). `read` no lleva `data` obligatoria.
+ */
+export async function handleManageQuotes(action: ManageQuotesAction, data?: unknown): Promise<ExecutionResult> {
+  try {
+    switch (action) {
+      case 'create': {
+        const parsed = QuoteCreateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await createQuote(parsed.data);
+      }
+      case 'create_many': {
+        const parsed = QuoteCreateManySchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await createManyQuotes(parsed.data);
+      }
+      case 'read': {
+        const parsed = QuoteReadSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await readQuotes(parsed.data);
+      }
+      case 'update': {
+        const parsed = QuoteUpdateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await updateQuote(parsed.data);
+      }
+      case 'deactivate': {
+        const parsed = QuoteDeactivateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await deactivateQuote(parsed.data);
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para manage_quotes: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_quotes:', error);
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: 'Error inesperado en manage_quotes',
     };
   }
 }

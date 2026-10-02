@@ -5,6 +5,8 @@
 //
 // finalizeElapsed corre al principio de cada operación (FR-005): así una tanda cuyo tiempo ya
 // se cumplió queda completada sola, aunque nadie la haya tocado y el teléfono esté bloqueado.
+// Un cronómetro (004, FR-F06) no tiene tiempo que cumplir: finalizeElapsed lo ignora y solo se
+// cierra al terminarlo (`finish`), interrumpirlo (`interrupt`) o, más adelante, corregirlo.
 //
 // FR-004 (como máximo una tanda en curso) se resuelve con `running_lock TEXT UNIQUE` (migración
 // 008): `start` intenta un INSERT directo (nunca un SELECT previo que decida si insertar) y
@@ -12,17 +14,18 @@
 // la que arbitra atómicamente entre dos inicios simultáneos desde dispositivos distintos.
 
 import crypto from 'crypto';
-import { localParts, localDateTimeToInstant, addDays } from './time';
+import { localParts, localDateTimeToInstant, addDays, splitByLocalDay } from './time';
 import {
   TANDA_MINUTES_DEFAULT,
-  TANDA_MINUTES_MIN,
-  TANDA_MINUTES_MAX,
   DAY_LOCK_TIME,
+  CRONOMETRO_MIN_FINISH_SECONDS,
   LATE_LOG_MAX_HOURS_BACK,
   LATE_LOG_MAX_PER_DAY,
+  LATE_LOG_MIN_MINUTES,
+  LATE_LOG_MAX_MINUTES,
 } from './constants';
-import { tandaUnits } from '../domain/execution';
-import type { ExecutionResult } from '../validations/schemas';
+import { sessionShares, tallyDay, type SplitByLocalDay } from '../domain/focus';
+import type { ExecutionResult, ExecutionErrorResult } from '../validations/schemas';
 import {
   fetchTandasFromDb,
   saveTandaToDb,
@@ -30,6 +33,8 @@ import {
   fetchRoutineSlotsFromDb,
   saveSlotOutcomeToDb,
   RoutineSlotRecord,
+  fetchObjectivesFromDb,
+  ObjectiveRecord,
 } from '../db/execution-pg';
 
 /** true si `error` es la violación de la restricción UNIQUE de `running_lock` (pg y pg-mem
@@ -51,8 +56,66 @@ async function findTandaById(id: string): Promise<TandaRecord | null> {
   return (Array.isArray(raw) ? raw[0] : raw) as TandaRecord | null;
 }
 
-function endsAtMs(tanda: TandaRecord): number {
-  return new Date(tanda.started_at).getTime() + tanda.planned_minutes * 60_000;
+async function findObjectiveById(id: string): Promise<ObjectiveRecord | null> {
+  const raw = await fetchObjectivesFromDb(id);
+  return ((Array.isArray(raw) ? raw[0] : raw) ?? null) as ObjectiveRecord | null;
+}
+
+/**
+ * Todos los objetivos por id, para `tallyDay` (FR-F13: decide con `objetivo.subject_id` si una
+ * sesión cuenta para el mínimo). Incluye los archivados, porque sus sesiones viejas siguen contando
+ * igual que antes de archivarlos. Una sola lectura por llamada de lectura (readTandas, getToday,
+ * getCompliance): son pocas filas y se reutiliza el mapa para todos los días evaluados.
+ */
+export async function loadObjectivesById(): Promise<Map<string, ObjectiveRecord>> {
+  const raw = await fetchObjectivesFromDb();
+  const list = (Array.isArray(raw) ? raw : []) as ObjectiveRecord[];
+  return new Map(list.map((objective) => [objective.id, objective]));
+}
+
+/** NO_ENCONTRADO si el objetivo no existe; con `rejectArchived`, OBJETIVO_ARCHIVADO si está archivado.
+ * `null` si es válido (US-F2-AS3). */
+async function checkObjective(
+  objectiveId: string,
+  opts: { rejectArchived: boolean }
+): Promise<ExecutionErrorResult | null> {
+  const objective = await findObjectiveById(objectiveId);
+  if (!objective) {
+    return { status: 'error', code: 'NO_ENCONTRADO', message: `No existe el objetivo ${objectiveId}.` };
+  }
+  if (opts.rejectArchived && objective.archived) {
+    return {
+      status: 'error',
+      code: 'OBJETIVO_ARCHIVADO',
+      message: `El objetivo ${objective.name} está archivado: elige uno activo para empezar la sesión.`,
+    };
+  }
+  return null;
+}
+
+/** Instante previsto de fin (ms), o null en un cronómetro, que no tiene fin previsto (FR-F01). */
+function endsAtMs(tanda: TandaRecord): number | null {
+  if (tanda.kind === 'cronometro' || !tanda.planned_minutes) return null;
+  return new Date(tanda.started_at).getTime() + (tanda.planned_minutes as number) * 60_000;
+}
+
+/**
+ * `splitByLocalDay` con caché por (inicio, fin). `tallyDay` reparte cada cronómetro una vez por
+ * día evaluado; con un año de días y varias sesiones eso repetiría miles de veces el mismo reparto
+ * (y cada uno construye `Intl.DateTimeFormat`). La caché vive lo que dura una llamada de lectura:
+ * crea una por llamada, no una global.
+ */
+export function cachedSplitByLocalDay(): SplitByLocalDay {
+  const cache = new Map<string, ReturnType<SplitByLocalDay>>();
+  return (startIso, endIso) => {
+    const key = `${new Date(startIso).getTime()}|${new Date(endIso).getTime()}`;
+    let shares = cache.get(key);
+    if (!shares) {
+      shares = splitByLocalDay(startIso, endIso);
+      cache.set(key, shares);
+    }
+    return shares;
+  };
 }
 
 /**
@@ -64,11 +127,15 @@ function endsAtMs(tanda: TandaRecord): number {
 export async function finalizeElapsed(now: Date = new Date()): Promise<TandaRecord | null> {
   const running = await findRunningTanda();
   if (!running) return null;
-  if (now.getTime() < endsAtMs(running)) return null;
+  // R8: el cronómetro no se cierra por tiempo (ni dispara el aviso de fin del tick: tick.ts solo
+  // avisa cuando esta función devuelve una tanda cerrada).
+  if (running.kind === 'cronometro') return null;
+  const ends = endsAtMs(running);
+  if (ends === null || now.getTime() < ends) return null;
 
   return await saveTandaToDb({
     ...running,
-    ended_at: new Date(endsAtMs(running)).toISOString(),
+    ended_at: new Date(ends).toISOString(),
     actual_minutes: running.planned_minutes,
     status: 'completada',
     running_lock: null,
@@ -81,11 +148,17 @@ export interface TandaStartInput {
   deliverable_id?: string;
   task_id?: string;
   routine_slot_id?: string;
+  /** 004: 'temporizador' por defecto; 'cronometro' no tiene duración planeada. */
+  kind?: 'temporizador' | 'cronometro';
+  /** 004 (US-F2-AS3): objetivo al que se liga la sesión; debe existir y no estar archivado. */
+  objective_id?: string;
   planned_minutes?: number;
 }
 
 /**
- * FR-001, FR-002, FR-004: empieza una tanda con la hora del servidor. US2-AS7/FR-012: si viene
+ * FR-001, FR-002, FR-004: empieza una tanda con la hora del servidor. 004 (FR-F01): `kind` elige
+ * entre temporizador (10-180 min, `ends_at` previsto) y cronómetro (`planned_minutes` y `ends_at`
+ * nulos; solo se cierra al terminarlo o interrumpirlo). US2-AS7/FR-012: si viene
  * de un disparador (`routine_slot_id`), hereda su materia cuando no se indicó una explícita y
  * dispara el mismo efecto que "responder hecho" (slot_outcomes de hoy) — el botón "Empezar
  * tanda" de un disparador de estudio en Hoy llama a esta misma acción, así que aquí es donde debe
@@ -94,8 +167,14 @@ export interface TandaStartInput {
 export async function startTanda(
   input: TandaStartInput,
   now: Date = new Date()
-): Promise<ExecutionResult<{ tanda: TandaRecord; ends_at: string }>> {
+): Promise<ExecutionResult<{ tanda: TandaRecord; ends_at: string | null }>> {
   await finalizeElapsed(now);
+
+  // US-F2-AS3: el objetivo se valida antes de tocar nada, para que un rechazo no cree filas.
+  if (input.objective_id) {
+    const rejected = await checkObjective(input.objective_id, { rejectArchived: true });
+    if (rejected) return rejected;
+  }
 
   let subjectId = input.subject_id;
   if (input.routine_slot_id && !subjectId) {
@@ -103,10 +182,11 @@ export async function startTanda(
     if (slot?.subject_id) subjectId = slot.subject_id;
   }
 
-  const plannedMinutes = input.planned_minutes ?? TANDA_MINUTES_DEFAULT;
+  const kind = input.kind ?? 'temporizador';
+  const plannedMinutes = kind === 'cronometro' ? null : (input.planned_minutes ?? TANDA_MINUTES_DEFAULT);
   const local = localParts(now);
   const lockedAt = localDateTimeToInstant(addDays(local.dateKey, 1), DAY_LOCK_TIME);
-  const endsAt = new Date(now.getTime() + plannedMinutes * 60_000);
+  const endsAt = plannedMinutes === null ? null : new Date(now.getTime() + plannedMinutes * 60_000);
 
   try {
     const tanda = await saveTandaToDb({
@@ -116,8 +196,10 @@ export async function startTanda(
       deliverable_id: input.deliverable_id,
       task_id: input.task_id,
       routine_slot_id: input.routine_slot_id,
+      objective_id: input.objective_id,
       local_date: local.dateKey,
       started_at: now.toISOString(),
+      kind,
       planned_minutes: plannedMinutes,
       status: 'en_curso',
       running_lock: 'running',
@@ -135,7 +217,7 @@ export async function startTanda(
       });
     }
 
-    return { status: 'success', data: { tanda, ends_at: endsAt.toISOString() } };
+    return { status: 'success', data: { tanda, ends_at: endsAt ? endsAt.toISOString() : null } };
   } catch (error) {
     if (isRunningLockViolation(error)) {
       return {
@@ -148,8 +230,18 @@ export async function startTanda(
   }
 }
 
+/** `edited_after_lock` de un cierre hecho por el servicio: solo el cronómetro se marca al cerrarse
+ * después de `locked_at` (FR-F14a, US-F1-AS11), porque puede empezar un día y cerrarse en otro; el
+ * temporizador conserva el comportamiento de la 001/003. Nunca desmarca una edición previa. */
+function lockedEditFlag(tanda: TandaRecord, now: Date): boolean {
+  if (tanda.edited_after_lock) return true;
+  return tanda.kind === 'cronometro' && now.getTime() > new Date(tanda.locked_at).getTime();
+}
+
 /** FR-003: finish exige que el tiempo planeado ya se haya cumplido (con 30s de margen); antes
- * de eso, la única salida es interrupt. Idempotente sobre una tanda ya cerrada. */
+ * de eso, la única salida es interrupt. Idempotente sobre una tanda ya cerrada. FR-F07: un
+ * cronómetro se puede terminar a partir de CRONOMETRO_MIN_FINISH_SECONDS (1 min); antes,
+ * CRONOMETRO_MUY_CORTO y sigue en curso. */
 export async function finishTanda(id: string, now: Date = new Date()): Promise<ExecutionResult<TandaRecord>> {
   await finalizeElapsed(now);
 
@@ -163,13 +255,23 @@ export async function finishTanda(id: string, now: Date = new Date()): Promise<E
   }
 
   const elapsedMs = now.getTime() - new Date(existing.started_at).getTime();
-  const requiredMs = existing.planned_minutes * 60_000 - 30_000;
-  if (elapsedMs < requiredMs) {
-    return {
-      status: 'error',
-      code: 'TANDA_NO_TERMINADA',
-      message: 'Todavía no se cumple el tiempo planeado: usa interrupt si necesitas cortarla antes.',
-    };
+  if (existing.kind === 'cronometro') {
+    if (elapsedMs < CRONOMETRO_MIN_FINISH_SECONDS * 1_000) {
+      return {
+        status: 'error',
+        code: 'CRONOMETRO_MUY_CORTO',
+        message: 'El cronómetro lleva menos de 1 minuto: déjalo correr o interrúmpelo con una razón.',
+      };
+    }
+  } else {
+    const requiredMs = (existing.planned_minutes as number) * 60_000 - 30_000;
+    if (elapsedMs < requiredMs) {
+      return {
+        status: 'error',
+        code: 'TANDA_NO_TERMINADA',
+        message: 'Todavía no se cumple el tiempo planeado: usa interrupt si necesitas cortarla antes.',
+      };
+    }
   }
 
   const updated = await saveTandaToDb({
@@ -178,6 +280,7 @@ export async function finishTanda(id: string, now: Date = new Date()): Promise<E
     actual_minutes: Math.floor(elapsedMs / 60_000),
     status: 'completada',
     running_lock: null,
+    edited_after_lock: lockedEditFlag(existing, now),
   });
   return { status: 'success', data: updated };
 }
@@ -213,29 +316,51 @@ export async function interruptTanda(
     status: 'interrumpida',
     running_lock: null,
     interrupt_reason: input.interrupt_reason,
+    edited_after_lock: lockedEditFlag(existing, now),
   });
   return { status: 'success', data: updated };
 }
 
-/** `{ tanda | null, seconds_left | null, server_now }` (contracts/mcp-tools.md). */
-export async function currentTanda(
-  now: Date = new Date()
-): Promise<ExecutionResult<{ tanda: TandaRecord | null; seconds_left: number | null; server_now: string }>> {
+export interface CurrentTandaPayload {
+  tanda: TandaRecord | null;
+  /** Temporizador: segundos que faltan. Cronómetro (sin fin previsto) y sin tanda: null. */
+  seconds_left: number | null;
+  /** Cronómetro: segundos transcurridos desde el inicio del servidor. Temporizador y sin tanda: null. */
+  elapsed_seconds: number | null;
+  server_now: string;
+}
+
+/** `{ tanda | null, seconds_left | null, elapsed_seconds | null, server_now }`
+ * (contracts/mcp-tools.md). */
+export async function currentTanda(now: Date = new Date()): Promise<ExecutionResult<CurrentTandaPayload>> {
   await finalizeElapsed(now);
 
   const running = await findRunningTanda();
   if (!running) {
-    return { status: 'success', data: { tanda: null, seconds_left: null, server_now: now.toISOString() } };
+    return {
+      status: 'success',
+      data: { tanda: null, seconds_left: null, elapsed_seconds: null, server_now: now.toISOString() },
+    };
   }
 
-  const secondsLeft = Math.max(0, Math.round((endsAtMs(running) - now.getTime()) / 1000));
-  return { status: 'success', data: { tanda: running, seconds_left: secondsLeft, server_now: now.toISOString() } };
+  const ends = endsAtMs(running);
+  const secondsLeft = ends === null ? null : Math.max(0, Math.round((ends - now.getTime()) / 1000));
+  const elapsedSeconds =
+    running.kind === 'cronometro'
+      ? Math.max(0, Math.floor((now.getTime() - new Date(running.started_at).getTime()) / 1000))
+      : null;
+  return {
+    status: 'success',
+    data: { tanda: running, seconds_left: secondsLeft, elapsed_seconds: elapsedSeconds, server_now: now.toISOString() },
+  };
 }
 
 export interface TandaReadInput {
   from?: string;
   to?: string;
   subject_id?: string;
+  /** 004 (US-F2): solo las sesiones ligadas a este objetivo. */
+  objective_id?: string;
 }
 
 export interface TandaDayResumen {
@@ -247,7 +372,15 @@ export interface TandaDayResumen {
 }
 
 /** `{ tandas[], por_dia[] }` (contracts/mcp-tools.md). El filtrado y el agregado por día son
- * aritmética pura en TypeScript (Constitución, Principio III), no SQL. */
+ * aritmética pura en TypeScript (Constitución, Principio III), no SQL.
+ *
+ * 004 (FR-F14a): una tanda entra si ALGUNO de sus tramos cae en [from, to]; un cronómetro que
+ * empezó antes de `from` y cuyo tramo cae dentro entra aunque su `local_date` sea anterior. El
+ * agregado de cada día sale de `tallyDay` (la única regla de unidades y de minutos por día): sus
+ * `unidades` y `completadas` solo cuentan lo que cumple el mínimo y `minutos` es el foco total del
+ * día (completadas + interrumpidas). Los objetivos se leen una vez por llamada (FR-F13): una sesión
+ * de un objetivo sin materia suma minutos pero no unidades. `objective_id` filtra por objetivo y,
+ * como `subject_id`, el agregado por día se calcula solo con las tandas filtradas. */
 export async function readTandas(
   input: TandaReadInput = {},
   now: Date = new Date()
@@ -257,27 +390,36 @@ export async function readTandas(
   const allRaw = await fetchTandasFromDb();
   const all = (Array.isArray(allRaw) ? allRaw : []) as TandaRecord[];
 
-  const filtered = all.filter((t) => {
-    if (input.from && t.local_date < input.from) return false;
-    if (input.to && t.local_date > input.to) return false;
-    if (input.subject_id && t.subject_id !== input.subject_id) return false;
-    return true;
-  });
+  const objetivosById = await loadObjectivesById();
+  const split = cachedSplitByLocalDay();
+  const inRange = (date: string) => !((input.from && date < input.from) || (input.to && date > input.to));
 
-  const byDay = new Map<string, TandaDayResumen>();
-  for (const t of filtered) {
-    const bucket = byDay.get(t.local_date) ?? { date: t.local_date, completadas: 0, unidades: 0, interrumpidas: 0, minutos: 0 };
-    if (t.status === 'completada') {
-      bucket.completadas += 1;
-      // FR-T06: unidades solo de las completadas (las interrumpidas no aportan)
-      bucket.unidades += tandaUnits(t.actual_minutes);
-    }
-    if (t.status === 'interrumpida') bucket.interrumpidas += 1;
-    bucket.minutos += t.actual_minutes ?? 0;
-    byDay.set(t.local_date, bucket);
+  const filtered: TandaRecord[] = [];
+  const daysWithSessions = new Set<string>();
+  for (const t of all) {
+    if (input.subject_id && t.subject_id !== input.subject_id) continue;
+    if (input.objective_id && t.objective_id !== input.objective_id) continue;
+    const datesInRange = sessionShares(t, split)
+      .map((share) => share.date)
+      .filter(inRange);
+    if (datesInRange.length === 0) continue;
+    filtered.push(t);
+    for (const date of datesInRange) daysWithSessions.add(date);
   }
 
-  const por_dia = Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date));
+  const por_dia: TandaDayResumen[] = Array.from(daysWithSessions)
+    .sort((a, b) => a.localeCompare(b))
+    .map((date) => {
+      const tally = tallyDay(date, filtered, objetivosById, split);
+      return {
+        date,
+        completadas: tally.completadas,
+        unidades: tally.unidades,
+        interrumpidas: tally.interrumpidas,
+        minutos: tally.minutos_foco,
+      };
+    });
+
   return { status: 'success', data: { tandas: filtered, por_dia } };
 }
 
@@ -287,6 +429,9 @@ export interface TandaUpdateInput {
   topic_id?: string;
   deliverable_id?: string;
   task_id?: string;
+  /** 004 (US-F2-AS10): debe existir, pero puede estar archivado (reclasificar una sesión vieja
+   * hacia un objetivo archivado es legítimo). */
+  objective_id?: string;
   mode?: string;
   interrupt_reason?: string;
 }
@@ -312,11 +457,17 @@ export async function updateTanda(
     };
   }
 
+  if (input.objective_id) {
+    const rejected = await checkObjective(input.objective_id, { rejectArchived: false });
+    if (rejected) return rejected;
+  }
+
   const editedAfterLock = existing.edited_after_lock || now.getTime() > new Date(existing.locked_at).getTime();
 
   const updated = await saveTandaToDb({
     ...existing,
     subject_id: input.subject_id ?? existing.subject_id,
+    objective_id: input.objective_id ?? existing.objective_id,
     topic_id: input.topic_id ?? existing.topic_id,
     deliverable_id: input.deliverable_id ?? existing.deliverable_id,
     task_id: input.task_id ?? existing.task_id,
@@ -353,8 +504,8 @@ export interface TandaLogLateInput {
  * que `now`. 4) ended_at <= now y ended_at > started_at. 5) started_at no más de
  * LATE_LOG_MAX_HOURS_BACK horas atrás. 6) duración (redondeada hacia abajo a minutos) entre
  * TANDA_MINUTES_MIN y TANDA_MINUTES_MAX. 7) límite de LATE_LOG_MAX_PER_DAY registros tardíos por
- * día local. 8) solapamiento con cualquier otra tanda del mismo día (una en curso ocupa desde su
- * inicio hasta ahora).
+ * día local. 8) solapamiento con cualquier otra sesión, de cualquier día (una en curso ocupa desde
+ * su inicio hasta ahora; un cronómetro iniciado ayer cuenta si su tramo llega a hoy).
  */
 export async function logLateTanda(
   input: TandaLogLateInput,
@@ -401,11 +552,11 @@ export async function logLateTanda(
   }
 
   const durationMinutes = Math.floor((endedAtDate.getTime() - startedAtDate.getTime()) / 60_000);
-  if (durationMinutes < TANDA_MINUTES_MIN || durationMinutes > TANDA_MINUTES_MAX) {
+  if (durationMinutes < LATE_LOG_MIN_MINUTES || durationMinutes > LATE_LOG_MAX_MINUTES) {
     return {
       status: 'error',
       code: 'REGISTRO_TARDIO_INVALIDO',
-      message: `La duración debe quedar entre ${TANDA_MINUTES_MIN} y ${TANDA_MINUTES_MAX} minutos.`,
+      message: `La duración debe quedar entre ${LATE_LOG_MIN_MINUTES} y ${LATE_LOG_MAX_MINUTES} minutos.`,
     };
   }
 
@@ -424,7 +575,11 @@ export async function logLateTanda(
 
   const newStartMs = startedAtDate.getTime();
   const newEndMs = endedAtDate.getTime();
-  const overlaps = sameDay.some((t) => {
+  // 004 (FR-F14a / FR-T11): el solapamiento mira TODAS las tandas, no solo las de hoy. Un cronómetro
+  // iniciado ayer que sigue en curso (ocupa hasta ahora) o que cruzó la medianoche ocupa tiempo de
+  // hoy aunque su `local_date` sea el día de inicio. El tope de registros tardíos de arriba sigue
+  // contando solo las `late_logged` de hoy.
+  const overlaps = all.some((t) => {
     const existingStartMs = new Date(t.started_at).getTime();
     const existingEndMs = t.status === 'en_curso' ? now.getTime() : new Date(t.ended_at ?? t.started_at).getTime();
     // Se cruzan si ambos intervalos comparten algún instante; tocarse en el borde no cuenta.
@@ -434,7 +589,7 @@ export async function logLateTanda(
     return {
       status: 'error',
       code: 'REGISTRO_TARDIO_INVALIDO',
-      message: 'Ese tramo se solapa con otra tanda de hoy: revisa la hora de inicio y fin.',
+      message: 'Ese tramo se solapa con otra sesión: revisa la hora de inicio y fin.',
     };
   }
 
@@ -460,4 +615,116 @@ export async function logLateTanda(
   });
 
   return { status: 'success', data: tanda };
+}
+
+export interface TandaCorrectInput {
+  id: string;
+  /** ISO 8601. Segunda excepción acotada del módulo: un instante aportado por el cliente (ver el
+   * comentario de correctTanda más abajo). */
+  ended_at: string;
+  /** 1-140 caracteres, ya recortada por el esquema Zod. */
+  reason: string;
+}
+
+/**
+ * US-F4/FR-F20..FR-F24: `correct` es la SEGUNDA entrada del módulo (después de `log_late`) que
+ * acepta un instante del cliente (`ended_at`) -- una excepción deliberada y acotada al Principio III
+ * de la Constitución ("todo instante registrado DEBE salir del reloj del servidor"), documentada en
+ * specs/004-foco-cronometro/plan.md § Complexity Tracking. El cronómetro no tiene tope por decisión
+ * de Andres; sin una forma de corregirlo, un olvido de 8 horas quedaría como 8 horas de estudio para
+ * siempre. La corrección es la red que hace aceptable esa decisión, y por eso solo puede REDUCIR
+ * datos: nunca alarga una sesión ni crea una (FR-T15 sigue vigente).
+ *
+ * Cotas (cada una tiene su propia prueba; si alguna se relaja, la excepción deja de estar acotada):
+ * - sesión cerrada (completada o interrumpida): `inicio + 60 s <= ended_at < ended_at registrado`;
+ *   conserva su estado y recalcula `actual_minutes = floor((ended_at - inicio) / 60 s)`;
+ * - cronómetro en curso: `inicio + 60 s <= ended_at <= now`; queda `completada` y libera el
+ *   `running_lock` (marca `edited_after_lock` si `now` pasa de `locked_at`, igual que `finish`);
+ * - temporizador en curso: CORRECCION_INVALIDA (para cortarlo existe `interrupt`).
+ * Fuera de cota: CORRECCION_INVALIDA y no se escribe nada.
+ *
+ * Deja constancia: `corrected = true`, `corrected_at = now` (hora del servidor, de la ÚLTIMA
+ * corrección; el reporte cuenta por ella) y `correction_reason`. `original_ended_at` y
+ * `original_minutes` se escriben solo si estaban nulos, así una segunda corrección conserva lo de
+ * antes de la primera; en un cronómetro en curso el original es `now` y los minutos hasta `now`.
+ * Está disponible siempre, sin mirar `locked_at` (US-F4-AS5), y sobre una sesión cerrada no toca
+ * `edited_after_lock`. Es solo MCP: no está en la lista blanca de app/api/execution/route.ts.
+ */
+export async function correctTanda(
+  input: TandaCorrectInput,
+  now: Date = new Date()
+): Promise<ExecutionResult<TandaRecord>> {
+  await finalizeElapsed(now);
+
+  const existing = await findTandaById(input.id);
+  if (!existing) {
+    return { status: 'error', code: 'NO_ENCONTRADO', message: `No existe la sesión ${input.id}.` };
+  }
+
+  const running = existing.status === 'en_curso';
+  if (running && existing.kind !== 'cronometro') {
+    return {
+      status: 'error',
+      code: 'CORRECCION_INVALIDA',
+      message: 'Un temporizador en curso no se corrige: para cortarlo usa interrupt.',
+    };
+  }
+
+  const newEndMs = new Date(input.ended_at).getTime();
+  if (Number.isNaN(newEndMs)) {
+    return { status: 'error', code: 'CORRECCION_INVALIDA', message: 'ended_at debe ser una fecha ISO 8601 válida.' };
+  }
+
+  const startMs = new Date(existing.started_at).getTime();
+  if (newEndMs < startMs + CRONOMETRO_MIN_FINISH_SECONDS * 1_000) {
+    return {
+      status: 'error',
+      code: 'CORRECCION_INVALIDA',
+      message: 'El fin corregido debe quedar al menos 1 minuto después del inicio de la sesión.',
+    };
+  }
+
+  // `registeredEndMs` es el fin vigente que la corrección no puede alargar: el registrado en una
+  // sesión cerrada, o `now` en un cronómetro en curso (todavía no tiene fin).
+  const registeredEndMs = running ? now.getTime() : existing.ended_at ? new Date(existing.ended_at).getTime() : null;
+  if (registeredEndMs === null) {
+    return {
+      status: 'error',
+      code: 'CORRECCION_INVALIDA',
+      message: 'La sesión cerrada no tiene un fin registrado que acortar.',
+    };
+  }
+  // Cerrada: estrictamente antes del fin registrado (igual no acorta nada). En curso: hasta `now`
+  // inclusive, que es cerrar el cronómetro en este instante dejando constancia.
+  if (running ? newEndMs > registeredEndMs : newEndMs >= registeredEndMs) {
+    return {
+      status: 'error',
+      code: 'CORRECCION_INVALIDA',
+      message: running
+        ? 'El fin corregido no puede quedar en el futuro: una corrección solo acorta.'
+        : 'El fin corregido debe ser anterior al fin registrado: una corrección solo acorta.',
+    };
+  }
+
+  const newEnd = new Date(newEndMs);
+  const originalEndedAt = existing.original_ended_at ?? new Date(registeredEndMs).toISOString();
+  const originalMinutes =
+    existing.original_minutes ??
+    existing.actual_minutes ??
+    Math.max(0, Math.floor((registeredEndMs - startMs) / 60_000));
+
+  const updated = await saveTandaToDb({
+    ...existing,
+    ended_at: newEnd.toISOString(),
+    actual_minutes: Math.floor((newEndMs - startMs) / 60_000),
+    status: running ? 'completada' : existing.status,
+    running_lock: null,
+    edited_after_lock: running ? lockedEditFlag(existing, now) : existing.edited_after_lock,
+    corrected: true,
+    corrected_at: now.toISOString(),
+    original_ended_at: originalEndedAt,
+    original_minutes: originalMinutes,
+    correction_reason: input.reason,
+  });
+  return { status: 'success', data: updated };
 }

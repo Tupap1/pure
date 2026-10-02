@@ -10,6 +10,15 @@ import {
   INTERRUPT_REASON_MIN,
   INTERRUPT_REASON_MAX,
   USER_NOTE_MAX,
+  CORRECTION_REASON_MIN,
+  CORRECTION_REASON_MAX,
+  OBJECTIVE_NAME_MAX,
+  WEEKLY_TARGET_MAX_MINUTES,
+  QUOTE_TEXT_MAX,
+  QUOTE_TRANSLATION_MAX,
+  QUOTE_SOURCE_MAX,
+  QUOTE_BATCH_MAX,
+  FOCUS_WEEKS_MAX,
 } from '../execution/constants';
 
 export const UniversitySchema = z.object({
@@ -245,7 +254,11 @@ export type ExecutionErrorCode =
   | 'PARTIR_TAREA'
   | 'LIMITE_FRICCION'
   | 'REGISTRO_TARDIO_INVALIDO'
-  | 'LIMITE_REGISTRO_TARDIO';
+  | 'LIMITE_REGISTRO_TARDIO'
+  | 'CRONOMETRO_MUY_CORTO'
+  | 'OBJETIVO_DUPLICADO'
+  | 'OBJETIVO_ARCHIVADO'
+  | 'CORRECCION_INVALIDA';
 
 export interface ExecutionErrorResult {
   status: 'error';
@@ -458,6 +471,10 @@ export const RoutineSlotRehearseSchema = z
 // (FR-002). Al ser esquemas `.strict()`, cualquiera de esas dos claves cae en `unrecognized_keys`
 // y, por defecto, se traduce a DATOS_INVALIDOS.
 
+// 004 (FR-F01..FR-F02): `kind` es 'temporizador' por defecto (con `planned_minutes` entero de 10 a
+// 180) o 'cronometro' (sin duración planeada: pasar `planned_minutes` es DATOS_INVALIDOS).
+// `objective_id` solo se valida aquí como forma; que exista y no esté archivado lo resuelve
+// startTanda (US-F2-AS3).
 export const TandaStartSchema = z
   .object({
     subject_id: z.string().optional(),
@@ -465,9 +482,20 @@ export const TandaStartSchema = z
     deliverable_id: z.string().optional(),
     task_id: z.string().optional(),
     routine_slot_id: z.string().optional(),
+    kind: z.enum(['temporizador', 'cronometro']).optional(),
+    objective_id: z.string().min(1).optional(),
     planned_minutes: z.number().int().min(TANDA_MINUTES_MIN).max(TANDA_MINUTES_MAX).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.kind === 'cronometro' && data.planned_minutes !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['planned_minutes'],
+        message: 'Un cronómetro no tiene duración planeada: no envíes planned_minutes.',
+      });
+    }
+  });
 
 export const TandaFinishSchema = z
   .object({
@@ -501,6 +529,7 @@ export const TandaReadSchema = z
     from: z.string().regex(DATE_KEY_RE).optional(),
     to: z.string().regex(DATE_KEY_RE).optional(),
     subject_id: z.string().optional(),
+    objective_id: z.string().optional(),
   })
   .strict();
 
@@ -514,6 +543,7 @@ export const TandaUpdateSchema = z
     task_id: z.string().optional(),
     mode: z.string().optional(),
     interrupt_reason: z.string().min(INTERRUPT_REASON_MIN).max(INTERRUPT_REASON_MAX).optional(),
+    objective_id: z.string().optional(),
   })
   .strict();
 
@@ -736,5 +766,110 @@ export const FrictionRateSchema = z
   .object({
     score: z.number().int().min(0).max(10),
     program_week_id: z.string().min(1).optional(),
+  })
+  .strict();
+
+// --- Foco: cronómetro, objetivos y mapa de calor (US-F1..US-F5) ---
+
+// US-F1/US-F4: solo MCP, fuera de la web (ALLOWED_ACTIONS). Corrección de un cronómetro olvidado.
+export const TandaCorrectSchema = z
+  .object({
+    id: z.string().min(1),
+    ended_at: z.string().datetime(),
+    reason: z.string().trim().min(CORRECTION_REASON_MIN).max(CORRECTION_REASON_MAX),
+  })
+  .strict();
+
+// US-F2: crear objetivo con nombre, materia opcional y meta opcional.
+export const ObjectiveCreateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(OBJECTIVE_NAME_MAX),
+    subject_id: z.string().optional(),
+    weekly_target_minutes: z.number().int().min(1).max(WEEKLY_TARGET_MAX_MINUTES).optional(),
+  })
+  .strict();
+
+// US-F2: actualizar objetivo (todo opcional salvo id).
+export const ObjectiveUpdateSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().trim().min(1).max(OBJECTIVE_NAME_MAX).optional(),
+    subject_id: z.string().nullable().optional(),
+    weekly_target_minutes: z.number().int().min(1).max(WEEKLY_TARGET_MAX_MINUTES).nullable().optional(),
+  })
+  .strict();
+
+// US-F2: archivar objetivo.
+export const ObjectiveArchiveSchema = z
+  .object({
+    id: z.string().min(1),
+  })
+  .strict();
+
+// US-F2: leer objetivos (con opción de incluir archivados).
+export const ObjectiveReadSchema = z
+  .object({
+    include_archived: z.boolean().optional(),
+  })
+  .strict();
+
+// US-F3: resumen de foco (minutos, nivel, por objetivo).
+export const FocusSummarySchema = z
+  .object({
+    weeks: z.number().int().min(1).max(FOCUS_WEEKS_MAX).optional(),
+    objective_id: z.string().optional(),
+    subject_id: z.string().optional(),
+    at: z.string().datetime().optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.objective_id && data.subject_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['objective_id'],
+        message: 'No se puede filtrar por objetivo y materia a la vez.',
+        params: { code: 'DATOS_INVALIDOS' satisfies ExecutionErrorCode },
+      });
+    }
+  });
+
+// US-F5: crear una frase (latín + traducción/fuente opcionales).
+export const QuoteCreateSchema = z
+  .object({
+    text: z.string().trim().min(1).max(QUOTE_TEXT_MAX),
+    translation: z.string().trim().max(QUOTE_TRANSLATION_MAX).optional(),
+    source: z.string().trim().max(QUOTE_SOURCE_MAX).optional(),
+  })
+  .strict();
+
+// US-F5: crear muchas frases de una vez (lote de 1 a 200).
+export const QuoteCreateManySchema = z
+  .object({
+    frases: z.array(QuoteCreateSchema).min(1).max(QUOTE_BATCH_MAX),
+  })
+  .strict();
+
+// US-F5: actualizar una frase (todo opcional salvo id).
+export const QuoteUpdateSchema = z
+  .object({
+    id: z.string().min(1),
+    text: z.string().trim().min(1).max(QUOTE_TEXT_MAX).optional(),
+    translation: z.string().trim().max(QUOTE_TRANSLATION_MAX).optional(),
+    source: z.string().trim().max(QUOTE_SOURCE_MAX).optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+
+// US-F5: desactivar una frase (solo MCP).
+export const QuoteDeactivateSchema = z
+  .object({
+    id: z.string().min(1),
+  })
+  .strict();
+
+// US-F5: leer frases (con opción de incluir inactivas).
+export const QuoteReadSchema = z
+  .object({
+    include_inactive: z.boolean().optional(),
   })
   .strict();

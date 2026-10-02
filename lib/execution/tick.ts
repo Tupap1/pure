@@ -143,6 +143,7 @@ async function freezeOneWeek(
     aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
     friccion_retiradas: await listIrritationDropsInRange(from, to, cutoff),
     registros_tardios: compliance.registros_tardios,
+    correcciones: compliance.correcciones,
   };
   const payload = buildReportPayload(input);
 

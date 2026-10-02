@@ -5,6 +5,7 @@
 // semanal (US6); get_compliance_report (T055) lo expone tal cual por MCP.
 
 import { addDays, localParts } from './time';
+import { cachedSplitByLocalDay, loadObjectivesById } from './tandas';
 import {
   fetchHabitsFromDb,
   fetchDailyChecksFromDb,
@@ -25,12 +26,12 @@ import {
   isHabitActive,
   evaluateDay,
   describeDay,
-  tandaUnits,
   isTandaBeforeCutoff,
   isoDayOfWeekForDateKey,
   DayEvaluation,
   DayBreakdown,
 } from '../domain/execution';
+import { sessionShares, tallyDay, type FocusObjectiveInput, type SplitByLocalDay } from '../domain/focus';
 
 export interface ComplianceInput {
   /** YYYY-MM-DD, inicio del rango que se quiere reportar (p. ej. el lunes de la semana). */
@@ -75,6 +76,11 @@ export interface RegistrosTardios {
   minutos: number;
 }
 
+export interface Correcciones {
+  total: number;
+  minutos_recortados: number;
+}
+
 export interface ComplianceResult {
   dias: ComplianceDay[];
   days_fulfilled: number;
@@ -91,6 +97,11 @@ export interface ComplianceResult {
    * minutos: 0 }): un reporte silencioso sobre el registro tardío sería tan invisible como el
    * incidente que esta historia soluciona. */
   registros_tardios: RegistrosTardios;
+  /** US-F4/FR-F23: sesiones corregidas (manage_tandas:correct) cuya corrección cayó en el rango, y
+   * los minutos que recortaron (Σ original_minutes − actual_minutes). Se cuentan por la semana
+   * local de `corrected_at`, no por la del inicio de la sesión. Siempre números explícitos, nunca
+   * null ni ausente (ceros cuando no hubo ninguna), por la misma razón que `registros_tardios`. */
+  correcciones: Correcciones;
 }
 
 export function summarizePlanOpenings(
@@ -122,19 +133,22 @@ function evaluateOneDay(
   weeks: ProgramWeekRecord[],
   tandas: TandaRecord[],
   habits: HabitRecord[],
-  checks: DailyCheckRecord[]
+  checks: DailyCheckRecord[],
+  split: SplitByLocalDay,
+  objetivosById: Map<string, FocusObjectiveInput>
 ): ComplianceDay {
   const week = weeks.find((w) => w.starts_on <= dateKey && dateKey <= addDays(w.starts_on, 6)) ?? null;
-  const completedThatDay = tandas.filter((t) => t.local_date === dateKey && t.status === 'completada');
-  const completedCount = completedThatDay.length;
-  // FR-T05: calcular unidades (suma de tandaUnits sobre las completadas).
-  const completedUnits = completedThatDay.reduce((sum, t) => sum + tandaUnits(t.actual_minutes), 0);
+  // 004 (FR-F04, FR-F13, FR-F14a): el recuento del día sale de tallyDay sobre los TRAMOS del día,
+  // no sobre `t.local_date === dateKey`: un cronómetro que cruza la medianoche aporta a cada día
+  // solo sus minutos. `objetivosById` es el mapa real (FR-F13): una sesión de un objetivo sin
+  // materia no suma unidades para el mínimo.
+  const tally = tallyDay(dateKey, tandas, objetivosById, split);
   const checksForDate = checks.filter((c) => c.date === dateKey);
   const evaluationInput = {
     dateKey,
     minTandasDia: week ? week.min_tandas_dia : null,
-    completedTandas: completedCount,
-    completedUnits,
+    completedTandas: tally.completadas,
+    completedUnits: tally.unidades,
     habits,
     checks: checksForDate.map((c) => ({ habit_id: c.habit_id, status: c.status })),
   };
@@ -146,7 +160,7 @@ function evaluateOneDay(
 export async function getCompliance(input: ComplianceInput): Promise<ComplianceResult> {
   const cutoff = input.cutoff ?? new Date(`${input.to}T23:59:59.999Z`);
 
-  const [weeksRaw, habitsRaw, checksRaw, tandasRaw, slotsRaw, outcomesRaw, planViewsRaw] = await Promise.all([
+  const [weeksRaw, habitsRaw, checksRaw, tandasRaw, slotsRaw, outcomesRaw, planViewsRaw, objetivosById] = await Promise.all([
     fetchProgramWeeksFromDb(),
     fetchHabitsFromDb(),
     fetchDailyChecksFromDb(),
@@ -154,14 +168,14 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
     fetchRoutineSlotsFromDb(),
     fetchSlotOutcomesFromDb(),
     fetchAllPlanViewsFromDb(),
+    loadObjectivesById(),
   ]);
 
   const weeks = (Array.isArray(weeksRaw) ? weeksRaw : []) as ProgramWeekRecord[];
   const habits = (Array.isArray(habitsRaw) ? habitsRaw : []) as HabitRecord[];
   const allChecks = (Array.isArray(checksRaw) ? checksRaw : []) as DailyCheckRecord[];
-  const tandasBeforeCutoff = ((Array.isArray(tandasRaw) ? tandasRaw : []) as TandaRecord[]).filter((t) =>
-    isTandaBeforeCutoff(t.started_at, cutoff)
-  );
+  const allTandas = (Array.isArray(tandasRaw) ? tandasRaw : []) as TandaRecord[];
+  const tandasBeforeCutoff = allTandas.filter((t) => isTandaBeforeCutoff(t.started_at, cutoff));
   const slots = (Array.isArray(slotsRaw) ? slotsRaw : []) as RoutineSlotRecord[];
   const outcomes = (Array.isArray(outcomesRaw) ? outcomesRaw : []) as SlotOutcomeRecord[];
   const planViews = (Array.isArray(planViewsRaw) ? planViewsRaw : []) as PlanViewRecord[];
@@ -174,9 +188,10 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
 
   const allDays: ComplianceDay[] = [];
   const MAX_DAYS = 400; // salvaguarda: un programa de 10 semanas nunca se acerca a este límite
+  const split = cachedSplitByLocalDay(); // un reparto por cronómetro, no uno por (día × cronómetro)
   let cursor = loopStart;
   while (cursor <= input.to && allDays.length < MAX_DAYS) {
-    allDays.push(evaluateOneDay(cursor, weeks, tandasBeforeCutoff, habits, allChecks));
+    allDays.push(evaluateOneDay(cursor, weeks, tandasBeforeCutoff, habits, allChecks, split, objetivosById));
     cursor = addDays(cursor, 1);
   }
 
@@ -195,16 +210,27 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
     })
     .filter((h) => h.total > 0);
 
-  const tandasInRange = tandasBeforeCutoff.filter((t) => t.local_date >= input.from && t.local_date <= input.to);
+  // 004 (FR-F14a): una sesión cuenta en el rango si algún TRAMO suyo cae en él, no por su
+  // `local_date` (el día de inicio): un cronómetro del domingo 23:00 al lunes 01:00 aparece en la
+  // semana que termina Y en la que empieza, y en cada una aporta solo los minutos de su tramo. Un
+  // temporizador tiene un único tramo en su día de inicio, así que para él nada cambia. Los conteos
+  // de abajo cuentan sesiones con algún tramo en el rango; los minutos, solo los de esos tramos.
+  const sessionsInRange: Array<{ tanda: TandaRecord; minutes: number }> = [];
+  for (const t of tandasBeforeCutoff) {
+    const tramos = sessionShares(t, split).filter((s) => s.date >= input.from && s.date <= input.to);
+    if (tramos.length === 0) continue;
+    sessionsInRange.push({ tanda: t, minutes: tramos.reduce((sum, s) => sum + s.minutes, 0) });
+  }
+  const tandasInRange = sessionsInRange.map((s) => s.tanda);
   const completadas = tandasInRange.filter((t) => t.status === 'completada').length;
   const interrumpidas = tandasInRange.filter((t) => t.status === 'interrumpida').length;
 
   const porMateriaMap = new Map<string, ComplianceSubjectTandas>();
-  for (const t of tandasInRange) {
+  for (const { tanda: t, minutes } of sessionsInRange) {
     const key = t.subject_id ?? 'sin-materia';
     const bucket = porMateriaMap.get(key) ?? { subject_id: t.subject_id ?? null, count: 0, minutes: 0 };
     bucket.count += 1;
-    bucket.minutes += t.actual_minutes ?? 0;
+    bucket.minutes += minutes;
     porMateriaMap.set(key, bucket);
   }
 
@@ -220,6 +246,31 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
   const registros_tardios: RegistrosTardios = {
     total: registrosTardiosEnRango.length,
     minutos: registrosTardiosEnRango.reduce((sum, t) => sum + (t.actual_minutes ?? 0), 0),
+  };
+
+  // US-F4/FR-F23: el criterio es la fecha local de la CORRECCIÓN (`corrected_at`), no la del inicio
+  // de la sesión: una sesión del domingo corregida el lunes cuenta en la semana del lunes. Por eso
+  // parte de todas las tandas y no de `tandasInRange`. Frente al `cutoff` del reporte congelado
+  // cuenta solo lo corregido a más tardar en el corte (`corrected_at <= cutoff`): el reporte
+  // congelado es una foto al domingo 19:00 y no se reescribe (spec.md, casos borde); una corrección
+  // posterior aparece en el get_compliance_report de esa semana (cuyo corte es `now`) y en el
+  // resumen de foco. Una sesión corregida a más tardar en el corte también empezó antes de él, así
+  // que este filtro nunca incluye una tanda que `tandasBeforeCutoff` excluiría.
+  const correccionesEnRango = allTandas.filter((t) => {
+    if (!t.corrected || !t.corrected_at) return false;
+    const correctedAt = new Date(t.corrected_at);
+    if (correctedAt.getTime() > cutoff.getTime()) return false;
+    const dateKey = localParts(correctedAt).dateKey;
+    return dateKey >= input.from && dateKey <= input.to;
+  });
+  const correcciones: Correcciones = {
+    total: correccionesEnRango.length,
+    // Una corrección solo acorta, así que cada resta es >= 0; el Math.max protege la suma de una
+    // fila inconsistente (p. ej. editada a mano) en vez de dejar que reste minutos al total.
+    minutos_recortados: correccionesEnRango.reduce(
+      (sum, t) => sum + Math.max(0, (t.original_minutes ?? 0) - (t.actual_minutes ?? 0)),
+      0
+    ),
   };
 
   const outcomesInRange = outcomes.filter((o) => o.date >= input.from && o.date <= input.to);
@@ -254,5 +305,6 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
     horizonte,
     aperturas_plan,
     registros_tardios,
+    correcciones,
   };
 }

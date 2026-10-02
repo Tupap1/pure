@@ -4,6 +4,7 @@ import {
   handleManageProgram,
   handleManageTandas,
   handleGetToday,
+  handleGetFocusSummary,
   handleManageRoutineSlots,
   handleManageDailyChecks,
   handleGetGradeProjection,
@@ -12,6 +13,8 @@ import {
   handleManageTasks,
   handlePlanWeek,
   handleManageFriction,
+  handleManageObjectives,
+  handleManageQuotes,
 } from '../lib/execution/handlers';
 
 // Módulo de Ejecución: los handlers viven en lib/execution/handlers.ts (Principio I, una sola
@@ -21,6 +24,7 @@ export {
   handleManageProgram,
   handleManageTandas,
   handleGetToday,
+  handleGetFocusSummary,
   handleManageRoutineSlots,
   handleManageDailyChecks,
   handleGetGradeProjection,
@@ -29,6 +33,8 @@ export {
   handleManageTasks,
   handlePlanWeek,
   handleManageFriction,
+  handleManageObjectives,
+  handleManageQuotes,
 };
 import {
   fetchAcademicOverviewFromDb,

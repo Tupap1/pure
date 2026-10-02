@@ -75,6 +75,15 @@ endpoint en ejecución.
   monocromos sin cajitas tintadas y tipografía monoespaciada solo para cifras.
 - NO DEBE haber gamificación (puntos, insignias, rachas largas, confeti) ni elementos
   decorativos. Cada elemento en pantalla muestra un dato o dispara una acción (`PRODUCT.md`).
+- Única excepción admitida, la frase del día:
+  - es una sola frase al día en la pantalla Hoy, con su original en latín, su traducción y su
+    fuente;
+  - va en texto plano, sin icono, animación ni color de acento;
+  - las frases se cargan solo con las herramientas MCP (`manage_quotes`), nunca se siembran en
+    componentes, helpers ni migraciones;
+  - la frase del día se elige de forma determinista por la fecha local.
+
+  Ningún otro elemento decorativo puede ampararse en esta excepción.
 - Las métricas de carga académica DEBEN derivarse de la norma colombiana de créditos (Decreto
   1075 de 2015: 48 h por crédito por semestre) y mostrarse con su desglose. Los ajustes
   personales se muestran aparte, nunca fundidos con la cifra normativa.
@@ -155,5 +164,10 @@ exponerlas y en no guardar secretos donde puedan viajar.
     feature posterior a la 001 antepone la letra que le asigne Andres (`US-Bn-ASm` en la 002).
     Motivo: la 002 habría repetido IDs como `US1-AS1`, y el test de trazabilidad no habría podido
     distinguir la cobertura de cada feature.
+  - 1.1.0 (2026-10-02, MINOR): el Principio V admite una sola excepción acotada, la frase del día
+    en Hoy, con su original en latín, su traducción y su fuente. Las frases se cargan solo por MCP.
+    Motivo: Andres pidió la frase del día en la feature 004-foco-cronometro y prefirió enmendar
+    la constitución antes que saltársela. La excepción se acota a un único elemento para que no
+    abra la puerta a otros decorativos.
 
-**Version**: 1.0.1 | **Ratified**: 2026-09-11 | **Last Amended**: 2026-09-12
+**Version**: 1.1.0 | **Ratified**: 2026-09-11 | **Last Amended**: 2026-10-02

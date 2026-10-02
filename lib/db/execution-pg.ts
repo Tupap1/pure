@@ -415,7 +415,7 @@ export interface TandaRecord {
   local_date: string;
   started_at: string;
   ended_at?: string | null;
-  planned_minutes: number;
+  planned_minutes: number | null;
   actual_minutes?: number | null;
   status: string;
   running_lock?: string | null;
@@ -426,6 +426,20 @@ export interface TandaRecord {
   end_notified_at?: string | null;
   /** US-T2: true solo para tandas creadas por manage_tandas:log_late (registro tardío). */
   late_logged: boolean;
+  /** US-F1: tipo de sesión ('temporizador' o 'cronometro'). */
+  kind: 'temporizador' | 'cronometro';
+  /** US-F2: objetivo vinculado a esta sesión. */
+  objective_id?: string | null;
+  /** US-F4: bandera de corrección. */
+  corrected: boolean;
+  /** US-F4: hora del servidor de la última corrección. */
+  corrected_at?: string | null;
+  /** US-F4: fin antes de la primera corrección (en cronómetro en curso, hora de la corrección). */
+  original_ended_at?: string | null;
+  /** US-F4: minutos antes de la primera corrección. */
+  original_minutes?: number | null;
+  /** US-F4: razón de la última corrección. */
+  correction_reason?: string | null;
   created_at?: string;
 }
 
@@ -450,7 +464,7 @@ export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaR
     local_date: tanda.local_date!,
     started_at: tanda.started_at!,
     ended_at: tanda.ended_at ?? null,
-    planned_minutes: tanda.planned_minutes ?? 10,
+    planned_minutes: tanda.planned_minutes ?? (tanda.kind === 'cronometro' ? null : 10),
     actual_minutes: tanda.actual_minutes ?? null,
     status: tanda.status || 'en_curso',
     running_lock: tanda.running_lock ?? null,
@@ -459,13 +473,21 @@ export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaR
     locked_at: tanda.locked_at!,
     edited_after_lock: tanda.edited_after_lock ?? false,
     late_logged: tanda.late_logged ?? false,
+    kind: tanda.kind || 'temporizador',
+    objective_id: tanda.objective_id ?? null,
+    corrected: tanda.corrected ?? false,
+    corrected_at: tanda.corrected_at ?? null,
+    original_ended_at: tanda.original_ended_at ?? null,
+    original_minutes: tanda.original_minutes ?? null,
+    correction_reason: tanda.correction_reason ?? null,
   };
   const res = await pgPool.query(
     `INSERT INTO tandas
        (id, subject_id, topic_id, deliverable_id, task_id, routine_slot_id, study_block_id,
         local_date, started_at, ended_at, planned_minutes, actual_minutes, status, running_lock,
-        interrupt_reason, mode, locked_at, edited_after_lock, late_logged)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        interrupt_reason, mode, locked_at, edited_after_lock, late_logged, kind, objective_id,
+        corrected, corrected_at, original_ended_at, original_minutes, correction_reason)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
      ON CONFLICT (id) DO UPDATE SET
        subject_id = EXCLUDED.subject_id,
        topic_id = EXCLUDED.topic_id,
@@ -480,7 +502,13 @@ export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaR
        interrupt_reason = EXCLUDED.interrupt_reason,
        mode = EXCLUDED.mode,
        edited_after_lock = EXCLUDED.edited_after_lock,
-       late_logged = EXCLUDED.late_logged
+       late_logged = EXCLUDED.late_logged,
+       objective_id = EXCLUDED.objective_id,
+       corrected = EXCLUDED.corrected,
+       corrected_at = EXCLUDED.corrected_at,
+       original_ended_at = EXCLUDED.original_ended_at,
+       original_minutes = EXCLUDED.original_minutes,
+       correction_reason = EXCLUDED.correction_reason
      RETURNING *`,
     [
       record.id,
@@ -502,6 +530,13 @@ export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaR
       record.locked_at,
       record.edited_after_lock,
       record.late_logged,
+      record.kind,
+      record.objective_id,
+      record.corrected,
+      record.corrected_at,
+      record.original_ended_at,
+      record.original_minutes,
+      record.correction_reason,
     ]
   );
   return res.rows[0];
@@ -1009,4 +1044,116 @@ export async function claimIrritationDropInDb(
     [ratingId, now.toISOString(), measureId]
   );
   return res.rows[0] || null;
+}
+
+// --- objetivos (US-F2) ---
+
+export interface ObjectiveRecord {
+  id: string;
+  name: string;
+  active_name_key: string | null;
+  subject_id?: string | null;
+  weekly_target_minutes?: number | null;
+  archived: boolean;
+  archived_at?: string | null;
+  created_at?: string;
+}
+
+export async function fetchObjectivesFromDb(id?: string): Promise<ObjectiveRecord | ObjectiveRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM objetivos WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM objetivos ORDER BY name ASC');
+  return res.rows;
+}
+
+export async function insertObjectiveToDb(objective: Partial<ObjectiveRecord>): Promise<ObjectiveRecord> {
+  const record: ObjectiveRecord = {
+    id: objective.id!,
+    name: objective.name!,
+    active_name_key: objective.active_name_key ?? null,
+    subject_id: objective.subject_id ?? null,
+    weekly_target_minutes: objective.weekly_target_minutes ?? null,
+    archived: objective.archived ?? false,
+    archived_at: objective.archived_at ?? null,
+  };
+  const res = await pgPool.query(
+    `INSERT INTO objetivos (id, name, active_name_key, subject_id, weekly_target_minutes, archived, archived_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING *`,
+    [record.id, record.name, record.active_name_key, record.subject_id, record.weekly_target_minutes, record.archived, record.archived_at]
+  );
+  return res.rows[0];
+}
+
+export async function updateObjectiveInDb(objective: Partial<ObjectiveRecord>): Promise<ObjectiveRecord> {
+  const record: ObjectiveRecord = {
+    id: objective.id!,
+    name: objective.name!,
+    active_name_key: objective.active_name_key ?? null,
+    subject_id: objective.subject_id ?? null,
+    weekly_target_minutes: objective.weekly_target_minutes ?? null,
+    archived: objective.archived ?? false,
+    archived_at: objective.archived_at ?? null,
+  };
+  const res = await pgPool.query(
+    `UPDATE objetivos SET name = $2, active_name_key = $3, subject_id = $4, weekly_target_minutes = $5, archived = $6, archived_at = $7
+     WHERE id = $1
+     RETURNING *`,
+    [record.id, record.name, record.active_name_key, record.subject_id, record.weekly_target_minutes, record.archived, record.archived_at]
+  );
+  return res.rows[0];
+}
+
+// --- frases (US-F5) ---
+
+export interface QuoteRecord {
+  id: string;
+  text: string;
+  translation?: string | null;
+  source?: string | null;
+  active: boolean;
+  created_at?: string;
+}
+
+export async function fetchQuotesFromDb(): Promise<QuoteRecord[]> {
+  const res = await pgPool.query('SELECT * FROM frases ORDER BY id ASC');
+  return res.rows;
+}
+
+export async function insertQuotesInDb(rows: Array<Partial<QuoteRecord>>, client?: PoolClient): Promise<void> {
+  const runner = client ?? pgPool;
+  for (const row of rows) {
+    const record: QuoteRecord = {
+      id: row.id!,
+      text: row.text!,
+      translation: row.translation ?? null,
+      source: row.source ?? null,
+      active: row.active ?? true,
+    };
+    await runner.query(
+      `INSERT INTO frases (id, text, translation, source, active)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (id) DO NOTHING`,
+      [record.id, record.text, record.translation, record.source, record.active]
+    );
+  }
+}
+
+export async function updateQuoteInDb(quote: Partial<QuoteRecord>): Promise<QuoteRecord> {
+  const record: QuoteRecord = {
+    id: quote.id!,
+    text: quote.text!,
+    translation: quote.translation ?? null,
+    source: quote.source ?? null,
+    active: quote.active ?? true,
+  };
+  const res = await pgPool.query(
+    `UPDATE frases SET text = $2, translation = $3, source = $4, active = $5
+     WHERE id = $1
+     RETURNING *`,
+    [record.id, record.text, record.translation, record.source, record.active]
+  );
+  return res.rows[0];
 }
