@@ -47,6 +47,11 @@ import {
   ObjectiveUpdateSchema,
   ObjectiveArchiveSchema,
   FocusSummarySchema,
+  QuoteCreateSchema,
+  QuoteCreateManySchema,
+  QuoteReadSchema,
+  QuoteUpdateSchema,
+  QuoteDeactivateSchema,
   zodErrorToExecutionResult,
   type ExecutionResult,
 } from '../validations/schemas';
@@ -62,6 +67,7 @@ import {
   correctTanda,
 } from './tandas';
 import { createObjective, readObjectives, updateObjective, archiveObjective } from './objectives';
+import { createQuote, createManyQuotes, readQuotes, updateQuote, deactivateQuote } from './quotes';
 import { getToday } from './today';
 import { getFocusSummary } from './focus';
 import {
@@ -878,6 +884,60 @@ export async function handleManageObjectives(
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: 'Error inesperado en manage_objectives',
+    };
+  }
+}
+
+export type ManageQuotesAction = 'create' | 'create_many' | 'read' | 'update' | 'deactivate';
+
+/**
+ * `manage_quotes` (US-F5): frases latinas de la línea del día en Hoy. Acciones: create (idempotente
+ * por texto normalizado: devuelve la existente), create_many (lote de 1 a 200, todo o nada e
+ * idempotente: `{ creadas, omitidas }`), read, update y deactivate. Solo MCP: NO está en
+ * `ALLOWED_ACTIONS` de app/api/execution/route.ts, así que la web no puede crear ni modificar frases
+ * (FR-F25, US-F5-AS6). `read` no lleva `data` obligatoria.
+ */
+export async function handleManageQuotes(action: ManageQuotesAction, data?: unknown): Promise<ExecutionResult> {
+  try {
+    switch (action) {
+      case 'create': {
+        const parsed = QuoteCreateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await createQuote(parsed.data);
+      }
+      case 'create_many': {
+        const parsed = QuoteCreateManySchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await createManyQuotes(parsed.data);
+      }
+      case 'read': {
+        const parsed = QuoteReadSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await readQuotes(parsed.data);
+      }
+      case 'update': {
+        const parsed = QuoteUpdateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await updateQuote(parsed.data);
+      }
+      case 'deactivate': {
+        const parsed = QuoteDeactivateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await deactivateQuote(parsed.data);
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para manage_quotes: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_quotes:', error);
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: 'Error inesperado en manage_quotes',
     };
   }
 }

@@ -9,8 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { FocusDuration, FocusHeatmap } from '@/components/ui/FocusHeatmap';
 import { buildFocusStripView } from '@/lib/domain/focus-heatmap';
-import type { TodayPayload, TodayRunningTanda } from '@/lib/execution/today';
-import type { QuoteOfDay } from '@/lib/domain/focus';
+import type { TodayRunningTanda } from '@/lib/execution/today';
 import {
   buildTodayFooterView,
   describeFinishFailure,
@@ -156,9 +155,8 @@ export const TodayDashboard: React.FC = () => {
   }
 
   const running = today.running_tanda;
-  // US-F5 (FR-F27): lectura tolerante de `frase_del_dia`. El backend (T041) todavía no la declara en
-  // `TodayPayload`; cuando lo haga, este cast sobra. Sin frase, `quote` es null y no se pinta nada.
-  const quote = quoteLineView((today as TodayPayload & { frase_del_dia?: QuoteOfDay | null }).frase_del_dia);
+  // US-F5 (FR-F27): sin frase activa `frase_del_dia` es null, `quote` es null y no se pinta nada.
+  const quote = quoteLineView(today.frase_del_dia);
   const isCronometro = running?.kind === 'cronometro';
   // aria-live: el texto solo cambia una vez por minuto (un entero de minutos), nunca por segundo.
   const minutesLeft = running && secondsLeft != null ? Math.ceil(secondsLeft / 60) : null;

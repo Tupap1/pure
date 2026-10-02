@@ -8,9 +8,15 @@ import { readProgram } from './program';
 import { currentTanda, readTandas, cachedSplitByLocalDay, loadObjectivesById } from './tandas';
 import { resolveTodayTrigger } from './routine';
 import { focusDays, sumFocusMinutes, type FocusDay } from './focus';
-import { fetchHabitsFromDb, fetchDailyChecksFromDb, HabitRecord, DailyCheckRecord } from '../db/execution-pg';
+import {
+  fetchHabitsFromDb,
+  fetchDailyChecksFromDb,
+  fetchQuotesFromDb,
+  HabitRecord,
+  DailyCheckRecord,
+} from '../db/execution-pg';
 import { isHabitActive, evaluateDay, describeDay, CurrentTrigger, DayBreakdown } from '../domain/execution';
-import { tallyDay } from '../domain/focus';
+import { tallyDay, quoteOfDay, type QuoteOfDay } from '../domain/focus';
 import type { ExecutionResult } from '../validations/schemas';
 
 export interface TodayRunningTanda {
@@ -50,6 +56,9 @@ export interface TodayPayload {
   /** 004 (US-F3, FR-F18): días del mapa de las últimas 12 semanas (del lunes de hace 11 semanas a
    * hoy; menos de 84 si la semana en curso no terminó), con el mismo nivel que `get_focus_summary`. */
   foco_12_semanas: FocusDay[];
+  /** 004 (US-F5, FR-F26): la frase latina del día, por rotación determinista sobre las frases activas
+   * según la fecha local; null si no hay ninguna activa (Hoy no pinta nada, US-F5-AS4). */
+  frase_del_dia: QuoteOfDay | null;
 }
 
 export async function getToday(now: Date = new Date()): Promise<ExecutionResult<TodayPayload>> {
@@ -136,6 +145,9 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
   const evaluation = evaluateDay(evaluationInput);
   const evaluacion_dia = describeDay(evaluationInput);
 
+  // 004 (US-F5): `quoteOfDay` filtra las activas y las ordena por id; aquí solo se leen.
+  const frase_del_dia = quoteOfDay(dateKey, await fetchQuotesFromDb());
+
   return {
     status: 'success',
     data: {
@@ -151,6 +163,7 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
       evaluacion_dia,
       foco_semana_minutos,
       foco_12_semanas,
+      frase_del_dia,
     },
   };
 }

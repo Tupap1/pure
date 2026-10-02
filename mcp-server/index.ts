@@ -43,6 +43,7 @@ import {
   handlePlanWeek,
   handleManageFriction,
   handleManageObjectives,
+  handleManageQuotes,
 } from './tools-handler';
 import { runExecutionTick } from '../lib/execution/tick';
 import { createZeptoMailer } from '../lib/execution/mailer';
@@ -338,7 +339,7 @@ export const TOOLS_LIST = [
   {
     name: 'get_today',
     description:
-      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (con los segundos restantes), el disparador vigente si lo hay, los hábitos pendientes, si el día quedó cumplido y la evaluación desglosada del día (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled). También foco_semana_minutos (minutos enfocados de lunes a hoy) y foco_12_semanas (días { date, minutos, nivel } de las últimas 12 semanas, el mismo nivel y los mismos minutos que get_focus_summary).',
+      'Módulo de Ejecución: estado de la pantalla Hoy (US1-US3), de solo lectura. Devuelve la hora del servidor, la fecha y semana local, la tanda en curso (running_tanda con kind temporizador|cronometro, objective_id, y seconds_left en el temporizador o elapsed_seconds en el cronómetro), el disparador vigente si lo hay, los hábitos pendientes, si el día quedó cumplido y la evaluación desglosada del día (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled). También foco_semana_minutos (minutos enfocados de lunes a hoy) y foco_12_semanas (días { date, minutos, nivel } de las últimas 12 semanas, el mismo nivel y los mismos minutos que get_focus_summary) y frase_del_dia ({ text, translation, source } o null si no hay frases activas: una frase latina por día, rotación determinista por fecha local sobre las frases activas de manage_quotes).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -534,6 +535,29 @@ export const TOOLS_LIST = [
       required: ['action'],
     },
   },
+  {
+    name: 'manage_quotes',
+    description:
+      'Módulo de Ejecución: frases latinas de la línea del día en Hoy (US-F5). SOLO MCP: la web no puede crearlas ni modificarlas. Una frase tiene texto latino (1-300 caracteres), traducción opcional (hasta 300) y fuente opcional (hasta 120); get_today devuelve una por día (frase_del_dia) con rotación determinista por fecha local sobre las frases activas. ' +
+      'Carga inicial: una sola vez, con "create_many" y el contenido de specs/004-foco-cronometro/frases.json (50 frases); responde { creadas, omitidas }. "create_many" (1 a 200 frases) es todo o nada: una frase inválida rechaza el lote entero con DATOS_INVALIDOS y no escribe ninguna; es idempotente, repetir la carga da { creadas: 0, omitidas: 50 }. ' +
+      'La comparación ignora mayúsculas y espacios en los extremos del texto latino. "create" también es idempotente: si la frase ya existe devuelve la existente. "read" lista las activas ordenadas por id (include_inactive incluye las desactivadas). "update" cambia texto, traducción, fuente o active sin cambiar el id; "deactivate" saca la frase de la rotación (idempotente).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'create_many', 'read', 'update', 'deactivate'] },
+        data: {
+          type: 'object',
+          description:
+            'create: { text (1-300), translation? (hasta 300), source? (hasta 120) } -> la frase (la existente si ya estaba). ' +
+            'create_many: { frases: [{ text, translation?, source? }] } (1 a 200, todo o nada) -> { creadas, omitidas }. ' +
+            'read: { include_inactive? (false por defecto) } -> { frases[] } ordenadas por id. ' +
+            'update: { id, text?, translation?, source?, active? } (cambiar text no cambia el id). ' +
+            'deactivate: { id }.',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export function createMcpServerInstance() {
@@ -549,7 +573,7 @@ export function createMcpServerInstance() {
     }
   );
 
-  // Register all 10 tools using modern McpServer tool() API
+  // Register all tools using modern McpServer tool() API
   mcpServer.tool('get_academic_overview', 'Retorna el resumen académico global, tiempo libre neto y promedios por carrera.', {}, async () => {
     const res = await handleGetAcademicOverview();
     return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
@@ -761,7 +785,7 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'get_today',
-    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso, disparador vigente, hábitos pendientes, día cumplido, evaluación desglosada con tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled, foco_semana_minutos y foco_12_semanas con los días { date, minutos, nivel } de las últimas 12 semanas). Solo lectura.',
+    'Módulo de Ejecución: estado de Hoy (server_now, fecha y semana local, tanda en curso con kind temporizador|cronometro, objective_id, seconds_left o elapsed_seconds, disparador vigente, hábitos pendientes, día cumplido, evaluación desglosada con tandas_completadas/min_requerido/cumplio_tandas/cumplio_habitos/day_fulfilled, foco_semana_minutos, foco_12_semanas con los días { date, minutos, nivel } de las últimas 12 semanas y frase_del_dia { text, translation, source } | null). Solo lectura.',
     {
       data: z.any().optional(),
     },
@@ -894,6 +918,19 @@ export function createMcpServerInstance() {
     },
     async ({ action, data }) => {
       const res = await handleManageObjectives(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_quotes',
+    'Módulo de Ejecución: frases latinas de la línea del día en Hoy (US-F5). Solo MCP. create/create_many/read/update/deactivate. Carga inicial una sola vez con create_many y el contenido de specs/004-foco-cronometro/frases.json: todo o nada e idempotente por texto latino (sin distinguir mayúsculas ni espacios en los extremos), responde { creadas, omitidas }. create devuelve la existente si ya estaba; read lista las activas (include_inactive las desactivadas); update no cambia el id; deactivate saca la frase de la rotación de frase_del_dia en get_today.',
+    {
+      action: z.enum(['create', 'create_many', 'read', 'update', 'deactivate']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageQuotes(action, data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );
