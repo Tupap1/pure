@@ -25,6 +25,7 @@ import {
   isHabitActive,
   evaluateDay,
   describeDay,
+  tandaUnits,
   isTandaBeforeCutoff,
   isoDayOfWeekForDateKey,
   DayEvaluation,
@@ -69,6 +70,11 @@ export interface AperturasPlan {
   razones: string[];
 }
 
+export interface RegistrosTardios {
+  total: number;
+  minutos: number;
+}
+
 export interface ComplianceResult {
   dias: ComplianceDay[];
   days_fulfilled: number;
@@ -80,6 +86,11 @@ export interface ComplianceResult {
   dias_cumplidos_totales: number;
   horizonte: number;
   aperturas_plan: AperturasPlan;
+  /** US-T2/FR-T14: tandas con late_logged=true en el rango pedido, y la suma de sus
+   * actual_minutes. Siempre números explícitos, nunca null ni ausente (aunque sea { total: 0,
+   * minutos: 0 }): un reporte silencioso sobre el registro tardío sería tan invisible como el
+   * incidente que esta historia soluciona. */
+  registros_tardios: RegistrosTardios;
 }
 
 export function summarizePlanOpenings(
@@ -114,12 +125,16 @@ function evaluateOneDay(
   checks: DailyCheckRecord[]
 ): ComplianceDay {
   const week = weeks.find((w) => w.starts_on <= dateKey && dateKey <= addDays(w.starts_on, 6)) ?? null;
-  const completedThatDay = tandas.filter((t) => t.local_date === dateKey && t.status === 'completada').length;
+  const completedThatDay = tandas.filter((t) => t.local_date === dateKey && t.status === 'completada');
+  const completedCount = completedThatDay.length;
+  // FR-T05: calcular unidades (suma de tandaUnits sobre las completadas).
+  const completedUnits = completedThatDay.reduce((sum, t) => sum + tandaUnits(t.actual_minutes), 0);
   const checksForDate = checks.filter((c) => c.date === dateKey);
   const evaluationInput = {
     dateKey,
     minTandasDia: week ? week.min_tandas_dia : null,
-    completedTandas: completedThatDay,
+    completedTandas: completedCount,
+    completedUnits,
     habits,
     checks: checksForDate.map((c) => ({ habit_id: c.habit_id, status: c.status })),
   };
@@ -199,6 +214,14 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
 
   const ediciones_tardias = tandasInRange.filter((t) => t.edited_after_lock).length;
 
+  // US-T2/FR-T14: sobre el mismo rango ya filtrado por cutoff y fecha (tandasInRange), nunca
+  // ausente ni null -- { total: 0, minutos: 0 } cuando no hubo ningún registro tardío.
+  const registrosTardiosEnRango = tandasInRange.filter((t) => t.late_logged);
+  const registros_tardios: RegistrosTardios = {
+    total: registrosTardiosEnRango.length,
+    minutos: registrosTardiosEnRango.reduce((sum, t) => sum + (t.actual_minutes ?? 0), 0),
+  };
+
   const outcomesInRange = outcomes.filter((o) => o.date >= input.from && o.date <= input.to);
   const hecho = outcomesInRange.filter((o) => o.outcome === 'hecho').length;
   const no = outcomesInRange.filter((o) => o.outcome === 'no').length;
@@ -230,5 +253,6 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
     dias_cumplidos_totales,
     horizonte,
     aperturas_plan,
+    registros_tardios,
   };
 }

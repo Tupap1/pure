@@ -7,7 +7,7 @@ import { readProgram } from './program';
 import { currentTanda, readTandas } from './tandas';
 import { resolveTodayTrigger } from './routine';
 import { fetchHabitsFromDb, fetchDailyChecksFromDb, HabitRecord, DailyCheckRecord } from '../db/execution-pg';
-import { isHabitActive, evaluateDay, describeDay, CurrentTrigger, DayBreakdown } from '../domain/execution';
+import { isHabitActive, evaluateDay, describeDay, tandaUnits, CurrentTrigger, DayBreakdown } from '../domain/execution';
 import type { ExecutionResult } from '../validations/schemas';
 
 export interface TodayRunningTanda {
@@ -31,6 +31,7 @@ export interface TodayPayload {
   trigger: CurrentTrigger | null;
   pending_checks: TodayPendingCheck[];
   tandas_today: number;
+  unidades_hoy: number;
   day_fulfilled: boolean | null;
   evaluacion_dia: DayBreakdown | null;
 }
@@ -65,8 +66,12 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
   // (auditoría US2/US3): antes, tandas_today contaba las tres, así que el pie podía decir "1
   // tanda hoy" apenas se tocaba "Empezar tanda", sin haber estudiado un minuto.
   const readRes = await readTandas({ from: dateKey, to: dateKey }, now);
-  const completedToday =
-    readRes.status === 'success' ? readRes.data!.tandas.filter((t) => t.status === 'completada').length : 0;
+  const completedTandas =
+    readRes.status === 'success' ? readRes.data!.tandas.filter((t) => t.status === 'completada') : [];
+  const completedToday = completedTandas.length;
+
+  // FR-T05: calcular unidades de hoy (suma de tandaUnits sobre las completadas).
+  const completedUnitsToday = completedTandas.reduce((sum, t) => sum + tandaUnits(t.actual_minutes), 0);
 
   const trigger = await resolveTodayTrigger(now);
 
@@ -86,6 +91,7 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
     dateKey,
     minTandasDia: currentWeek ? currentWeek.min_tandas_dia : null,
     completedTandas: completedToday,
+    completedUnits: completedUnitsToday,
     habits,
     checks: checksToday.map((c) => ({ habit_id: c.habit_id, status: c.status })),
   };
@@ -103,6 +109,7 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
       trigger,
       pending_checks,
       tandas_today: completedToday,
+      unidades_hoy: completedUnitsToday,
       day_fulfilled: evaluation ? evaluation.fulfilled : null,
       evaluacion_dia,
     },

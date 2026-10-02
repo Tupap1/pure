@@ -17,6 +17,7 @@ import {
   TandaInterruptSchema,
   TandaReadSchema,
   TandaUpdateSchema,
+  TandaLogLateSchema,
   RoutineSlotSchema,
   RoutineSlotReadSchema,
   RoutineSlotDeleteSchema,
@@ -38,11 +39,13 @@ import {
   IntentionsSetSchema,
   PlanWeekPreviewSchema,
   PlanWeekOpenViewSchema,
+  FrictionMeasureSchema,
+  FrictionRateSchema,
   zodErrorToExecutionResult,
   type ExecutionResult,
 } from '../validations/schemas';
 import { initProgram, readProgram, updateProgramWeek, upsertHabit, retireHabit } from './program';
-import { startTanda, finishTanda, interruptTanda, currentTanda, readTandas, updateTanda } from './tandas';
+import { startTanda, finishTanda, interruptTanda, currentTanda, readTandas, updateTanda, logLateTanda } from './tandas';
 import { getToday } from './today';
 import {
   upsertRoutineSlot,
@@ -51,6 +54,14 @@ import {
   respondToRoutineSlot,
   rehearseRoutineSlot,
 } from './routine';
+import {
+  enableFriction,
+  disableFriction,
+  verifyFriction,
+  rateFriction,
+  readFriction,
+  listIrritationDropsInRange,
+} from './friction';
 import { setDailyCheck, readDailyChecks } from './checks';
 import { computeGradeProjections } from './grade-projection';
 import { getCompliance } from './compliance';
@@ -133,13 +144,15 @@ export async function handleManageProgram(
   }
 }
 
-export type ManageTandasAction = 'start' | 'finish' | 'interrupt' | 'current' | 'read' | 'update';
+export type ManageTandasAction = 'start' | 'finish' | 'interrupt' | 'current' | 'read' | 'update' | 'log_late';
 
 /**
- * `manage_tandas` (US1): la tanda de 10 minutos en un toque. `start`/`finish`/`interrupt`/
- * `update` validan su forma con los esquemas Zod estrictos de schemas.ts (que ya rechazan
- * `started_at`/`ended_at` del cliente por ser claves no reconocidas) y delegan las reglas de
- * negocio en lib/execution/tandas.ts. `current` no tiene esquema propio: no recibe `data`.
+ * `manage_tandas` (US1, US-T1, US-T2): la tanda de estudio, de 10 a 60 minutos. `start`/`finish`/
+ * `interrupt`/`update` validan su forma con los esquemas Zod estrictos de schemas.ts (que ya
+ * rechazan `started_at`/`ended_at` del cliente por ser claves no reconocidas) y delegan las
+ * reglas de negocio en lib/execution/tandas.ts. `current` no tiene esquema propio: no recibe
+ * `data`. `log_late` (US-T2) es la única excepción acotada que sí acepta instantes del cliente;
+ * no entra en la lista blanca de app/api/execution/route.ts (FR-T15): solo se dispara por MCP.
  */
 export async function handleManageTandas(
   action: ManageTandasAction,
@@ -150,8 +163,14 @@ export async function handleManageTandas(
     switch (action) {
       case 'start': {
         const parsed = TandaStartSchema.safeParse(data ?? {});
-        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
-        return await startTanda(parsed.data, now);
+        const result = parsed.success
+          ? await startTanda(parsed.data, now)
+          : zodErrorToExecutionResult(parsed.error);
+        // Incidente 21-sep: registrar cada rechazo (validación o regla de negocio) para facilitar investigación
+        if (result.status === 'error') {
+          console.warn('[execution] start rechazado:', result.code, result.message);
+        }
+        return result;
       }
       case 'finish': {
         const parsed = TandaFinishSchema.safeParse(data ?? {});
@@ -175,6 +194,11 @@ export async function handleManageTandas(
         const parsed = TandaUpdateSchema.safeParse(data ?? {});
         if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
         return await updateTanda(parsed.data, now);
+      }
+      case 'log_late': {
+        const parsed = TandaLogLateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await logLateTanda(parsed.data, now);
       }
       default:
         return {
@@ -357,9 +381,10 @@ async function assembleReportInput(
   const from = week.starts_on;
   const to = addDays(week.starts_on, 6);
 
-  const [compliance, projections] = await Promise.all([
+  const [compliance, projections, friccionRetiradas] = await Promise.all([
     getCompliance({ from, to, cutoff }),
     computeGradeProjections(cutoff),
+    listIrritationDropsInRange(from, to, cutoff),
   ]);
   const enRiesgo = deriveRiskSection(projections.materias, projections.alertas);
 
@@ -387,6 +412,8 @@ async function assembleReportInput(
     // cambiar mientras la semana en curso no se congele de verdad.
     second_consecutive_failure: false,
     aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
+    friccion_retiradas: friccionRetiradas,
+    registros_tardios: compliance.registros_tardios,
   };
 }
 
@@ -698,6 +725,59 @@ export async function handlePlanWeek(
       status: 'error',
       code: 'DATOS_INVALIDOS',
       message: 'Error inesperado en plan_week',
+    };
+  }
+}
+
+export type ManageFrictionAction = 'enable' | 'disable' | 'verify' | 'rate' | 'read';
+
+/**
+ * `manage_friction` (US-B5): registrar y gestionar medidas de fricción del teléfono.
+ * Acciones: enable, disable, verify, rate, read.
+ */
+export async function handleManageFriction(
+  action: ManageFrictionAction,
+  data?: unknown,
+  now: Date = new Date()
+): Promise<ExecutionResult> {
+  try {
+    switch (action) {
+      case 'enable': {
+        const parsed = FrictionMeasureSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await enableFriction(parsed.data.measure_key, now);
+      }
+      case 'disable': {
+        const parsed = FrictionMeasureSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await disableFriction(parsed.data.measure_key, now);
+      }
+      case 'verify': {
+        const parsed = FrictionMeasureSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await verifyFriction(parsed.data.measure_key, now);
+      }
+      case 'rate': {
+        const parsed = FrictionRateSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await rateFriction(parsed.data, now);
+      }
+      case 'read': {
+        return await readFriction(now);
+      }
+      default:
+        return {
+          status: 'error',
+          code: 'DATOS_INVALIDOS',
+          message: `Acción no válida para manage_friction: ${String(action)}`,
+        };
+    }
+  } catch (error: any) {
+    console.error('[execution] Error inesperado en manage_friction:', error);
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: 'Error inesperado en manage_friction',
     };
   }
 }

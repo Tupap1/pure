@@ -113,6 +113,20 @@ describe('[001] US7 — Avisos en el teléfono', () => {
     expect(pusher.calls).toHaveLength(1);
   });
 
+  it('US-T1-AS9 · el aviso de fin de una tanda de 40 minutos dice "40 minutos"', async () => {
+    await setupProgram();
+
+    vi.setSystemTime(new Date('2026-09-14T15:00:00.000Z'));
+    await handleManageTandas('start', { planned_minutes: 40 });
+
+    vi.setSystemTime(new Date('2026-09-14T15:40:05.000Z')); // +40 min y unos segundos
+    const pusher = makeFakePusher();
+    const tick = await runExecutionTick(new Date(), { mailer: makeFakeMailer(), pusher });
+    expect(tick.notified).toBe(1);
+    expect(pusher.calls).toHaveLength(1);
+    expect(pusher.calls[0]).toMatchObject({ title: 'Terminó la tanda', body: '40 minutos', tag: 'tanda', url: '/' });
+  });
+
   it('US7-AS3 · al congelar el reporte llega un aviso con la hora límite de la nota; si falla el envío, llega un aviso del fallo', async () => {
     await setupProgram(2);
     await setupPartner();

@@ -55,6 +55,13 @@ export interface BuildReportPayloadInput {
   aperturas_plan?: { total: number; con_razon: number; libres_usadas: number };
   /** @deprecated solo payloads congelados antes de la 002. */
   plan_openings?: number;
+  /** US-B5: medidas de fricción retiradas por irritación durante esta semana (FR-B21). Lista
+   * vacía si no hubo retiros; ausente en payloads congelados antes de esta feature. */
+  friccion_retiradas?: { measure_key: string; fecha: string }[];
+  /** US-T2/FR-T14: registros tardíos (manage_tandas:log_late) de la semana, con ceros explícitos
+   * cuando no hubo ninguno. Opcional para compatibilidad con payloads congelados antes de esta
+   * feature (esos, al leerse de vuelta, simplemente no traen esta sección). */
+  registros_tardios?: { total: number; minutos: number };
 }
 
 export interface ReportPayload extends BuildReportPayloadInput {
@@ -106,6 +113,16 @@ export function deriveRiskSection(materias: SubjectProjectionEntry[], alertas: G
 
 const MONTHS_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const WEEKDAYS_ES = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']; // 1=lunes..7=domingo
+
+/** US-B5/contracts/notifications.md: etiqueta en español de cada medida de fricción, para la
+ * línea "Fricción: se retiró "{etiqueta}" por irritación." del correo. */
+const FRICTION_LABELS: Record<string, string> = {
+  sin_biometria: 'sin biometría',
+  clave_larga: 'clave larga',
+  escala_grises: 'escala de grises',
+  redes_fuera_home: 'redes fuera de la pantalla de inicio',
+  app_desinstalada: 'app desinstalada',
+};
 
 function dayOfMonth(dateKey: string): number {
   return Number(dateKey.split('-')[2]);
@@ -195,6 +212,15 @@ export function renderReportText(payload: ReportPayload): string {
     lines.push(`Aperturas del plan: ${total}${conRazonText}`);
   } else if (payload.plan_openings != null) {
     lines.push(`Aperturas del plan: ${payload.plan_openings}`);
+  }
+  // US-T2/FR-T14: solo aparece cuando hubo al menos uno -- "0 registros tardíos" todas las
+  // semanas sería ruido, no una señal (spec.md, "Qué construir" #8).
+  if (payload.registros_tardios && payload.registros_tardios.total > 0) {
+    lines.push(`Registros tardíos: ${payload.registros_tardios.total} (${payload.registros_tardios.minutos} min)`);
+  }
+  for (const item of payload.friccion_retiradas ?? []) {
+    const label = FRICTION_LABELS[item.measure_key] ?? item.measure_key;
+    lines.push(`Fricción: se retiró "${label}" por irritación.`);
   }
 
   return lines.join('\n');

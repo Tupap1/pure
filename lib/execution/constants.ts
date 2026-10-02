@@ -2,10 +2,22 @@
 // (lib/validations/schemas.ts) como en los servicios (lib/execution/*), para no repetir los
 // números mágicos de spec.md en dos lugares distintos.
 
-/** FR-001: la pantalla de inicio siempre usa 10 minutos; el rango 5-25 es para el asistente de IA. */
+/** FR-T01: la pantalla de inicio usa 10 minutos; el rango 10-60 permite tandas más largas.
+ * TANDA_DURATION_OPTIONS se usa en la UI (10, 25, 40, 60 minutos, cada uno iniciando la tanda). */
 export const TANDA_MINUTES_DEFAULT = 10;
-export const TANDA_MINUTES_MIN = 5;
-export const TANDA_MINUTES_MAX = 25;
+export const TANDA_MINUTES_MIN = 10;
+export const TANDA_MINUTES_MAX = 60;
+export const TANDA_UNIT_MINUTES = 10;
+export const TANDA_DURATION_OPTIONS = [10, 25, 40, 60] as const;
+
+/** FR-T11/US-T2: `log_late` solo acepta sesiones que empezaron dentro de esta ventana hacia
+ * atrás (horas), contada desde el reloj del servidor. Es la única entrada del módulo que acepta
+ * instantes del cliente -- excepción deliberada y acotada al Principio III (plan.md). */
+export const LATE_LOG_MAX_HOURS_BACK = 6;
+
+/** FR-T12/US-T2: como máximo esta cantidad de registros tardíos por día local -- el límite existe
+ * para que `log_late` no reemplace el hábito de darle iniciar. */
+export const LATE_LOG_MAX_PER_DAY = 3;
 
 /** FR-011: un disparador sin responder deja de mostrarse pasadas 4 horas de su ancla. */
 export const TRIGGER_WINDOW_MINUTES = 240;
@@ -62,3 +74,16 @@ export const REPORT_RETRY_BACKOFF_MINUTES = 10;
 /** US6: un reporte que lleva más de 15 minutos en 'enviando' vuelve a 'congelado' (intento
  * colgado: el proceso que lo reclamó murió antes de terminar el envío). */
 export const REPORT_STUCK_SENDING_MINUTES = 15;
+
+/** US-B5: límite máximo de medidas de fricción habilitadas simultáneamente (FR-B17). */
+export const FRICTION_MAX_ENABLED = 2;
+
+/** US-B5: slots de la base para habilitar medidas de fricción ('a' y 'b') (FR-B17). */
+export const FRICTION_SLOTS = ['a', 'b'] as const;
+
+/** US-B5: umbral de irritación para aplicar retiros automáticos (dos semanas consecutivas >= 7) (FR-B20). */
+export const FRICTION_IRRITATION_THRESHOLD = 7;
+
+/** US-B5: mensaje de error cuando se intenta habilitar una tercera medida (FR-B17). */
+export const FRICTION_LIMIT_MESSAGE =
+  'Ya hay 2 medidas de fricción habilitadas. El límite existe porque la restricción parcial aumenta el estrés reportado y una medida abandonada por irritación vale 0: dos sostenibles valen más que cinco abandonadas. Deshabilita una antes de agregar otra.';

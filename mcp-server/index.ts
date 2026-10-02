@@ -40,6 +40,7 @@ import {
   handleGetComplianceReport,
   handleManageTasks,
   handlePlanWeek,
+  handleManageFriction,
 } from './tools-handler';
 import { runExecutionTick } from '../lib/execution/tick';
 import { createZeptoMailer } from '../lib/execution/mailer';
@@ -307,22 +308,24 @@ export const TOOLS_LIST = [
   {
     name: 'manage_tandas',
     description:
-      'Módulo de Ejecución: tanda de estudio de 10 minutos (US1), la unidad de ejecución de Pure. ' +
+      'Módulo de Ejecución: tanda de estudio de 10 a 60 minutos (US1, US-T1), la unidad de ejecución de Pure. ' +
       '"start" la empieza con la hora del servidor (rechaza started_at/ended_at del cliente: sin tandas retroactivas) y falla con TANDA_EN_CURSO si ya hay una en curso. ' +
       '"finish" solo funciona si ya se cumplió el tiempo planeado; antes de eso usa "interrupt" con interrupt_reason (1-140 caracteres, obligatorio). ' +
-      '"current" devuelve la tanda en curso y los segundos restantes. "read" lista tandas con su resumen por día. ' +
-      '"update" solo reclasifica una tanda ya cerrada (materia, tema, entregable, tarea, modo); nunca acepta tiempos.',
+      '"current" devuelve la tanda en curso y los segundos restantes. "read" lista tandas con su resumen por día (incluye unidades). ' +
+      '"update" solo reclasifica una tanda ya cerrada (materia, tema, entregable, tarea, modo); nunca acepta tiempos. ' +
+      '"log_late" (US-T2) es la ÚNICA excepción del módulo que sí acepta started_at/ended_at del cliente: registra una sesión que se estudió sin darle iniciar, acotada a hoy (día local del servidor), hasta 6 horas atrás, 10-60 minutos, sin solaparse con otra tanda del día y máximo 3 por día; queda marcada late_logged=true y se cuenta aparte en el reporte semanal (registros_tardios). No está en la lista blanca de la web: solo se dispara por este agente.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['start', 'finish', 'interrupt', 'current', 'read', 'update'] },
+        action: { type: 'string', enum: ['start', 'finish', 'interrupt', 'current', 'read', 'update', 'log_late'] },
         data: {
           type: 'object',
           description:
-            'start: { subject_id?, topic_id?, deliverable_id?, task_id?, routine_slot_id?, planned_minutes? (5-25, 10 por defecto) }. ' +
+            'start: { subject_id?, topic_id?, deliverable_id?, task_id?, routine_slot_id?, planned_minutes? (10-60, 10 por defecto) }. ' +
             'finish: { id }. interrupt: { id, interrupt_reason (1-140) }. current: sin data. ' +
             'read: { from?, to? (YYYY-MM-DD), subject_id? }. ' +
-            'update: { id, subject_id?, topic_id?, deliverable_id?, task_id?, mode?, interrupt_reason? }.',
+            'update: { id, subject_id?, topic_id?, deliverable_id?, task_id?, mode?, interrupt_reason? }. ' +
+            'log_late: { subject_id, started_at (ISO, hoy, hasta 6h atrás), ended_at (ISO, <= ahora, > started_at), topic_id?, task_id? } -> REGISTRO_TARDIO_INVALIDO | LIMITE_REGISTRO_TARDIO.',
         },
       },
       required: ['action'],
@@ -469,6 +472,21 @@ export const TOOLS_LIST = [
             'preview: { program_week_id? } (domingo→siguiente, si no en curso, si no siguiente disponible; sin nada → NO_ENCONTRADO). ' +
             'set_intentions: { program_week_id, items: [{ subject_id, strength (0-10), reason? }] }. ' +
             'open_view: { program_week_id?, reason? } (la semana indicada o resuelta; futura es apertura de planeación sin compuerta; en curso aplica compuerta normal).',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_friction',
+    description: 'Registrar y gestionar medidas de fricción del teléfono. Pure solo registra; la ejecución la hace el SO. Máximo 2 habilitadas a la vez (si hay más de 2 → LIMITE_FRICCION). Calificación semanal de irritación (0-10); dos semanas consecutivas ≥7 retiran automáticamente la medida más recientemente habilitada sin avisos. Medidas: sin biometría, clave larga, escala de grises, redes fuera de la pantalla de inicio, app desinstalada.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['enable', 'disable', 'verify', 'rate', 'read'] },
+        data: {
+          type: 'object',
+          description: 'enable/disable/verify: { measure_key } (sin_biometria, clave_larga, escala_grises, redes_fuera_home, app_desinstalada). rate: { score: 0-10, program_week_id? (defecto: semana en curso) }. read: sin data.',
         },
       },
       required: ['action'],
@@ -688,9 +706,9 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'manage_tandas',
-    'Módulo de Ejecución: tanda de estudio de 10 minutos (US1). start/finish/interrupt/current/read/update. La hora siempre la fija el servidor; sin tandas retroactivas; interrupt exige una razón de 1-140 caracteres.',
+    'Módulo de Ejecución: tanda de estudio de 10 a 60 minutos (US1, US-T1). start/finish/interrupt/current/read/update/log_late. La hora siempre la fija el servidor; sin tandas retroactivas; interrupt exige una razón de 1-140 caracteres. log_late (US-T2) es la única excepción acotada que acepta started_at/ended_at del cliente (hoy, hasta 6h atrás, máx. 3/día, marcada late_logged y contada aparte en el reporte); no está disponible desde la web.',
     {
-      action: z.enum(['start', 'finish', 'interrupt', 'current', 'read', 'update']),
+      action: z.enum(['start', 'finish', 'interrupt', 'current', 'read', 'update', 'log_late']),
       data: z.any().optional(),
     },
     async ({ action, data }) => {
@@ -796,6 +814,19 @@ export function createMcpServerInstance() {
     },
     async ({ action, data }) => {
       const res = await handlePlanWeek(action, data);
+      return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  mcpServer.tool(
+    'manage_friction',
+    'Registrar y gestionar medidas de fricción del teléfono (US-B5). Pure solo registra; el sistema operativo ejecuta. Máximo 2 simultáneas. Calificación semanal (0-10); dos semanas consecutivas ≥7 retiran la más recientemente habilitada.',
+    {
+      action: z.enum(['enable', 'disable', 'verify', 'rate', 'read']),
+      data: z.any().optional(),
+    },
+    async ({ action, data }) => {
+      const res = await handleManageFriction(action, data);
       return { content: [{ type: 'text', text: JSON.stringify(res, null, 2) }] };
     }
   );

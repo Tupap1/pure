@@ -110,6 +110,7 @@ export async function readDailyChecks(
   const tandasRes = await readTandas({ from, to }, now);
   const porDia = tandasRes.status === 'success' ? tandasRes.data!.por_dia : [];
   const completedByDate = new Map(porDia.map((d) => [d.date, d.completadas]));
+  const completedUnitsByDate = new Map(porDia.map((d) => [d.date, d.unidades]));
 
   const dias: {
     date: string;
@@ -127,6 +128,7 @@ export async function readDailyChecks(
       dateKey: cursor,
       minTandasDia: week ? week.min_tandas_dia : null,
       completedTandas: completedByDate.get(cursor) ?? 0,
+      completedUnits: completedUnitsByDate.get(cursor) ?? 0,
       habits,
       checks: checksForDate.map((c) => ({ habit_id: c.habit_id, status: c.status })),
     });

@@ -91,6 +91,7 @@ describe('[002] US-B4 — Un día solo se cumple si hice las tandas mínimas', (
 
     expect(todayData.evaluacion_dia).toEqual({
       tandas_completadas: 2,
+      unidades_completadas: 2,
       min_requerido: 3,
       cumplio_tandas: false,
       cumplio_habitos: true,
@@ -106,6 +107,7 @@ describe('[002] US-B4 — Un día solo se cumple si hice las tandas mínimas', (
     expect(complianceData.dias).toHaveLength(1);
     expect(complianceData.dias[0].evaluacion_dia).toEqual({
       tandas_completadas: 2,
+      unidades_completadas: 2,
       min_requerido: 3,
       cumplio_tandas: false,
       cumplio_habitos: true,
@@ -156,6 +158,7 @@ describe('[002] US-B4 — Un día solo se cumple si hice las tandas mínimas', (
 
     expect(todayData.evaluacion_dia).toEqual({
       tandas_completadas: 3,
+      unidades_completadas: 3,
       min_requerido: 3,
       cumplio_tandas: true,
       cumplio_habitos: false,
@@ -257,6 +260,7 @@ describe('[002] US-B4 — Un día solo se cumple si hice las tandas mínimas', (
 
     expect(todayData.evaluacion_dia).toEqual({
       tandas_completadas: 3,
+      unidades_completadas: 3,
       min_requerido: 3,
       cumplio_tandas: true,
       cumplio_habitos: true,
@@ -301,6 +305,7 @@ describe('[002] US-B4 — Un día solo se cumple si hice las tandas mínimas', (
       day_fulfilled: false,
       evaluacion_dia: {
         tandas_completadas: 2,
+        unidades_completadas: 2,
         min_requerido: 3,
         cumplio_tandas: false,
         cumplio_habitos: true,

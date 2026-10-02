@@ -33,6 +33,13 @@ const SPECS: SpecConfig[] = [
     manualExclusions: new Set(['US-B4-AS8']),
     expectedCount: 34,
   },
+  {
+    feature: '003',
+    spec: path.join(REPO_ROOT, 'specs', '003-tandas-variables', 'spec.md'),
+    idRe: /US-T\d+-AS\d+/,
+    manualExclusions: new Set([]),
+    expectedCount: 24,
+  },
 ];
 
 /**
@@ -118,6 +125,38 @@ describe('[001] Trazabilidad spec -> tests (SC-007, Principio II)', () => {
 
 describe('[002] Trazabilidad spec -> tests (SC-B06, Principio II)', () => {
   const cfg = SPECS[1];
+  const specContent = fs.readFileSync(cfg.spec, 'utf-8');
+  const specIds = extractSpecScenarioIds(specContent, cfg.idRe);
+
+  const citedIds = new Set<string>();
+  for (const id of extractCitedIds(allTestContent, cfg.idRe)) {
+    citedIds.add(id);
+  }
+
+  it('encuentra escenarios no manuales declarados en la spec (sanity check)', () => {
+    expect(specIds.size).toBe(cfg.expectedCount);
+    for (const excluded of cfg.manualExclusions) {
+      expect(specIds.has(excluded)).toBe(false);
+    }
+  });
+
+  it('todo escenario no manual de spec.md tiene un test (it/it.todo) nombrado con su ID', () => {
+    const missing = Array.from(specIds)
+      .filter((id) => !citedIds.has(id))
+      .sort();
+    expect(missing).toEqual([]);
+  });
+
+  it('ningún test cita un ID de escenario que no exista en spec.md', () => {
+    const invalid = Array.from(citedIds)
+      .filter((id) => !specIds.has(id))
+      .sort();
+    expect(invalid).toEqual([]);
+  });
+});
+
+describe('[003] Trazabilidad spec -> tests (US-T*, Principio II)', () => {
+  const cfg = SPECS[2];
   const specContent = fs.readFileSync(cfg.spec, 'utf-8');
   const specIds = extractSpecScenarioIds(specContent, cfg.idRe);
 

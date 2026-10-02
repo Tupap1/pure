@@ -100,11 +100,11 @@ describe('[001] Validación Zod — Módulo de Ejecución (Foundational)', () =>
   });
 
   describe('Tanda (tandas)', () => {
-    it('planned_minutes acepta de 5 a 25 minutos', () => {
-      expect(TandaStartSchema.safeParse({ planned_minutes: 4 }).success).toBe(false);
-      expect(TandaStartSchema.safeParse({ planned_minutes: 26 }).success).toBe(false);
-      expect(TandaStartSchema.safeParse({ planned_minutes: 5 }).success).toBe(true);
-      expect(TandaStartSchema.safeParse({ planned_minutes: 25 }).success).toBe(true);
+    it('planned_minutes acepta de 10 a 60 minutos', () => {
+      expect(TandaStartSchema.safeParse({ planned_minutes: 9 }).success).toBe(false);
+      expect(TandaStartSchema.safeParse({ planned_minutes: 61 }).success).toBe(false);
+      expect(TandaStartSchema.safeParse({ planned_minutes: 10 }).success).toBe(true);
+      expect(TandaStartSchema.safeParse({ planned_minutes: 60 }).success).toBe(true);
       expect(TandaStartSchema.safeParse({}).success).toBe(true); // opcional: 10 por defecto en el servicio
     });
 

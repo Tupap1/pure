@@ -6,6 +6,7 @@
 // (`manage_weekly_report:run_tick`): es la misma función en los dos casos.
 
 import { finalizeElapsed } from './tandas';
+import { applyIrritationDrops, listIrritationDropsInRange } from './friction';
 import { addDays, localDateTimeToInstant, localParts } from './time';
 import {
   REPORT_FREEZE_TIME,
@@ -53,13 +54,17 @@ export interface TickOptions {
   pusher?: Pusher;
 }
 
-/** "10 minutos de {materia}" (con materia) o "10 minutos" (sin ella), como pide
- * contracts/notifications.md para el aviso de fin de tanda. */
+/** "N minutos de {materia}" (con materia) o "N minutos" (sin ella), como pide
+ * contracts/notifications.md para el aviso de fin de tanda. Usa los minutos reales de la tanda:
+ * tanda.actual_minutes (si no existe, usa planned_minutes como fallback).
+ * FR-T08: el aviso dice los minutos reales de esa tanda. */
 async function tandaEndBody(tanda: TandaRecord): Promise<string> {
-  if (!tanda.subject_id) return '10 minutos';
+  const minutes = tanda.actual_minutes ?? tanda.planned_minutes;
+  const minutesText = minutes === 1 ? '1 minuto' : `${minutes} minutos`;
+  if (!tanda.subject_id) return minutesText;
   const subjectRaw = await fetchSubjectsFromDb(tanda.subject_id);
   const subject = Array.isArray(subjectRaw) ? subjectRaw[0] : subjectRaw;
-  return subject?.name ? `10 minutos de ${subject.name}` : '10 minutos';
+  return subject?.name ? `${minutesText} de ${subject.name}` : minutesText;
 }
 
 function formatHHMM(minutesSinceMidnight: number): string {
@@ -136,6 +141,8 @@ async function freezeOneWeek(
     previous_report_failed: previousReportFailed,
     second_consecutive_failure: secondConsecutiveFailure,
     aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
+    friccion_retiradas: await listIrritationDropsInRange(from, to, cutoff),
+    registros_tardios: compliance.registros_tardios,
   };
   const payload = buildReportPayload(input);
 
@@ -342,6 +349,10 @@ export async function runExecutionTick(now: Date, options: TickOptions): Promise
     await markTandaEndNotifiedInDb(finalizedTanda.id, now);
     notified++;
   }
+
+  // US-B5/FR-B20: retiro automático por irritación sostenida, antes de congelar (R-B09): así un
+  // retiro previo al corte del domingo entra en el reporte de esa semana (listIrritationDropsInRange).
+  await applyIrritationDrops(now);
 
   await revertStuckSendingToFrozenInDb(now, REPORT_STUCK_SENDING_MINUTES);
 

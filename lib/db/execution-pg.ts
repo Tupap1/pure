@@ -424,6 +424,8 @@ export interface TandaRecord {
   locked_at: string;
   edited_after_lock: boolean;
   end_notified_at?: string | null;
+  /** US-T2: true solo para tandas creadas por manage_tandas:log_late (registro tardío). */
+  late_logged: boolean;
   created_at?: string;
 }
 
@@ -456,13 +458,14 @@ export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaR
     mode: tanda.mode ?? null,
     locked_at: tanda.locked_at!,
     edited_after_lock: tanda.edited_after_lock ?? false,
+    late_logged: tanda.late_logged ?? false,
   };
   const res = await pgPool.query(
     `INSERT INTO tandas
        (id, subject_id, topic_id, deliverable_id, task_id, routine_slot_id, study_block_id,
         local_date, started_at, ended_at, planned_minutes, actual_minutes, status, running_lock,
-        interrupt_reason, mode, locked_at, edited_after_lock)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        interrupt_reason, mode, locked_at, edited_after_lock, late_logged)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
      ON CONFLICT (id) DO UPDATE SET
        subject_id = EXCLUDED.subject_id,
        topic_id = EXCLUDED.topic_id,
@@ -476,7 +479,8 @@ export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaR
        running_lock = EXCLUDED.running_lock,
        interrupt_reason = EXCLUDED.interrupt_reason,
        mode = EXCLUDED.mode,
-       edited_after_lock = EXCLUDED.edited_after_lock
+       edited_after_lock = EXCLUDED.edited_after_lock,
+       late_logged = EXCLUDED.late_logged
      RETURNING *`,
     [
       record.id,
@@ -497,6 +501,7 @@ export async function saveTandaToDb(tanda: Partial<TandaRecord>): Promise<TandaR
       record.mode,
       record.locked_at,
       record.edited_after_lock,
+      record.late_logged,
     ]
   );
   return res.rows[0];
@@ -882,4 +887,126 @@ export async function savePlanViewToDb(view: {
     [view.id, view.program_week_id, view.viewed_at, view.surface, view.was_gated, view.reason ?? null]
   );
   return res.rows[0] ?? null;
+}
+
+// --- friction_measures and friction_ratings (US-B5) ---
+
+export interface FrictionMeasureRecord {
+  id: string;
+  enabled_slot?: string | null;
+  started_on?: string | null;
+  enabled_at?: string | null;
+  verified_at?: string | null;
+  disabled_at?: string | null;
+  drop_reason?: string | null;
+  created_at?: string;
+}
+
+export interface FrictionRatingRecord {
+  id: string;
+  program_week_id: string;
+  score: number;
+  rated_at: string;
+  drop_applied_at?: string | null;
+  dropped_measure_id?: string | null;
+  created_at?: string;
+}
+
+export async function fetchFrictionMeasuresFromDb(
+  id?: string,
+  client?: PoolClient
+): Promise<FrictionMeasureRecord | FrictionMeasureRecord[] | null> {
+  const runner = client ?? pgPool;
+  if (id) {
+    const res = await runner.query('SELECT * FROM friction_measures WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await runner.query('SELECT * FROM friction_measures ORDER BY created_at ASC');
+  return res.rows;
+}
+
+export async function ensureFrictionMeasureRowInDb(id: string): Promise<void> {
+  await pgPool.query(`INSERT INTO friction_measures (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`, [id]);
+}
+
+export async function claimFrictionSlotInDb(
+  id: string,
+  slot: string,
+  startedOn: string,
+  now: Date
+): Promise<FrictionMeasureRecord | null> {
+  const res = await pgPool.query(
+    `UPDATE friction_measures
+     SET enabled_slot = $2, started_on = $3, enabled_at = $4, verified_at = NULL, disabled_at = NULL, drop_reason = NULL
+     WHERE id = $1 AND enabled_slot IS NULL AND NOT EXISTS (SELECT 1 FROM friction_measures f2 WHERE f2.enabled_slot = $2)
+     RETURNING *`,
+    [id, slot, startedOn, now.toISOString()]
+  );
+  return res.rows[0] || null;
+}
+
+export async function disableFrictionMeasureInDb(
+  id: string,
+  reason: string,
+  now: Date,
+  client?: PoolClient
+): Promise<FrictionMeasureRecord | null> {
+  const runner = client ?? pgPool;
+  const res = await runner.query(
+    `UPDATE friction_measures
+     SET enabled_slot = NULL, disabled_at = $2, drop_reason = $3
+     WHERE id = $1 AND enabled_slot IS NOT NULL
+     RETURNING *`,
+    [id, now.toISOString(), reason]
+  );
+  return res.rows[0] || null;
+}
+
+export async function verifyFrictionMeasureInDb(id: string, now: Date): Promise<FrictionMeasureRecord | null> {
+  const res = await pgPool.query(
+    `UPDATE friction_measures SET verified_at = $2 WHERE id = $1 AND enabled_slot IS NOT NULL RETURNING *`,
+    [id, now.toISOString()]
+  );
+  return res.rows[0] || null;
+}
+
+export async function fetchFrictionRatingsFromDb(id?: string): Promise<FrictionRatingRecord | FrictionRatingRecord[] | null> {
+  if (id) {
+    const res = await pgPool.query('SELECT * FROM friction_ratings WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+  const res = await pgPool.query('SELECT * FROM friction_ratings ORDER BY created_at ASC');
+  return res.rows;
+}
+
+export async function saveFrictionRatingToDb(input: {
+  program_week_id: string;
+  score: number;
+  rated_at: Date;
+}): Promise<FrictionRatingRecord> {
+  const id = input.program_week_id;
+  const res = await pgPool.query(
+    `INSERT INTO friction_ratings (id, program_week_id, score, rated_at)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (id) DO UPDATE SET score = EXCLUDED.score, rated_at = EXCLUDED.rated_at
+     RETURNING *`,
+    [id, input.program_week_id, input.score, input.rated_at.toISOString()]
+  );
+  return res.rows[0];
+}
+
+export async function claimIrritationDropInDb(
+  ratingId: string,
+  measureId: string | null,
+  now: Date,
+  client: PoolClient
+): Promise<FrictionRatingRecord | null> {
+  const res = await client.query(
+    `UPDATE friction_ratings
+     SET drop_applied_at = $2, dropped_measure_id = $3
+     WHERE id = $1 AND drop_applied_at IS NULL
+     RETURNING *`,
+    [ratingId, now.toISOString(), measureId]
+  );
+  return res.rows[0] || null;
 }

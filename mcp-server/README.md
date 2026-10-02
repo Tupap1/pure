@@ -164,7 +164,7 @@ URL de SSE para configurar en el cliente agente:
 
 ---
 
-## 🎯 Catálogo de Herramientas (30 tools)
+## 🎯 Catálogo de Herramientas (31 tools)
 
 El servidor expone **30 herramientas MCP** divididas en dos grupos:
 
@@ -177,17 +177,20 @@ Esquema de respuesta:
 { "status": "error", "code": "ERROR_CODE", "message": "Descripción" }
 ```
 
-### Grupo 2: Módulo de Ejecución (10 tools) — US1–US9
+### Grupo 2: Módulo de Ejecución (11 tools) — US1–US9, US-B1–US-B5
 
-#### 5. `manage_tandas` — Sesiones de 10 minutos (US1)
+#### 5. `manage_tandas` — Tandas de 10 a 60 minutos (US1, US-T1, US-T2)
 | Acción | `data` | Respuesta |
 |---|---|---|
-| `start` | `subject_id?`, `planned_minutes?` (5–25, default 10) | `{ tanda, ends_at }` \| `TANDA_EN_CURSO` |
+| `start` | `subject_id?`, `planned_minutes?` (10–60, default 10) | `{ tanda, ends_at }` \| `TANDA_EN_CURSO` |
 | `finish` | `id` | Tanda completada (idempotente) \| `TANDA_NO_TERMINADA` |
 | `interrupt` | `id`, `interrupt_reason` (1–140) | Tanda interrumpida \| `RAZON_REQUERIDA` |
 | `current` | — | `{ tanda \| null, seconds_left \| null, server_now }` |
-| `read` | `from?`, `to?` (YYYY-MM-DD), `subject_id?` | `{ tandas[], por_dia }` |
+| `read` | `from?`, `to?` (YYYY-MM-DD), `subject_id?` | `{ tandas[], por_dia }` (por_dia incluye `unidades`) |
 | `update` | `id` + (`subject_id` \| `interrupt_reason` \| `mode`) | Tanda con `edited_after_lock` si aplica |
+| `log_late` | `subject_id`, `started_at`, `ended_at` (ISO, hoy local, `started_at` hasta 6h atrás, duración 10–60 min, sin solapes), `topic_id?`, `task_id?` | Tanda `completada` con `late_logged: true` (máx. 3/día local) \| `REGISTRO_TARDIO_INVALIDO` \| `LIMITE_REGISTRO_TARDIO` |
+
+`log_late` es la única acción del módulo que acepta instantes del cliente: una excepción deliberada y acotada al Principio III de la Constitución (todo lo demás sale del reloj del servidor), pensada para el caso de "olvidé darle iniciar", nunca para maquillar el reporte. No está en la lista blanca de `app/api/execution/route.ts`: solo un agente de IA puede dispararla.
 
 #### 6. `manage_daily_checks` — Registro de hábitos (US3)
 | Acción | `data` | Respuesta |
@@ -224,12 +227,13 @@ Parámetro `data?`: `{ at? }` (ISO, solo lectura). Respuesta:
   "trigger": { "id", "cue_text", "action_text", "kind", "subject?" } | null,
   "pending_checks": [{ "habit_id", "label" }],
   "tandas_today": number,
-  "day_fulfilled": boolean | null
+  "day_fulfilled": boolean | null,
+  "evaluacion_dia": { "tandas_completadas", "min_requerido", "cumplio_tandas", "cumplio_habitos", "day_fulfilled" } | null
 }
 ```
 
-#### 10. `get_compliance_report` — Cumplimiento semanal (US6)
-Parámetro `data?`: `{ from?, to?, program_week_id? }`. Respuesta: días evaluados, `days_fulfilled`, hábitos, tandas por materia, disparadores respondidos, razones de interrupción, `dias_cumplidos_totales` y horizonte.
+#### 10. `get_compliance_report` — Cumplimiento semanal (US6, US-T2)
+Parámetro `data?`: `{ from?, to?, program_week_id? }`. Respuesta: `dias[]` con `evaluacion_dia` (tandas_completadas, min_requerido, cumplio_tandas, cumplio_habitos, day_fulfilled), `days_fulfilled`, `aperturas_plan: { libres_usadas, con_razon, total, razones[] }` (solo aperturas de semana, no planeación), hábitos como fracción (se omiten los que no tienen días activos en el rango), tandas por materia, disparadores respondidos, razones de interrupción, `dias_cumplidos_totales`, horizonte y `registros_tardios: { total, minutos }` (tandas `log_late` en el rango; `{ total: 0, minutos: 0 }` si no hubo ninguna).
 
 #### 11. `get_grade_projection` — Proyección de notas (US5)
 Parámetro `data?`: `{ subject_id? }`. Respuesta:
@@ -260,12 +264,25 @@ Parámetro `data?`: `{ subject_id? }`. Respuesta:
 #### 13. `manage_tasks` — Tareas de N tandas (US8)
 Acciones: `create`, `read`, `update`, `delete`, `today`. Parámetro: `id?`, `title` (3–120), `subject_id`, `estimated_tandas` (1–3), `status?`, `scheduled_date?`. Más de 3 tandas → `PARTIR_TAREA`. `today` devuelve tareas con `scheduled_date = hoy`.
 
-#### 14. `plan_week` — Planeación de la semana (US8–US9)
+#### 14. `plan_week` — Planeación de la semana (US8–US9–B1)
 | Acción | `data` | Respuesta |
 |---|---|---|
-| `preview` | `program_week_id?` | `{ semana_pasada, entregas_14_dias, intenciones, disparadores, reparto_sugerido }` |
+| `preview` | `program_week_id?` (resuelve sin id) | `{ semana_pasada, entregas_14_dias, intenciones, disparadores, reparto_sugerido }` |
 | `set_intentions` | `program_week_id`, `items: [{ subject_id, strength (0–10), reason? }]` | Las intenciones \| `RAZON_REQUERIDA` |
-| `open_view` | `reason?` | `{ allowed, needs_reason, opens_this_week }` \| `RAZON_REQUERIDA` |
+| `open_view` | `program_week_id?` (resuelve sin id), `reason?` | `{ allowed, needs_reason, opens_this_week, surface: 'planeacion' \| 'semana' }` \| `RAZON_REQUERIDA` |
+
+Sin `program_week_id`, la semana se resuelve así: si hoy es domingo con una que empieza mañana, esa; si no, la que contiene hoy; si no, la próxima que empieza; si no hay, `NO_ENCONTRADO`. Si la semana indicada no existe, `NO_ENCONTRADO`. Una semana que todavía no ha empezado es `surface='planeacion'`: sin compuerta, sin pedir razón, sin contar en aperturas del plan.
+
+#### 15. `manage_friction` — Fricción del teléfono (US-B5)
+| Acción | `data` | Respuesta |
+|---|---|---|
+| `enable` | `measure_key` | La medida habilitada \| `LIMITE_FRICCION` |
+| `disable` | `measure_key` | La medida con `ya_deshabilitada` (si ya estaba deshabilitada o nunca existió: `ya_deshabilitada: true` y sin cambios) |
+| `verify` | `measure_key` | La medida verificada \| `NO_ENCONTRADO` |
+| `rate` | `score` (0–10), `program_week_id?` (semana en curso por defecto) | La calificación \| `NO_ENCONTRADO` \| `FECHA_FUTURA` |
+| `read` | — | `{ activas: [{ measure_key, started_on, verified_at, confirmada }], total_activas, limite: 2, irritacion_semana_actual: 0-10 \| null }` |
+
+Medidas: `sin_biometria`, `clave_larga`, `escala_grises`, `redes_fuera_home`, `app_desinstalada`. Máximo 2 simultáneas. Calificación semanal; dos semanas consecutivas ≥7 retiran automáticamente la más recientemente habilitada.
 
 ---
 
@@ -276,6 +293,8 @@ Acciones: `create`, `read`, `update`, `delete`, `today`. Parámetro: `id?`, `tit
 | `DATOS_INVALIDOS` | Validación Zod fallida |
 | `SOBRE_ESPECIFICACION` | Claves no permitidas (ej. `duration` en un disparador) |
 | `NO_ENCONTRADO` | ID inexistente |
+| `FECHA_FUTURA` | Fecha posterior a hoy |
+| `LIMITE_FRICCION` | Ya hay 2 medidas de fricción habilitadas |
 | `TANDA_EN_CURSO` | Ya hay una sesión activa |
 | `TANDA_NO_TERMINADA` | `finish` antes de tiempo (usar `interrupt`) |
 | `RAZON_REQUERIDA` | Falta motivación |
@@ -290,3 +309,5 @@ Acciones: `create`, `read`, `update`, `delete`, `today`. Parámetro: `id?`, `tit
 | `VENTANA_CERRADA` | `set_note` después de `note_deadline` |
 | `YA_ENVIADO` | El reporte ya se envió |
 | `PARTIR_TAREA` | Tarea con > 3 tandas |
+| `REGISTRO_TARDIO_INVALIDO` | `log_late` viola día local, ventana de 6h, duración 10–60 min o se solapa con otra tanda |
+| `LIMITE_REGISTRO_TARDIO` | Ya hay 3 registros tardíos hoy (día local) |

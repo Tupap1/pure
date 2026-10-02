@@ -1,5 +1,7 @@
 # Contrato — Herramientas MCP del Módulo de Ejecución
 
+> **Feature 002**: La feature `002-ejecucion-ajustes` actualizó `plan_week`, `manage_routine_slots:rehearse`, `get_today`, `get_compliance_report` y el reporte semanal, además de agregar `manage_friction`. Consulta [`specs/002-ejecucion-ajustes/contracts/mcp-tools.md`](../../002-ejecucion-ajustes/contracts/mcp-tools.md) para los cambios exactos.
+
 Cada herramienta se declara en **dos lugares** de `mcp-server/index.ts`: en `TOOLS_LIST` y en
 `mcpServer.tool(name, descripción, { action: z.enum([...]), data: z.any().optional() }, …)`, igual
 que `manage_study_blocks`. La validación real ocurre dentro del handler, con esquemas Zod
