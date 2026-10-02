@@ -20,7 +20,8 @@ export function clockOffset(serverNowIso: string, clientNowMs: number): number {
  * (US1-AS8): aunque el reloj del teléfono esté desfasado, el conteo usa la hora real del
  * servidor — `clientNowMs + offsetMs` — no la lectura cruda de `Date.now()` en el tick.
  */
-export function secondsLeft(endsAtIso: string, offsetMs: number, clientNowMs: number): number {
+export function secondsLeft(endsAtIso: string | null, offsetMs: number, clientNowMs: number): number | null {
+  if (!endsAtIso) return null; // T014: cronómetro sin fin (spec 004)
   const correctedNowMs = clientNowMs + offsetMs;
   const remainingMs = new Date(endsAtIso).getTime() - correctedNowMs;
   return Math.max(0, Math.round(remainingMs / 1000));

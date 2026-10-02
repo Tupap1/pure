@@ -161,8 +161,12 @@ export const TodayDashboard: React.FC = () => {
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               <span>Empezó a las <span className="font-mono">{formatLocalTime(running.started_at)}</span></span>
-              {' · '}
-              <span>hasta las <span className="font-mono">{formatLocalTime(running.ends_at)}</span></span>
+              {running.ends_at && (
+                <>
+                  {' · '}
+                  <span>hasta las <span className="font-mono">{formatLocalTime(running.ends_at)}</span></span>
+                </>
+              )}
             </p>
             {/* Anuncio para lectores de pantalla: solo cambia de texto una vez por minuto
                 (minutesLeft es un entero de minutos), así aria-live no interrumpe cada segundo. */}

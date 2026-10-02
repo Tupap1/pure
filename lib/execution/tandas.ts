@@ -15,11 +15,11 @@ import crypto from 'crypto';
 import { localParts, localDateTimeToInstant, addDays } from './time';
 import {
   TANDA_MINUTES_DEFAULT,
-  TANDA_MINUTES_MIN,
-  TANDA_MINUTES_MAX,
   DAY_LOCK_TIME,
   LATE_LOG_MAX_HOURS_BACK,
   LATE_LOG_MAX_PER_DAY,
+  LATE_LOG_MIN_MINUTES,
+  LATE_LOG_MAX_MINUTES,
 } from './constants';
 import { tandaUnits } from '../domain/execution';
 import type { ExecutionResult } from '../validations/schemas';
@@ -51,8 +51,10 @@ async function findTandaById(id: string): Promise<TandaRecord | null> {
   return (Array.isArray(raw) ? raw[0] : raw) as TandaRecord | null;
 }
 
-function endsAtMs(tanda: TandaRecord): number {
-  return new Date(tanda.started_at).getTime() + tanda.planned_minutes * 60_000;
+function endsAtMs(tanda: TandaRecord): number | null {
+  if (!tanda.planned_minutes) return null;
+  // T014 reemplaza esto por la rama del cronómetro (spec 004)
+  return new Date(tanda.started_at).getTime() + (tanda.planned_minutes as number) * 60_000;
 }
 
 /**
@@ -64,11 +66,12 @@ function endsAtMs(tanda: TandaRecord): number {
 export async function finalizeElapsed(now: Date = new Date()): Promise<TandaRecord | null> {
   const running = await findRunningTanda();
   if (!running) return null;
-  if (now.getTime() < endsAtMs(running)) return null;
+  const ends = endsAtMs(running);
+  if (!ends || now.getTime() < ends) return null;
 
   return await saveTandaToDb({
     ...running,
-    ended_at: new Date(endsAtMs(running)).toISOString(),
+    ended_at: new Date(ends).toISOString(),
     actual_minutes: running.planned_minutes,
     status: 'completada',
     running_lock: null,
@@ -163,7 +166,15 @@ export async function finishTanda(id: string, now: Date = new Date()): Promise<E
   }
 
   const elapsedMs = now.getTime() - new Date(existing.started_at).getTime();
-  const requiredMs = existing.planned_minutes * 60_000 - 30_000;
+  if (existing.planned_minutes === null) {
+    return {
+      status: 'error',
+      code: 'DATOS_INVALIDOS',
+      message: 'No se puede cerrar un cronómetro con finish: usa interrupt.',
+    };
+  }
+  // T014 reemplaza esto por la rama del cronómetro (spec 004)
+  const requiredMs = (existing.planned_minutes as number) * 60_000 - 30_000;
   if (elapsedMs < requiredMs) {
     return {
       status: 'error',
@@ -228,7 +239,8 @@ export async function currentTanda(
     return { status: 'success', data: { tanda: null, seconds_left: null, server_now: now.toISOString() } };
   }
 
-  const secondsLeft = Math.max(0, Math.round((endsAtMs(running) - now.getTime()) / 1000));
+  const ends = endsAtMs(running);
+  const secondsLeft = ends ? Math.max(0, Math.round((ends - now.getTime()) / 1000)) : null;
   return { status: 'success', data: { tanda: running, seconds_left: secondsLeft, server_now: now.toISOString() } };
 }
 
@@ -401,11 +413,11 @@ export async function logLateTanda(
   }
 
   const durationMinutes = Math.floor((endedAtDate.getTime() - startedAtDate.getTime()) / 60_000);
-  if (durationMinutes < TANDA_MINUTES_MIN || durationMinutes > TANDA_MINUTES_MAX) {
+  if (durationMinutes < LATE_LOG_MIN_MINUTES || durationMinutes > LATE_LOG_MAX_MINUTES) {
     return {
       status: 'error',
       code: 'REGISTRO_TARDIO_INVALIDO',
-      message: `La duración debe quedar entre ${TANDA_MINUTES_MIN} y ${TANDA_MINUTES_MAX} minutos.`,
+      message: `La duración debe quedar entre ${LATE_LOG_MIN_MINUTES} y ${LATE_LOG_MAX_MINUTES} minutos.`,
     };
   }
 

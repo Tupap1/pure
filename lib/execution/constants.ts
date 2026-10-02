@@ -10,6 +10,42 @@ export const TANDA_MINUTES_MAX = 60;
 export const TANDA_UNIT_MINUTES = 10;
 export const TANDA_DURATION_OPTIONS = [10, 25, 40, 60] as const;
 
+/** FR-T11/US-T2 (003): cotas propias de `log_late`, separadas de TANDA_MINUTES_* para que subir
+ * el tope del temporizador en la 004 no las afecte. Sin cambios en la 004. */
+export const LATE_LOG_MIN_MINUTES = 10;
+export const LATE_LOG_MAX_MINUTES = 60;
+
+/** US-F1: tiempo mínimo que debe transcurrir en el cronómetro para poder cerrarlo (1 min). */
+export const CRONOMETRO_MIN_FINISH_SECONDS = 60;
+
+/** US-F4: razón obligatoria de una corrección de cronómetro. */
+export const CORRECTION_REASON_MIN = 1;
+export const CORRECTION_REASON_MAX = 140;
+
+/** US-F2: nombre del objetivo. */
+export const OBJECTIVE_NAME_MAX = 60;
+
+/** US-F2: meta semanal de minutos de foco. */
+export const WEEKLY_TARGET_MAX_MINUTES = 10080;
+
+/** US-F5: límites de un latín y su traducción/fuente. */
+export const QUOTE_TEXT_MAX = 300;
+export const QUOTE_TRANSLATION_MAX = 300;
+export const QUOTE_SOURCE_MAX = 120;
+
+/** US-F5: tamaño máximo de un lote de frases. */
+export const QUOTE_BATCH_MAX = 200;
+
+/** US-F3: rango de semanas para el resumen de foco. */
+export const FOCUS_WEEKS_DEFAULT = 52;
+export const FOCUS_WEEKS_MAX = 53;
+
+/** US-F3: semanas mostradas en Hoy. */
+export const TODAY_HEATMAP_WEEKS = 12;
+
+/** US-F3: límites de minutos para cada nivel del mapa de calor. */
+export const HEAT_LEVEL_BOUNDS = [30, 90, 180] as const;
+
 /** FR-T11/US-T2: `log_late` solo acepta sesiones que empezaron dentro de esta ventana hacia
  * atrás (horas), contada desde el reloj del servidor. Es la única entrada del módulo que acepta
  * instantes del cliente -- excepción deliberada y acotada al Principio III (plan.md). */

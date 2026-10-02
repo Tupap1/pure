@@ -14,7 +14,7 @@ export interface TodayRunningTanda {
   id: string;
   subject_id: string | null;
   started_at: string;
-  ends_at: string;
+  ends_at: string | null;
   seconds_left: number;
 }
 
@@ -54,9 +54,12 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
         id: runningRaw.id,
         subject_id: runningRaw.subject_id ?? null,
         started_at: new Date(runningRaw.started_at).toISOString(),
-        ends_at: new Date(
-          new Date(runningRaw.started_at).getTime() + runningRaw.planned_minutes * 60_000
-        ).toISOString(),
+        ends_at:
+          runningRaw.planned_minutes !== null
+            ? new Date(
+                new Date(runningRaw.started_at).getTime() + (runningRaw.planned_minutes as number) * 60_000
+              ).toISOString()
+            : null,
         seconds_left: secondsLeft ?? 0,
       }
     : null;

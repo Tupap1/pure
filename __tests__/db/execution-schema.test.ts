@@ -85,25 +85,30 @@ describe('[001] Migración 008 — esquema base del Módulo de Ejecución (Found
     expect(after.rows[0].count).toBe(0);
   });
 
-  it('FR-T02 · planned_minutes CHECK valida el rango 10-60 en la base de datos', async () => {
-    const insertTanda = (id: string, plannedMinutes: number) =>
+  it('FR-T02 · FR-F03 · el CHECK de tipo y duración rechaza 9 y 181 en el temporizador (la 004 reemplaza el tope de 60)', async () => {
+    const insertTanda = (id: string, kind: string, plannedMinutes: number | null) =>
       harness.pool.query(
-        `INSERT INTO tandas (id, local_date, started_at, locked_at, planned_minutes)
-         VALUES ($1, $2, now(), now(), $3)`,
-        [id, '2026-09-14', plannedMinutes]
+        `INSERT INTO tandas (id, local_date, started_at, locked_at, kind, planned_minutes)
+         VALUES ($1, $2, now(), now(), $3, $4)`,
+        [id, '2026-09-14', kind, plannedMinutes]
       );
 
-    // Valores fuera del rango se rechazan en la base
-    await expect(insertTanda('tanda-5min', 5)).rejects.toThrow(); // demasiado bajo
-    await expect(insertTanda('tanda-61min', 61)).rejects.toThrow(); // demasiado alto
+    // 9 se rechaza (demasiado bajo); 181 se rechaza (demasiado alto, la 004 sube el máximo a 180)
+    await expect(insertTanda('tanda-9min', 'temporizador', 9)).rejects.toThrow();
+    await expect(insertTanda('tanda-181min', 'temporizador', 181)).rejects.toThrow();
 
-    // Valores en los límites se aceptan
-    await expect(insertTanda('tanda-10min', 10)).resolves.toBeDefined();
-    await expect(insertTanda('tanda-60min', 60)).resolves.toBeDefined();
+    // 10, 61 (que antes era rechazado) y 180 se aceptan con kind='temporizador'
+    await expect(insertTanda('tanda-10min', 'temporizador', 10)).resolves.toBeDefined();
+    await expect(insertTanda('tanda-61min', 'temporizador', 61)).resolves.toBeDefined();
+    await expect(insertTanda('tanda-180min', 'temporizador', 180)).resolves.toBeDefined();
 
-    const res = await harness.pool.query('SELECT planned_minutes FROM tandas ORDER BY id');
-    expect(res.rows).toHaveLength(2);
+    const res = await harness.pool.query('SELECT kind, planned_minutes FROM tandas ORDER BY planned_minutes');
+    expect(res.rows).toHaveLength(3);
+    expect(res.rows[0].kind).toBe('temporizador');
     expect(res.rows[0].planned_minutes).toBe(10);
-    expect(res.rows[1].planned_minutes).toBe(60);
+    expect(res.rows[1].kind).toBe('temporizador');
+    expect(res.rows[1].planned_minutes).toBe(61);
+    expect(res.rows[2].kind).toBe('temporizador');
+    expect(res.rows[2].planned_minutes).toBe(180);
   });
 });

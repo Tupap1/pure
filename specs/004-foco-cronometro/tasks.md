@@ -78,7 +78,7 @@ historia lo da su propio archivo de tests.
 
 ## Phase 1: Setup
 
-- [ ] T001 C VERIFY — En la rama `004-foco-cronometro`:
+- [x] T001 C VERIFY (2026-10-02: línea base 73 archivos, 516 tests en verde; Sync Impact Report retirado en 445afbe) — En la rama `004-foco-cronometro`:
       - `npm run test:all` en verde como línea base antes de tocar código; anotar el número de
         tests;
       - confirmar que `specs/004-foco-cronometro/` tiene spec, plan, research, data-model,
@@ -95,7 +95,7 @@ comparten archivos y van en paralelo.
 
 ### Pista A — Datos (P1, Haiku)
 
-- [ ] T002 [P] P1 TEST — Crear `__tests__/db/execution-schema-foco.test.ts`, con
+- [x] T002 [P] P1 TEST — Crear `__tests__/db/execution-schema-foco.test.ts`, con
       `createTestDb()`, insertando por `harness.pool.query`. Sin IDs de escenario: es
       infraestructura. Casos:
       - `objetivos` existe con las columnas `id, name, active_name_key, subject_id,
@@ -126,7 +126,7 @@ comparten archivos y van en paralelo.
         - `insertObjectiveToDb`/`fetchObjectivesFromDb`/`updateObjectiveInDb` hacen ida y
           vuelta;
         - `insertQuotesInDb` con un id repetido no lanza error y no duplica la fila.
-- [ ] T003 P1 IMPL — Crear `db/migrations/015_objetivos_frases.sql` y
+- [x] T003 P1 IMPL — Crear `db/migrations/015_objetivos_frases.sql` y
       `db/migrations/016_tandas_cronometro.sql` **tal cual** [data-model.md](./data-model.md):
       - `objetivos.weekly_target_minutes` con
         `CHECK (weekly_target_minutes IS NULL OR weekly_target_minutes BETWEEN 1 AND 10080)`;
@@ -144,7 +144,7 @@ comparten archivos y van en paralelo.
         **después** de `'tandas'`.
 
       T002 en verde.
-- [ ] T004 P1 IMPL — `lib/db/execution-pg.ts`:
+- [x] T004 P1 IMPL — `lib/db/execution-pg.ts`:
       - `TandaRecord` agrega `kind: 'temporizador' | 'cronometro'`, `objective_id?`,
         `corrected: boolean`, `corrected_at?`, `original_ended_at?`, `original_minutes?` y
         `correction_reason?`; `planned_minutes: number | null`;
@@ -162,7 +162,7 @@ comparten archivos y van en paralelo.
         `updateQuoteInDb`.
 
       Los casos de repositorio de T002 en verde.
-- [ ] T005 P1 IMPL — `lib/execution/constants.ts`:
+- [x] T005 P1 IMPL — `lib/execution/constants.ts`:
       - agregar exactamente: `LATE_LOG_MIN_MINUTES = 10`, `LATE_LOG_MAX_MINUTES = 60`,
         `CRONOMETRO_MIN_FINISH_SECONDS = 60`, `CORRECTION_REASON_MIN = 1`,
         `CORRECTION_REASON_MAX = 140`, `OBJECTIVE_NAME_MAX = 60`,
@@ -176,7 +176,7 @@ comparten archivos y van en paralelo.
         de `tandas.ts` que toca P1.
 
       `npm run test:all` sigue verde.
-- [ ] T005b [P] P1 TEST — Crear `__tests__/validations/schemas-foco.test.ts`, sin IDs de
+- [x] T005b [P] P1 TEST — Crear `__tests__/validations/schemas-foco.test.ts`, sin IDs de
       escenario (forma, no comportamiento):
       - cada esquema nuevo de T006 es `.strict()` y rechaza una clave desconocida;
       - las cotas exactas:
@@ -190,7 +190,7 @@ comparten archivos y van en paralelo.
       - `TandaReadSchema` y `TandaUpdateSchema` aceptan `objective_id`.
 
       Debe fallar (RED) antes de T006.
-- [ ] T006 P1 IMPL — `lib/validations/schemas.ts`:
+- [x] T006 P1 IMPL — `lib/validations/schemas.ts`:
       - `ExecutionErrorCode` agrega `'CRONOMETRO_MUY_CORTO' | 'OBJETIVO_DUPLICADO' |
         'OBJETIVO_ARCHIVADO' | 'CORRECCION_INVALIDA'`;
       - esquemas nuevos, `.strict()`, según [contracts/mcp-tools.md](./contracts/mcp-tools.md):
@@ -212,14 +212,14 @@ comparten archivos y van en paralelo.
 
 ### Pista B — Funciones puras y zona horaria (P2, Sonnet)
 
-- [ ] T007 [P] P2 TEST — En `__tests__/domain/execution-time.test.ts`, agregar tests de
+- [x] T007 [P] P2 TEST — En `__tests__/domain/execution-time.test.ts`, agregar tests de
       `splitByLocalDay(startIso, endIso)` con `PURE_TZ` por defecto (Bogotá):
       - mismo día → un tramo;
       - `US-F1-AS10 · 23:00→01:30 local se reparte 60 + 90`;
       - `US-F1-AS10 · lunes 22:00 → miércoles 02:00 se reparte 120 + 1440 + 120`;
       - piso acumulado: 23:00:30 → 00:10:40 da 59 + 11 = 70 (nunca 69);
       - la suma de los tramos siempre es `floor((fin − inicio) / 60 s)`.
-- [ ] T008 [P] P2 TEST — Crear `__tests__/domain/focus.test.ts` contra `lib/domain/focus.ts`
+- [x] T008 [P] P2 TEST — Crear `__tests__/domain/focus.test.ts` contra `lib/domain/focus.ts`
       (puro, sin base):
       - `US-F1-AS6 · unidades: cronómetro 45→4, 10→1, 9→0; temporizador 8→1`;
       - `US-F2-AS4 · objetivo sin materia y sin vínculo propio no cuenta: 60 min de foco, 0
@@ -233,10 +233,10 @@ comparten archivos y van en paralelo.
         una una vez; 0 activas → null`.
 
       `sessionShares` se prueba con un `split` falso inyectado.
-- [ ] T009 P2 IMPL — `lib/execution/time.ts`: `splitByLocalDay` según research R6 (recorre las
+- [x] T009 P2 IMPL — `lib/execution/time.ts`: `splitByLocalDay` según research R6 (recorre las
       medianoches locales con `localParts` y `localDateTimeToInstant(dateKey, '00:00')`; piso
       acumulado). T007 en verde.
-- [ ] T010 P2 IMPL — Crear `lib/domain/focus.ts` (sin `Intl`, sin `process.env`) con:
+- [x] T010 P2 IMPL — Crear `lib/domain/focus.ts` (sin `Intl`, sin `process.env`) con:
       - `sessionUnits(kind, minutes)`: el temporizador delega en `tandaUnits` de
         `lib/domain/execution.ts`; el cronómetro es `Math.floor(minutes / 10)`;
       - `countsTowardMinimum(t, objetivo | null)`;
