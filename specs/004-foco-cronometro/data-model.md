@@ -178,6 +178,7 @@ ordenadas por `id` y usa el índice `dayNumber(dateKey) mod N` (R5). Con 0 activ
 | Payload | Cambio |
 |---|---|
 | `TodayPayload.running_tanda` | + `kind`, `objective_id`, `elapsed_seconds`. `ends_at` y `seconds_left` pasan a `string \| null` y `number \| null` (null en el cronómetro). |
+| `TodayPayload.tandas_today` | Pasa a contar solo las sesiones completadas que cumplen la regla del mínimo (`tallyDay.completadas`): una sesión de un objetivo sin materia no aparece en "N tandas hoy". Sus minutos sí están en `foco_semana_minutos`. |
 | `TodayPayload` | + `foco_semana_minutos: number`, `foco_12_semanas: { date, minutos, nivel }[]` y `frase_del_dia: { text, translation, source } \| null`. |
 | `ComplianceResult` y payload del reporte semanal | + `correcciones: { total, minutos_recortados }`, contadas por la semana local de `corrected_at`, con ceros explícitos. `minutos_recortados` = Σ (`original_minutes` − `actual_minutes`). |
 | `readTandas().por_dia[]` | `unidades` y `completadas` según `tallyDay`; `minutos` = `minutos_foco`. |
@@ -196,6 +197,7 @@ ordenadas por `id` y usa el índice `dayNumber(dateKey) mod N` (R5). Con 0 activ
 | `OBJECTIVE_NAME_MAX` | 60 |
 | `WEEKLY_TARGET_MAX_MINUTES` | 10080 |
 | `QUOTE_TEXT_MAX` / `QUOTE_TRANSLATION_MAX` / `QUOTE_SOURCE_MAX` | 300 / 300 / 120 |
+| `QUOTE_BATCH_MAX` | 200 (tamaño máximo de `create_many`) |
 | `FOCUS_WEEKS_DEFAULT` / `FOCUS_WEEKS_MAX` | 52 / 53 |
 | `TODAY_HEATMAP_WEEKS` | 12 |
 | `HEAT_LEVEL_BOUNDS` | `[30, 90, 180]` |

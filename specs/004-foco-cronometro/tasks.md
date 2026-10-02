@@ -57,8 +57,8 @@ description: "Lista de tareas de Foco (temporizador, cronómetro, objetivos y ma
 
 | Paquete | Archivos que solo él edita |
 |---|---|
-| P1 | `db/migrations/015_*`, `016_*`, `lib/db/execution-pg.ts`, `lib/validations/schemas.ts`, `__tests__/helpers/test-db.ts`, `__tests__/db/execution-schema-foco.test.ts`. Además, en la Fase 2, solo la línea de `logLateTanda` de `tandas.ts` y `lib/execution/constants.ts` |
-| P2 | `lib/execution/time.ts`, `lib/domain/focus.ts`, `lib/execution/tandas.ts` (desde la Fase 3), `today.ts`, `compliance.ts`, `checks.ts`, `report.ts`, `constants.ts` (desde la Fase 3) y sus tests |
+| P1 | `db/migrations/015_*`, `016_*`, `lib/db/execution-pg.ts`, `lib/validations/schemas.ts`, `__tests__/helpers/test-db.ts`, `__tests__/db/execution-schema-foco.test.ts`, `__tests__/validations/schemas-foco.test.ts`. Además, en la Fase 2, solo la línea de `logLateTanda` de `tandas.ts` y `lib/execution/constants.ts` |
+| P2 | `lib/execution/time.ts`, `lib/domain/focus.ts`, `lib/execution/tandas.ts` (desde la Fase 3), `today.ts`, `compliance.ts`, `checks.ts`, `report.ts`, `tick.ts`, `constants.ts` (desde la Fase 3) y sus tests |
 | P3 | `lib/execution/objectives.ts`, `quotes.ts`, `focus.ts`, `handlers.ts`, `app/api/execution/route.ts`, `app/api/execution/focus/route.ts`, `mcp-server/*` y sus tests |
 | P4 | `lib/execution/today-view.ts`, `lib/domain/focus-heatmap.ts`, `lib/hooks/*`, `components/**`, `app/globals.css` y `__tests__/domain/today-view.test.ts`, `focus-heatmap.test.ts` |
 
@@ -118,7 +118,14 @@ comparten archivos y van en paralelo.
         - rechaza `corrected = TRUE` sin `corrected_at`, `original_ended_at`, `original_minutes`
           o `correction_reason`;
         - acepta la fila completa;
-      - correr `runPostgresMigrations` una segunda vez no falla (idempotencia).
+      - correr `runPostgresMigrations` una segunda vez no falla (idempotencia);
+      - repositorio (T004), contra funciones que todavía no existen:
+        - `saveTandaToDb` guarda y relee `kind`, `objective_id` y los campos de corrección;
+        - al volver a guardarla con otro `actual_minutes`, los campos de corrección persisten y
+          `kind`/`planned_minutes` no cambian;
+        - `insertObjectiveToDb`/`fetchObjectivesFromDb`/`updateObjectiveInDb` hacen ida y
+          vuelta;
+        - `insertQuotesInDb` con un id repetido no lanza error y no duplica la fila.
 - [ ] T003 P1 IMPL — Crear `db/migrations/015_objetivos_frases.sql` y
       `db/migrations/016_tandas_cronometro.sql` **tal cual** [data-model.md](./data-model.md):
       - `objetivos.weekly_target_minutes` con
@@ -154,8 +161,7 @@ comparten archivos y van en paralelo.
         `ON CONFLICT (id) DO NOTHING`; **no** confiar en `RETURNING` para contar, R4) y
         `updateQuoteInDb`.
 
-      Agregar a T002 un caso de ida y vuelta: se guarda una tanda corregida con `saveTandaToDb`,
-      se vuelve a guardar con otro `actual_minutes`, y los campos de corrección persisten.
+      Los casos de repositorio de T002 en verde.
 - [ ] T005 P1 IMPL — `lib/execution/constants.ts`:
       - agregar exactamente: `LATE_LOG_MIN_MINUTES = 10`, `LATE_LOG_MAX_MINUTES = 60`,
         `CRONOMETRO_MIN_FINISH_SECONDS = 60`, `CORRECTION_REASON_MIN = 1`,
@@ -170,6 +176,20 @@ comparten archivos y van en paralelo.
         de `tandas.ts` que toca P1.
 
       `npm run test:all` sigue verde.
+- [ ] T005b [P] P1 TEST — Crear `__tests__/validations/schemas-foco.test.ts`, sin IDs de
+      escenario (forma, no comportamiento):
+      - cada esquema nuevo de T006 es `.strict()` y rechaza una clave desconocida;
+      - las cotas exactas:
+        - `name` vacío o de 61 caracteres;
+        - `weekly_target_minutes` 0 y 10081;
+        - `reason` vacía (solo espacios) y de 141 caracteres;
+        - `text` de 301, `translation` de 301 y `source` de 121;
+        - `frases` vacío y de 201;
+        - `weeks` 0 y 54;
+      - `FocusSummarySchema` rechaza `objective_id` y `subject_id` juntos;
+      - `TandaReadSchema` y `TandaUpdateSchema` aceptan `objective_id`.
+
+      Debe fallar (RED) antes de T006.
 - [ ] T006 P1 IMPL — `lib/validations/schemas.ts`:
       - `ExecutionErrorCode` agrega `'CRONOMETRO_MUY_CORTO' | 'OBJETIVO_DUPLICADO' |
         'OBJETIVO_ARCHIVADO' | 'CORRECCION_INVALIDA'`;
@@ -187,6 +207,8 @@ comparten archivos y van en paralelo.
         - `QuoteUpdateSchema`, `QuoteDeactivateSchema` y `QuoteReadSchema`;
       - `TandaReadSchema` y `TandaUpdateSchema` agregan `objective_id?`;
       - **No tocar todavía `TandaStartSchema`** (T013).
+
+      T005b en verde.
 
 ### Pista B — Funciones puras y zona horaria (P2, Sonnet)
 
@@ -388,6 +410,13 @@ sesión en cada uno; solo la segunda cumple el mínimo.
         - invariante `archived ⇔ active_name_key IS NULL`;
       - `US-F2-AS10`: `manage_tandas:update { objective_id }` reclasifica sin tocar los tiempos y
         marca `edited_after_lock` si es después del cierre;
+      - `US-F2-AS8` (casos adicionales):
+        - `update` sobre un objetivo archivado → `OBJETIVO_ARCHIVADO`;
+        - `manage_tandas:read { objective_id }` filtra por objetivo;
+        - `get_today.tandas_today` no cuenta una sesión de un objetivo sin materia (I1: cuenta
+          solo las sesiones que cumplen la regla del mínimo);
+        - borrar la materia de un objetivo deja `subject_id = NULL`, y sus sesiones dejan de
+          contar para el mínimo;
       - `US-F2-AS11`: `POST /api/execution` con `manage_objectives` create/read/update/archive da
         los mismos resultados y errores que el handler.
 
@@ -397,6 +426,7 @@ sesión en cada uno; solo la segunda cumple el mínimo.
       - `startTanda` valida `objective_id`: inexistente → `NO_ENCONTRADO`; `archived` →
         `OBJETIVO_ARCHIVADO`; se valida antes del INSERT;
       - `updateTanda` acepta `objective_id` (debe existir; puede estar archivado);
+      - `readTandas` filtra por `objective_id` si viene;
       - `readTandas`, `today.ts` y `compliance.ts` cargan `fetchObjectivesFromDb()` una vez por
         llamada y pasan el mapa real a `tallyDay`.
 
@@ -464,8 +494,9 @@ cuadra a mano y coincide con `GET /api/execution/focus`.
         materia; los dos filtros juntos → `DATOS_INVALIDOS`;
       - `US-F3-AS7`: una sesión en curso no suma, una corregida suma lo corregido (sembrar la fila
         corregida directo con `saveTandaToDb`) y la de un objetivo archivado suma;
-      - `US-F3-AS9`: `GET` de `@/app/api/execution/focus/route` devuelve lo mismo que el handler;
-        también comprobar `dynamic === 'force-dynamic'`;
+      - `US-F3-AS9`: con `vi.setSystemTime` y el handler llamado **sin** `at` (la ruta ignora
+        `at`), `GET` de `@/app/api/execution/focus/route` devuelve lo mismo que el handler para el
+        mismo `weeks` y filtro; también comprobar `dynamic === 'force-dynamic'`;
       - `US-F3-AS11`: un cronómetro de domingo 23:00 a lunes 01:00 da 60 y 60, cada uno en su
         semana, y un resumen que empieza el lunes incluye los 60 del lunes.
 - [ ] T027 [P] [US-F3] P4 TEST — Crear `__tests__/domain/focus-heatmap.test.ts`, con
@@ -486,7 +517,9 @@ cuadra a mano y coincide con `GET /api/execution/focus`.
       - `fetchTandasFromDb`, `fetchObjectivesFromDb` y `fetchSubjectsFromDb` una vez cada uno;
       - tramos con `splitByLocalDay`;
       - `heatLevel` por día;
-      - `por_objetivo` de la semana actual sin filtro, con una fila por sesión según FR-F16.
+      - `por_objetivo` de la semana actual sin filtro, con una fila por sesión según FR-F16;
+      - exportar `focusDays(tandas, objetivosById, from, to, filtro?)`, que devuelve
+        `{ date, minutos, nivel }[]`. `getFocusSummary` la usa y `today.ts` la reutiliza en T029b.
 
       Agregar a `lib/execution/handlers.ts` `handleGetFocusSummary(data, now)` (con `at` como en
       `handleGetToday`). Crear `app/api/execution/focus/route.ts`:
@@ -496,14 +529,14 @@ cuadra a mano y coincide con `GET /api/execution/focus`.
 
       Registrar `get_focus_summary` en los **4 sitios** de `mcp-server/`. `all-tools.test.ts` pasa
       a 33. T026 en verde.
-- [ ] T029 [US-F3] P2 IMPL — `lib/execution/today.ts` agrega `foco_semana_minutos` (lunes a hoy) y
-      `foco_12_semanas` (`{ date, minutos, nivel }[]`), reutilizando la misma agregación que
-      `getFocusSummary`. Debe exportarse desde `lib/execution/focus.ts` una función interna
-      `focusDays(tandas, objetivos, from, to, filtro?)` para no duplicar; se hace **en serie
-      después de T028**.
-
-      Agregar un test en `execution-foco-resumen.test.ts`: `get_today.foco_semana_minutos ===
-      get_focus_summary.total_semana`.
+- [ ] T029a [US-F3] P3 TEST — En `__tests__/mcp/execution-foco-resumen.test.ts` (en serie,
+      después de T028), test `US-F3-AS2 · get_today.foco_semana_minutos coincide con
+      get_focus_summary.total_semana` y `foco_12_semanas` tiene 84 días, o menos si la semana en
+      curso no terminó, con el mismo `nivel`. Debe fallar (RED).
+- [ ] T029b [US-F3] P2 IMPL — `lib/execution/today.ts` agrega `foco_semana_minutos` (lunes a hoy)
+      y `foco_12_semanas` (`{ date, minutos, nivel }[]`) con `focusDays` de
+      `lib/execution/focus.ts` (T028), sin duplicar la agregación. Se hace en serie después de
+      T029a. T029a en verde.
 - [ ] T030 [US-F3] P4 IMPL — Crear `lib/domain/focus-heatmap.ts` (`buildHeatmapGrid`,
       `formatFocusMinutes`, `buildFocusStripView` para Hoy, solo con total y rejilla, **sin meta
       ni faltantes**, R10). T027 en verde.
@@ -599,12 +632,17 @@ el reporte.
       cae en `[from, to]` y `minutos_recortados = Σ (original_minutes − actual_minutes)`; nunca
       ausente.
 
+      `lib/execution/tick.ts:145`, donde se arma el payload **congelado** del reporte: agregar
+      `correcciones: compliance.correcciones`, junto a `registros_tardios`.
+
       `lib/execution/report.ts`:
       - el campo `correcciones` en el payload;
       - la línea `Correcciones: N (M min recortados)` solo si N > 0, igual que `registros_tardios`
         (L218).
-- [ ] T038 [US-F4] P3 IMPL — `lib/execution/handlers.ts`: `case 'correct'` en `handleManageTandas`
-      con `TandaCorrectSchema`. **No** se agrega a `ALLOWED_ACTIONS`. `mcp-server/index.ts`:
+- [ ] T038 [US-F4] P3 IMPL — `lib/execution/handlers.ts`:
+      - `case 'correct'` en `handleManageTandas` con `TandaCorrectSchema`;
+      - en `handlers.ts:416`, donde se arma el payload de vista previa del reporte, agregar
+        `correcciones: compliance.correcciones` junto a `registros_tardios`. **No** se agrega a `ALLOWED_ACTIONS`. `mcp-server/index.ts`:
       `'correct'` en el enum de `manage_tandas` (descriptor y `mcpServer.tool`) y en la
       descripción. `instructions.md`: cuándo usarla (cronómetro olvidado) y que solo acorta. T035
       en verde.
@@ -625,7 +663,8 @@ misma frase el mismo día.
 - [ ] T039 [P] [US-F5] P3 TEST — Crear `__tests__/mcp/execution-foco-frases.test.ts`:
       - `US-F5-AS1`: `create_many` con el contenido real de `specs/004-foco-cronometro/frases.json`
         (leído con `fs`) → `{ creadas: 50, omitidas: 0 }`; repetirlo → `{ 0, 50 }`; una variante
-        con mayúsculas o espacios distintos se omite;
+        con mayúsculas o espacios distintos se omite; `create` individual de una frase ya
+        existente devuelve la existente sin duplicar;
       - `US-F5-AS2`: un lote con una frase sin texto, con un texto de 301, una traducción de 301 o
         una fuente de 121 → `DATOS_INVALIDOS` y 0 filas;
       - `US-F5-AS4`: sin frases activas, `get_today.frase_del_dia === null`;
@@ -648,7 +687,10 @@ misma frase el mismo día.
       `instructions.md`: catálogo y cómo cargar `frases.json`.
 - [ ] T041 [US-F5] P2 IMPL — `lib/execution/today.ts`: `frase_del_dia = quoteOfDay(dateKey,
       frasesActivas)`, con `fetchQuotesFromDb` y la forma `{ text, translation, source } | null`.
-      Se hace en serie después de T040. T039 en verde.
+      Se hace en serie después de T040. T039 en verde. P3, en serie: actualizar la descripción
+      de `get_today` en `mcp-server/index.ts` (descriptor y `mcpServer.tool`) con
+      `running_tanda.kind`/`elapsed_seconds`, `foco_semana_minutos`, `foco_12_semanas` y
+      `frase_del_dia`.
 
 ### UI (P4)
 
@@ -696,7 +738,10 @@ misma frase el mismo día.
       - `npm run mcp:start:http`;
       - `curl http://localhost:3001/health`;
       - las llamadas reales de [quickstart.md](./quickstart.md) por historia (US-F2 → F1 → F3 → F4
-        → F5).
+        → F5);
+      - **SC-F03**: con un año de sesiones sembradas (un script en el scratchpad, en una base
+        local o de pruebas, nunca en producción), `GET /api/execution/focus` responde en menos
+        de 1 s; anotar el tiempo medido.
 
       Si no hay Postgres en la máquina de desarrollo, se hace en el servidor tras T051.
 - [ ] T050 C VERIFY — Web con `preview_start` a 375 px y en escritorio. Repetir T019 y T034 si
@@ -723,10 +768,10 @@ misma frase el mismo día.
 
 ```text
 T001
- └─ Fase 2: Pista A (T002→T003→T004, T005, T006)  ∥  Pista B (T007, T008 → T009, T010)
+ └─ Fase 2: Pista A (T002→T003→T004, T005, T005b→T006)  ∥  Pista B (T007, T008 → T009, T010)
      └─ Fase 3 US-F1: T011, T012 (RED) → T013 → T014 → T015 ; T016 (P3) ; T017→T018→T019 (P4)
          └─ Fase 4 US-F2: T020 (RED) → T021 (P2) ∥ T022→T023 (P3) ; T024→T025 (P4)
-             ├─ Fase 5 US-F3: T026, T027 (RED) → T028 (P3) → T029 (P2) ; T030→T031→T032→T033→T034 (P4)
+             ├─ Fase 5 US-F3: T026, T027 (RED) → T028 (P3) → T029a (P3) → T029b (P2) ; T030→T031→T032→T033→T034 (P4)
              ├─ Fase 6 US-F4: T035 (RED) → T036 → T037 (P2) ; T038 (P3, tras T036)
              └─ Fase 7 US-F5: T039 (RED) → T040 (P3) → T041 (P2) ; T042→T043 (P4)
                  └─ Fase 8: T044, T045 → T046 → T047 → T048 → T049/T050 → T051 → T052
@@ -738,7 +783,7 @@ T001
 - **US-F3, US-F4 y US-F5** dependen de US-F2 (objetivos en el resumen y en la regla del mínimo),
   pero **no entre sí**. Se pueden repartir en paralelo respetando la propiedad de archivos. Hay dos
   excepciones:
-  - `today.ts` (T029, T041) y `handlers.ts` (T028, T038, T040) reciben cambios de varias
+  - `today.ts` (T029b, T041) y `handlers.ts` (T028, T038, T040) reciben cambios de varias
     historias: esas tareas van **en serie** dentro de su paquete;
   - `mcp-server/index.ts` lo edita solo P3, una tarea a la vez.
 
@@ -746,7 +791,7 @@ T001
 
 ```text
 # Fundación: dos agentes a la vez, sin archivos en común
-P1 (Haiku):  T002 → T003 → T004 → T005 → T006
+P1 (Haiku):  T002 → T003 → T004 → T005 → T005b → T006
 P2 (Sonnet): T007 + T008 (RED) → T009 → T010
 
 # Tras US-F2: tres frentes
