@@ -16,6 +16,21 @@ describe('Sistema de Migraciones Versionadas PostgreSQL', () => {
     expect(files).toContain('004_class_sessions.sql');
   });
 
+  it('no hay dos migraciones con el mismo número de versión', () => {
+    // El runner identifica cada migración solo por su número: si dos archivos lo comparten,
+    // el segundo se salta para siempre en una base que ya registró el primero (pasó con 012).
+    const migrationsDir = path.join(process.cwd(), 'db', 'migrations');
+    const versions = fs
+      .readdirSync(migrationsDir)
+      .filter((f) => f.endsWith('.sql'))
+      .map((f) => f.match(/^(\d+)_/)?.[1])
+      .filter((v): v is string => v !== undefined)
+      .map((v) => parseInt(v, 10));
+
+    const duplicated = versions.filter((v, i) => versions.indexOf(v) !== i);
+    expect(duplicated).toEqual([]);
+  });
+
   it('la migración 002 debe incluir la alteración idempotente para Sábado A/B y periodicidad', () => {
     const mig2Path = path.join(process.cwd(), 'db', 'migrations', '002_add_sabado_ab_columns.sql');
     const content = fs.readFileSync(mig2Path, 'utf-8');
