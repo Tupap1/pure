@@ -369,7 +369,7 @@ arrancar un temporizador de 45 min y dejar que se cierre solo.
       - el `aria-live` anuncia por minuto, no por segundo.
 
       T017 en verde.
-- [ ] T019 [US-F1] P4 VERIFY — Con `preview_start` sobre el dev server, a 375 px y en escritorio:
+- [x] T019 [US-F1] P4 VERIFY (2026-10-02, en T050 con Postgres real: cronómetro desde la UI, aviso de <1 min, 375 px sin desborde, sin errores de consola) — Con `preview_start` sobre el dev server, a 375 px y en escritorio:
       - sin errores de consola;
       - 45 en el campo libre arranca un temporizador de 45;
       - 181 muestra el error;
@@ -570,7 +570,7 @@ cuadra a mano y coincide con `GET /api/execution/focus`.
 - [x] T033 [US-F3] P4 IMPL — Retirar `components/ui/StudyHeatmap.tsx`, `lib/domain/study-heatmap.ts`
       y `__tests__/domain/study-heatmap.test.ts`, si `grep` confirma que no quedan usos. Actualizar
       la mención en `README.md`.
-- [ ] T034 [US-F3] P4 MANUAL/VERIFY — `US-F3-AS10` (manual). Con `preview_start`, a 375 px y en
+- [x] T034 [US-F3] P4 MANUAL/VERIFY (2026-10-02: Command Center 52 semanas a 375 px con scroll interno y en escritorio, leyenda en cifras, tabla por objetivo, sin rachas ni glow; Hoy con total y 12 semanas sin metas) — `US-F3-AS10` (manual). Con `preview_start`, a 375 px y en
       escritorio:
       - Command Center muestra el mapa de 52 semanas en lugar del de 28 días;
       - se desplaza horizontalmente sin desbordar la página;
@@ -734,7 +734,7 @@ misma frase el mismo día.
       número de tests con la línea base de T001.
 - [x] T048 C VERIFY (2026-10-02: /speckit-converge → 3 tareas parciales en la Fase 9, ninguna crítica) — Auditoría contra la spec (`/speckit-converge`). Cada FR-F01..FR-F27 tiene
       código y test, y `tasks.md` queda marcado.
-- [ ] T049 C VERIFY — Servidor MCP local:
+- [x] T049 C VERIFY (2026-10-02: Postgres 16 desechable; migraciones 001-016 e idempotencia; CHECKs verificados en el motor real; /health ok; 31/31 llamadas MCP+web en verde; SC-F03 0,10-0,13 s con 1099 sesiones) — Servidor MCP local:
       - `npm run mcp:start:http`;
       - `curl http://localhost:3001/health`;
       - las llamadas reales de [quickstart.md](./quickstart.md) por historia (US-F2 → F1 → F3 → F4
@@ -744,7 +744,7 @@ misma frase el mismo día.
         de 1 s; anotar el tiempo medido.
 
       Si no hay Postgres en la máquina de desarrollo, se hace en el servidor tras T051.
-- [ ] T050 C VERIFY — Web con `preview_start` a 375 px y en escritorio. Repetir T019 y T034 si
+- [x] T050 C VERIFY (2026-10-02: Hoy y Command Center en navegador contra el backend real, 375 px y escritorio; único 400 = rechazo esperado CRONOMETRO_MUY_CORTO) — Web con `preview_start` a 375 px y en escritorio. Repetir T019 y T034 si
       quedaron pendientes, sin errores de consola, con capturas.
 - [ ] T051 MANUAL — Despliegue (lo confirma Andres antes de ejecutarlo, porque es una acción
       hacia afuera):
