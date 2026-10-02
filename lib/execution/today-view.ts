@@ -1,8 +1,8 @@
-// Modelo de vista puro de Hoy (US1-AS8, US3-AS8, US-T1-AS10/AS11). Sin dependencias de React ni del DOM, para
+// Modelo de vista puro de Hoy (US1-AS8, US3-AS8, US-T1-AS10/AS11, US-F1-AS8/AS9). Sin dependencias de React ni del DOM, para
 // que sea testeable en el entorno 'node' de Vitest (Constitución, Principio IV); useToday.ts es
 // el único que lo llama desde un componente.
 
-import { TANDA_DURATION_OPTIONS, TANDA_MINUTES_DEFAULT } from './constants';
+import { TANDA_DURATION_OPTIONS, TANDA_MINUTES_DEFAULT, TANDA_MINUTES_MAX, TANDA_MINUTES_MIN } from './constants';
 
 /**
  * Offset entre el reloj del servidor y el del cliente, capturado una vez por cada respuesta de
@@ -33,6 +33,28 @@ export function formatCountdown(totalSeconds: number): string {
   const mm = Math.floor(safe / 60).toString().padStart(2, '0');
   const ss = (safe % 60).toString().padStart(2, '0');
   return `${mm}:${ss}`;
+}
+
+/**
+ * Segundos transcurridos desde `startedAtIso` (US-F1-AS9, FR-F09): el cronómetro cuenta hacia
+ * arriba desde la hora de inicio que registró el servidor, con el reloj del cliente corregido por
+ * `offsetMs` igual que `secondsLeft` — no con la lectura cruda de `Date.now()`. Son segundos
+ * enteros (se trunca, no se redondea: el cronómetro no adelanta el segundo que aún no pasó) y
+ * nunca negativos.
+ */
+export function elapsedSeconds(startedAtIso: string, offsetMs: number, clientNowMs: number): number {
+  const correctedNowMs = clientNowMs + offsetMs;
+  const elapsedMs = correctedNowMs - new Date(startedAtIso).getTime();
+  return Math.max(0, Math.floor(elapsedMs / 1000));
+}
+
+/** Formatea segundos como `h:mm:ss` (US-F1-AS9): `3725` -> `1:02:05`. Nunca negativo. */
+export function formatElapsed(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(safe / 3600);
+  const mm = Math.floor((safe % 3600) / 60).toString().padStart(2, '0');
+  const ss = (safe % 60).toString().padStart(2, '0');
+  return `${h}:${mm}:${ss}`;
 }
 
 /**
@@ -116,6 +138,27 @@ export function describeStartFailure(
 }
 
 /**
+ * Describe un error al terminar una sesión (US-F1-AS5, FR-F07). Igual que `describeStartFailure`,
+ * pero con el aviso de conexión propio de terminar: el mensaje del servidor (por ejemplo el de
+ * `CRONOMETRO_MUY_CORTO`) se muestra tal cual y `null` significa que no hubo error.
+ */
+export function describeFinishFailure(
+  result: { status?: string; code?: string; message?: string } | null | undefined
+): string | null {
+  if (result?.status === 'success') {
+    return null;
+  }
+
+  const fallbackMessage = 'No se pudo terminar la sesión. Revisa la conexión e inténtalo otra vez.';
+
+  if (result === null || result === undefined || result.code === 'SIN_CONEXION') {
+    return fallbackMessage;
+  }
+
+  return result.message ?? fallbackMessage;
+}
+
+/**
  * Formatea un ISO string a hora local en formato HH:MM (zona 'es-CO').
  * Usado en la pantalla Hoy para mostrar horas de inicio, fin de tanda y envío de reporte.
  */
@@ -124,13 +167,40 @@ export function formatLocalTime(iso: string): string {
 }
 
 /**
- * US-T1-AS11: opciones de duración para iniciar una tanda (10, 25, 40, 60 minutos).
- * Se usa en la pantalla Hoy para ofrecer los botones de duración.
- * Derivada de TANDA_DURATION_OPTIONS, con el 10 marcado como opción primaria.
+ * US-T1-AS11 · US-F1-AS8 (FR-F05): opciones de duración del temporizador en la pantalla Hoy
+ * (10, 25, 40, 60 minutos, cada una inicia la sesión en un toque). Derivada de
+ * TANDA_DURATION_OPTIONS, con el 10 marcado como opción primaria. Además de estos presets existe
+ * el campo libre de 10 a 180 minutos (`parseFreeMinutes`); el cronómetro no tiene duración.
  */
 export function tandaDurationOptions(): { minutes: number; isDefault: boolean }[] {
   return TANDA_DURATION_OPTIONS.map((minutes) => ({
     minutes,
     isDefault: minutes === TANDA_MINUTES_DEFAULT,
   }));
+}
+
+export type FreeMinutesResult = { ok: true; minutes: number } | { ok: false; error: string };
+
+/**
+ * US-F1-AS8 (FR-F05): valida el campo libre "Otro (10–180)" del temporizador. Solo acepta enteros
+ * escritos con dígitos entre TANDA_MINUTES_MIN y TANDA_MINUTES_MAX; todo lo demás (vacío, decimal,
+ * negativo, notación científica, fuera de rango) devuelve un mensaje en español que Hoy muestra
+ * como una línea de texto bajo el campo.
+ */
+export function parseFreeMinutes(raw: string): FreeMinutesResult {
+  const text = raw.trim();
+  const range = `${TANDA_MINUTES_MIN} a ${TANDA_MINUTES_MAX}`;
+
+  if (text === '') {
+    return { ok: false, error: `Escribe los minutos, de ${range}.` };
+  }
+  if (!/^\d+$/.test(text)) {
+    return { ok: false, error: `Usa un número entero de minutos, de ${range}.` };
+  }
+
+  const minutes = Number(text);
+  if (minutes < TANDA_MINUTES_MIN || minutes > TANDA_MINUTES_MAX) {
+    return { ok: false, error: `Los minutos van de ${range}.` };
+  }
+  return { ok: true, minutes };
 }

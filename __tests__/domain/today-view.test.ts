@@ -8,6 +8,10 @@ import {
   describeStartFailure,
   formatLocalTime,
   tandaDurationOptions,
+  parseFreeMinutes,
+  elapsedSeconds,
+  formatElapsed,
+  describeFinishFailure,
 } from '../../lib/execution/today-view';
 
 describe('[001] US1 — Tanda de 10 minutos en un toque', () => {
@@ -148,7 +152,7 @@ describe('[003] US-T1 — Tandas de duración variable', () => {
     expect(noTandas.tandasLine).toBeNull();
   });
 
-  it('US-T1-AS11 · tandaDurationOptions devuelve exactamente [10, 25, 40, 60] con 10 como primaria', () => {
+  it('US-T1-AS11 · US-F1-AS8 · tandaDurationOptions devuelve [10, 25, 40, 60] con 10 como primaria, y ahora existe el campo libre', () => {
     const options = tandaDurationOptions();
 
     expect(options).toHaveLength(4);
@@ -156,6 +160,9 @@ describe('[003] US-T1 — Tandas de duración variable', () => {
     expect(options[1]).toEqual({ minutes: 25, isDefault: false });
     expect(options[2]).toEqual({ minutes: 40, isDefault: false });
     expect(options[3]).toEqual({ minutes: 60, isDefault: false });
+
+    // US-F1-AS8: los presets no cambian; lo nuevo es el campo libre (parseFreeMinutes).
+    expect(parseFreeMinutes('45')).toEqual({ ok: true, minutes: 45 });
   });
 
   it('US-T1-AS10 · el pie conserva el comportamiento con solo tandas_today (regresión)', () => {
@@ -167,5 +174,96 @@ describe('[003] US-T1 — Tandas de duración variable', () => {
     expect(legacyInput.tandasLine).toBe('2 tandas hoy');
     expect(legacyInput.checks).toEqual([{ habit_id: 'test', label: 'Test' }]);
     expect(Object.keys(legacyInput).sort()).toEqual(['checks', 'dayFulfilledLine', 'tandasLine']);
+  });
+});
+
+describe('[004] US-F1 — Temporizador y cronómetro en Hoy', () => {
+  it('US-F1-AS8 · el campo libre solo acepta enteros de 10 a 180; fuera de eso devuelve un error en español', () => {
+    // Válidos, incluidos los dos bordes del rango 10–180 (FR-F05).
+    expect(parseFreeMinutes('45')).toEqual({ ok: true, minutes: 45 });
+    expect(parseFreeMinutes('10')).toEqual({ ok: true, minutes: 10 });
+    expect(parseFreeMinutes('180')).toEqual({ ok: true, minutes: 180 });
+    expect(parseFreeMinutes(' 90 ')).toEqual({ ok: true, minutes: 90 }); // espacios alrededor no estorban
+
+    // Inválidos: por debajo, por encima, no entero y vacío. Todos con un mensaje legible para Andres.
+    for (const raw of ['9', '181', '12.5', '', '   ', 'abc', '-20', '1e2']) {
+      const result = parseFreeMinutes(raw);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/[a-záéíóúñ]/i);
+        expect(result.error.length).toBeGreaterThan(10);
+      }
+    }
+
+    // El mensaje del rango nombra los límites de la regla: 10 y 180.
+    const tooShort = parseFreeMinutes('9');
+    const tooLong = parseFreeMinutes('181');
+    expect(tooShort.ok === false && tooShort.error).toContain('10');
+    expect(tooShort.ok === false && tooShort.error).toContain('180');
+    expect(tooLong.ok === false && tooLong.error).toContain('180');
+  });
+
+  it('US-F1-AS9 · el tiempo transcurrido del cronómetro se cuenta desde la hora de inicio del servidor, corregido por el desfase del reloj', () => {
+    // Mismo escenario que US1-AS8: el reloj del cliente va 5 minutos ADELANTADO.
+    const serverNowAtFetch = '2026-09-14T15:00:00.000Z';
+    const clientNowAtFetch = new Date('2026-09-14T15:05:00.000Z').getTime();
+    const offsetMs = clockOffset(serverNowAtFetch, clientNowAtFetch);
+
+    // El servidor registró el inicio a las 14:58:00Z: al hacer el fetch ya llevaba 120 s.
+    const startedAt = '2026-09-14T14:58:00.000Z';
+    expect(elapsedSeconds(startedAt, offsetMs, clientNowAtFetch)).toBe(120);
+
+    // Pasa 1 minuto real: el reloj del cliente marca 15:06:00Z (sigue desfasado +5 min). Con el
+    // offset corregido el "ahora" real es 15:01:00Z, o sea 3 minutos (180 s) desde el inicio —
+    // no los 8 minutos que daría una lectura cruda de Date.now().
+    const clientNowAtTick = new Date('2026-09-14T15:06:00.000Z').getTime();
+    expect(elapsedSeconds(startedAt, offsetMs, clientNowAtTick)).toBe(180);
+
+    // Segundos enteros transcurridos (no se redondea hacia arriba) y nunca negativo, aunque el
+    // cliente quede un instante por detrás del servidor.
+    const justAfterStart = new Date('2026-09-14T14:58:30.900Z').getTime();
+    expect(elapsedSeconds(startedAt, 0, justAfterStart)).toBe(30);
+    const beforeStart = new Date('2026-09-14T14:57:59.000Z').getTime();
+    expect(elapsedSeconds(startedAt, 0, beforeStart)).toBe(0);
+  });
+
+  it('US-F1-AS9 · formatElapsed devuelve h:mm:ss hacia arriba (sin cero a la izquierda en las horas)', () => {
+    expect(formatElapsed(3725)).toBe('1:02:05');
+    expect(formatElapsed(59)).toBe('0:00:59');
+    expect(formatElapsed(0)).toBe('0:00:00');
+    expect(formatElapsed(600)).toBe('0:10:00');
+    expect(formatElapsed(36000)).toBe('10:00:00');
+    expect(formatElapsed(-5)).toBe('0:00:00'); // nunca un contador negativo
+  });
+
+  it('US-F1-AS9 · el temporizador sigue usando la cuenta atrás: secondsLeft y formatCountdown, y sin fin (cronómetro) secondsLeft es null', () => {
+    const serverNowAtFetch = '2026-09-14T15:00:00.000Z';
+    const clientNowAtFetch = new Date('2026-09-14T15:05:00.000Z').getTime();
+    const offsetMs = clockOffset(serverNowAtFetch, clientNowAtFetch);
+    const endsAt = '2026-09-14T15:10:00.000Z';
+    const clientNowAtTick = new Date('2026-09-14T15:06:00.000Z').getTime();
+
+    const left = secondsLeft(endsAt, offsetMs, clientNowAtTick);
+    expect(left).toBe(540);
+    expect(formatCountdown(left as number)).toBe('09:00');
+
+    // Un cronómetro no tiene `ends_at`: no hay cuenta atrás que mostrar.
+    expect(secondsLeft(null, offsetMs, clientNowAtTick)).toBeNull();
+  });
+
+  it('US-F1-AS5 · si el servidor rechaza terminar un cronómetro de menos de 1 minuto, Hoy muestra el mensaje del servidor; sin red, un aviso de conexión', () => {
+    const tooShort = {
+      status: 'error',
+      code: 'CRONOMETRO_MUY_CORTO',
+      message: 'El cronómetro lleva menos de 1 minuto: déjalo correr o interrúmpelo con una razón.',
+    };
+    expect(describeFinishFailure(tooShort)).toBe(tooShort.message);
+
+    expect(describeFinishFailure({ status: 'success' })).toBeNull();
+
+    const offline = 'No se pudo terminar la sesión. Revisa la conexión e inténtalo otra vez.';
+    expect(describeFinishFailure({ status: 'error', code: 'SIN_CONEXION', message: 'Sin conexión con Pure.' })).toBe(offline);
+    expect(describeFinishFailure(null)).toBe(offline);
+    expect(describeFinishFailure({ status: 'error', code: 'ERROR_DESCONOCIDO' })).toBe(offline);
   });
 });

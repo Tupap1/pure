@@ -5,6 +5,8 @@
 //
 // finalizeElapsed corre al principio de cada operación (FR-005): así una tanda cuyo tiempo ya
 // se cumplió queda completada sola, aunque nadie la haya tocado y el teléfono esté bloqueado.
+// Un cronómetro (004, FR-F06) no tiene tiempo que cumplir: finalizeElapsed lo ignora y solo se
+// cierra al terminarlo (`finish`), interrumpirlo (`interrupt`) o, más adelante, corregirlo.
 //
 // FR-004 (como máximo una tanda en curso) se resuelve con `running_lock TEXT UNIQUE` (migración
 // 008): `start` intenta un INSERT directo (nunca un SELECT previo que decida si insertar) y
@@ -12,16 +14,17 @@
 // la que arbitra atómicamente entre dos inicios simultáneos desde dispositivos distintos.
 
 import crypto from 'crypto';
-import { localParts, localDateTimeToInstant, addDays } from './time';
+import { localParts, localDateTimeToInstant, addDays, splitByLocalDay } from './time';
 import {
   TANDA_MINUTES_DEFAULT,
   DAY_LOCK_TIME,
+  CRONOMETRO_MIN_FINISH_SECONDS,
   LATE_LOG_MAX_HOURS_BACK,
   LATE_LOG_MAX_PER_DAY,
   LATE_LOG_MIN_MINUTES,
   LATE_LOG_MAX_MINUTES,
 } from './constants';
-import { tandaUnits } from '../domain/execution';
+import { sessionShares, tallyDay, type SplitByLocalDay } from '../domain/focus';
 import type { ExecutionResult } from '../validations/schemas';
 import {
   fetchTandasFromDb,
@@ -51,10 +54,29 @@ async function findTandaById(id: string): Promise<TandaRecord | null> {
   return (Array.isArray(raw) ? raw[0] : raw) as TandaRecord | null;
 }
 
+/** Instante previsto de fin (ms), o null en un cronómetro, que no tiene fin previsto (FR-F01). */
 function endsAtMs(tanda: TandaRecord): number | null {
-  if (!tanda.planned_minutes) return null;
-  // T014 reemplaza esto por la rama del cronómetro (spec 004)
+  if (tanda.kind === 'cronometro' || !tanda.planned_minutes) return null;
   return new Date(tanda.started_at).getTime() + (tanda.planned_minutes as number) * 60_000;
+}
+
+/**
+ * `splitByLocalDay` con caché por (inicio, fin). `tallyDay` reparte cada cronómetro una vez por
+ * día evaluado; con un año de días y varias sesiones eso repetiría miles de veces el mismo reparto
+ * (y cada uno construye `Intl.DateTimeFormat`). La caché vive lo que dura una llamada de lectura:
+ * crea una por llamada, no una global.
+ */
+export function cachedSplitByLocalDay(): SplitByLocalDay {
+  const cache = new Map<string, ReturnType<SplitByLocalDay>>();
+  return (startIso, endIso) => {
+    const key = `${new Date(startIso).getTime()}|${new Date(endIso).getTime()}`;
+    let shares = cache.get(key);
+    if (!shares) {
+      shares = splitByLocalDay(startIso, endIso);
+      cache.set(key, shares);
+    }
+    return shares;
+  };
 }
 
 /**
@@ -66,8 +88,11 @@ function endsAtMs(tanda: TandaRecord): number | null {
 export async function finalizeElapsed(now: Date = new Date()): Promise<TandaRecord | null> {
   const running = await findRunningTanda();
   if (!running) return null;
+  // R8: el cronómetro no se cierra por tiempo (ni dispara el aviso de fin del tick: tick.ts solo
+  // avisa cuando esta función devuelve una tanda cerrada).
+  if (running.kind === 'cronometro') return null;
   const ends = endsAtMs(running);
-  if (!ends || now.getTime() < ends) return null;
+  if (ends === null || now.getTime() < ends) return null;
 
   return await saveTandaToDb({
     ...running,
@@ -84,11 +109,18 @@ export interface TandaStartInput {
   deliverable_id?: string;
   task_id?: string;
   routine_slot_id?: string;
+  /** 004: 'temporizador' por defecto; 'cronometro' no tiene duración planeada. */
+  kind?: 'temporizador' | 'cronometro';
+  /** 004, T021: lo valida (existe, no está archivado) y lo guarda startTanda en la historia US-F2.
+   * Hasta entonces el esquema lo acepta pero este servicio todavía no lo persiste. */
+  objective_id?: string;
   planned_minutes?: number;
 }
 
 /**
- * FR-001, FR-002, FR-004: empieza una tanda con la hora del servidor. US2-AS7/FR-012: si viene
+ * FR-001, FR-002, FR-004: empieza una tanda con la hora del servidor. 004 (FR-F01): `kind` elige
+ * entre temporizador (10-180 min, `ends_at` previsto) y cronómetro (`planned_minutes` y `ends_at`
+ * nulos; solo se cierra al terminarlo o interrumpirlo). US2-AS7/FR-012: si viene
  * de un disparador (`routine_slot_id`), hereda su materia cuando no se indicó una explícita y
  * dispara el mismo efecto que "responder hecho" (slot_outcomes de hoy) — el botón "Empezar
  * tanda" de un disparador de estudio en Hoy llama a esta misma acción, así que aquí es donde debe
@@ -97,7 +129,7 @@ export interface TandaStartInput {
 export async function startTanda(
   input: TandaStartInput,
   now: Date = new Date()
-): Promise<ExecutionResult<{ tanda: TandaRecord; ends_at: string }>> {
+): Promise<ExecutionResult<{ tanda: TandaRecord; ends_at: string | null }>> {
   await finalizeElapsed(now);
 
   let subjectId = input.subject_id;
@@ -106,10 +138,11 @@ export async function startTanda(
     if (slot?.subject_id) subjectId = slot.subject_id;
   }
 
-  const plannedMinutes = input.planned_minutes ?? TANDA_MINUTES_DEFAULT;
+  const kind = input.kind ?? 'temporizador';
+  const plannedMinutes = kind === 'cronometro' ? null : (input.planned_minutes ?? TANDA_MINUTES_DEFAULT);
   const local = localParts(now);
   const lockedAt = localDateTimeToInstant(addDays(local.dateKey, 1), DAY_LOCK_TIME);
-  const endsAt = new Date(now.getTime() + plannedMinutes * 60_000);
+  const endsAt = plannedMinutes === null ? null : new Date(now.getTime() + plannedMinutes * 60_000);
 
   try {
     const tanda = await saveTandaToDb({
@@ -121,6 +154,7 @@ export async function startTanda(
       routine_slot_id: input.routine_slot_id,
       local_date: local.dateKey,
       started_at: now.toISOString(),
+      kind,
       planned_minutes: plannedMinutes,
       status: 'en_curso',
       running_lock: 'running',
@@ -138,7 +172,7 @@ export async function startTanda(
       });
     }
 
-    return { status: 'success', data: { tanda, ends_at: endsAt.toISOString() } };
+    return { status: 'success', data: { tanda, ends_at: endsAt ? endsAt.toISOString() : null } };
   } catch (error) {
     if (isRunningLockViolation(error)) {
       return {
@@ -151,8 +185,18 @@ export async function startTanda(
   }
 }
 
+/** `edited_after_lock` de un cierre hecho por el servicio: solo el cronómetro se marca al cerrarse
+ * después de `locked_at` (FR-F14a, US-F1-AS11), porque puede empezar un día y cerrarse en otro; el
+ * temporizador conserva el comportamiento de la 001/003. Nunca desmarca una edición previa. */
+function lockedEditFlag(tanda: TandaRecord, now: Date): boolean {
+  if (tanda.edited_after_lock) return true;
+  return tanda.kind === 'cronometro' && now.getTime() > new Date(tanda.locked_at).getTime();
+}
+
 /** FR-003: finish exige que el tiempo planeado ya se haya cumplido (con 30s de margen); antes
- * de eso, la única salida es interrupt. Idempotente sobre una tanda ya cerrada. */
+ * de eso, la única salida es interrupt. Idempotente sobre una tanda ya cerrada. FR-F07: un
+ * cronómetro se puede terminar a partir de CRONOMETRO_MIN_FINISH_SECONDS (1 min); antes,
+ * CRONOMETRO_MUY_CORTO y sigue en curso. */
 export async function finishTanda(id: string, now: Date = new Date()): Promise<ExecutionResult<TandaRecord>> {
   await finalizeElapsed(now);
 
@@ -166,21 +210,23 @@ export async function finishTanda(id: string, now: Date = new Date()): Promise<E
   }
 
   const elapsedMs = now.getTime() - new Date(existing.started_at).getTime();
-  if (existing.planned_minutes === null) {
-    return {
-      status: 'error',
-      code: 'DATOS_INVALIDOS',
-      message: 'No se puede cerrar un cronómetro con finish: usa interrupt.',
-    };
-  }
-  // T014 reemplaza esto por la rama del cronómetro (spec 004)
-  const requiredMs = (existing.planned_minutes as number) * 60_000 - 30_000;
-  if (elapsedMs < requiredMs) {
-    return {
-      status: 'error',
-      code: 'TANDA_NO_TERMINADA',
-      message: 'Todavía no se cumple el tiempo planeado: usa interrupt si necesitas cortarla antes.',
-    };
+  if (existing.kind === 'cronometro') {
+    if (elapsedMs < CRONOMETRO_MIN_FINISH_SECONDS * 1_000) {
+      return {
+        status: 'error',
+        code: 'CRONOMETRO_MUY_CORTO',
+        message: 'El cronómetro lleva menos de 1 minuto: déjalo correr o interrúmpelo con una razón.',
+      };
+    }
+  } else {
+    const requiredMs = (existing.planned_minutes as number) * 60_000 - 30_000;
+    if (elapsedMs < requiredMs) {
+      return {
+        status: 'error',
+        code: 'TANDA_NO_TERMINADA',
+        message: 'Todavía no se cumple el tiempo planeado: usa interrupt si necesitas cortarla antes.',
+      };
+    }
   }
 
   const updated = await saveTandaToDb({
@@ -189,6 +235,7 @@ export async function finishTanda(id: string, now: Date = new Date()): Promise<E
     actual_minutes: Math.floor(elapsedMs / 60_000),
     status: 'completada',
     running_lock: null,
+    edited_after_lock: lockedEditFlag(existing, now),
   });
   return { status: 'success', data: updated };
 }
@@ -224,24 +271,43 @@ export async function interruptTanda(
     status: 'interrumpida',
     running_lock: null,
     interrupt_reason: input.interrupt_reason,
+    edited_after_lock: lockedEditFlag(existing, now),
   });
   return { status: 'success', data: updated };
 }
 
-/** `{ tanda | null, seconds_left | null, server_now }` (contracts/mcp-tools.md). */
-export async function currentTanda(
-  now: Date = new Date()
-): Promise<ExecutionResult<{ tanda: TandaRecord | null; seconds_left: number | null; server_now: string }>> {
+export interface CurrentTandaPayload {
+  tanda: TandaRecord | null;
+  /** Temporizador: segundos que faltan. Cronómetro (sin fin previsto) y sin tanda: null. */
+  seconds_left: number | null;
+  /** Cronómetro: segundos transcurridos desde el inicio del servidor. Temporizador y sin tanda: null. */
+  elapsed_seconds: number | null;
+  server_now: string;
+}
+
+/** `{ tanda | null, seconds_left | null, elapsed_seconds | null, server_now }`
+ * (contracts/mcp-tools.md). */
+export async function currentTanda(now: Date = new Date()): Promise<ExecutionResult<CurrentTandaPayload>> {
   await finalizeElapsed(now);
 
   const running = await findRunningTanda();
   if (!running) {
-    return { status: 'success', data: { tanda: null, seconds_left: null, server_now: now.toISOString() } };
+    return {
+      status: 'success',
+      data: { tanda: null, seconds_left: null, elapsed_seconds: null, server_now: now.toISOString() },
+    };
   }
 
   const ends = endsAtMs(running);
-  const secondsLeft = ends ? Math.max(0, Math.round((ends - now.getTime()) / 1000)) : null;
-  return { status: 'success', data: { tanda: running, seconds_left: secondsLeft, server_now: now.toISOString() } };
+  const secondsLeft = ends === null ? null : Math.max(0, Math.round((ends - now.getTime()) / 1000));
+  const elapsedSeconds =
+    running.kind === 'cronometro'
+      ? Math.max(0, Math.floor((now.getTime() - new Date(running.started_at).getTime()) / 1000))
+      : null;
+  return {
+    status: 'success',
+    data: { tanda: running, seconds_left: secondsLeft, elapsed_seconds: elapsedSeconds, server_now: now.toISOString() },
+  };
 }
 
 export interface TandaReadInput {
@@ -259,7 +325,13 @@ export interface TandaDayResumen {
 }
 
 /** `{ tandas[], por_dia[] }` (contracts/mcp-tools.md). El filtrado y el agregado por día son
- * aritmética pura en TypeScript (Constitución, Principio III), no SQL. */
+ * aritmética pura en TypeScript (Constitución, Principio III), no SQL.
+ *
+ * 004 (FR-F14a): una tanda entra si ALGUNO de sus tramos cae en [from, to]; un cronómetro que
+ * empezó antes de `from` y cuyo tramo cae dentro entra aunque su `local_date` sea anterior. El
+ * agregado de cada día sale de `tallyDay` (la única regla de unidades y de minutos por día): sus
+ * `unidades` y `completadas` solo cuentan lo que cumple el mínimo y `minutos` es el foco total del
+ * día (completadas + interrumpidas). Todavía sin objetivos (mapa vacío): conectarlos es T021. */
 export async function readTandas(
   input: TandaReadInput = {},
   now: Date = new Date()
@@ -269,27 +341,34 @@ export async function readTandas(
   const allRaw = await fetchTandasFromDb();
   const all = (Array.isArray(allRaw) ? allRaw : []) as TandaRecord[];
 
-  const filtered = all.filter((t) => {
-    if (input.from && t.local_date < input.from) return false;
-    if (input.to && t.local_date > input.to) return false;
-    if (input.subject_id && t.subject_id !== input.subject_id) return false;
-    return true;
-  });
+  const split = cachedSplitByLocalDay();
+  const inRange = (date: string) => !((input.from && date < input.from) || (input.to && date > input.to));
 
-  const byDay = new Map<string, TandaDayResumen>();
-  for (const t of filtered) {
-    const bucket = byDay.get(t.local_date) ?? { date: t.local_date, completadas: 0, unidades: 0, interrumpidas: 0, minutos: 0 };
-    if (t.status === 'completada') {
-      bucket.completadas += 1;
-      // FR-T06: unidades solo de las completadas (las interrumpidas no aportan)
-      bucket.unidades += tandaUnits(t.actual_minutes);
-    }
-    if (t.status === 'interrumpida') bucket.interrumpidas += 1;
-    bucket.minutos += t.actual_minutes ?? 0;
-    byDay.set(t.local_date, bucket);
+  const filtered: TandaRecord[] = [];
+  const daysWithSessions = new Set<string>();
+  for (const t of all) {
+    if (input.subject_id && t.subject_id !== input.subject_id) continue;
+    const datesInRange = sessionShares(t, split)
+      .map((share) => share.date)
+      .filter(inRange);
+    if (datesInRange.length === 0) continue;
+    filtered.push(t);
+    for (const date of datesInRange) daysWithSessions.add(date);
   }
 
-  const por_dia = Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date));
+  const por_dia: TandaDayResumen[] = Array.from(daysWithSessions)
+    .sort((a, b) => a.localeCompare(b))
+    .map((date) => {
+      const tally = tallyDay(date, filtered, new Map(), split);
+      return {
+        date,
+        completadas: tally.completadas,
+        unidades: tally.unidades,
+        interrumpidas: tally.interrumpidas,
+        minutos: tally.minutos_foco,
+      };
+    });
+
   return { status: 'success', data: { tandas: filtered, por_dia } };
 }
 

@@ -4,18 +4,27 @@
 
 import { localParts } from './time';
 import { readProgram } from './program';
-import { currentTanda, readTandas } from './tandas';
+import { currentTanda, readTandas, cachedSplitByLocalDay } from './tandas';
 import { resolveTodayTrigger } from './routine';
 import { fetchHabitsFromDb, fetchDailyChecksFromDb, HabitRecord, DailyCheckRecord } from '../db/execution-pg';
-import { isHabitActive, evaluateDay, describeDay, tandaUnits, CurrentTrigger, DayBreakdown } from '../domain/execution';
+import { isHabitActive, evaluateDay, describeDay, CurrentTrigger, DayBreakdown } from '../domain/execution';
+import { tallyDay } from '../domain/focus';
 import type { ExecutionResult } from '../validations/schemas';
 
 export interface TodayRunningTanda {
   id: string;
   subject_id: string | null;
+  /** 004: tipo de sesión; el cronómetro no tiene fin previsto. */
+  kind: 'temporizador' | 'cronometro';
+  /** 004: objetivo ligado a la sesión (US-F2). */
+  objective_id: string | null;
   started_at: string;
+  /** Fin previsto del temporizador; null en el cronómetro. */
   ends_at: string | null;
-  seconds_left: number;
+  /** Cuenta atrás del temporizador; null en el cronómetro. */
+  seconds_left: number | null;
+  /** Segundos transcurridos del cronómetro (hacia arriba); null en el temporizador. */
+  elapsed_seconds: number | null;
 }
 
 export interface TodayPendingCheck {
@@ -49,18 +58,23 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
   const currentRes = await currentTanda(now);
   const runningRaw = currentRes.status === 'success' ? currentRes.data!.tanda : null;
   const secondsLeft = currentRes.status === 'success' ? currentRes.data!.seconds_left : null;
+  const elapsedSeconds = currentRes.status === 'success' ? currentRes.data!.elapsed_seconds : null;
   const running_tanda: TodayRunningTanda | null = runningRaw
     ? {
         id: runningRaw.id,
         subject_id: runningRaw.subject_id ?? null,
+        kind: runningRaw.kind,
+        objective_id: runningRaw.objective_id ?? null,
         started_at: new Date(runningRaw.started_at).toISOString(),
+        // El cronómetro no tiene duración planeada ni fin previsto: ends_at y seconds_left son null.
         ends_at:
-          runningRaw.planned_minutes !== null
+          runningRaw.kind !== 'cronometro' && runningRaw.planned_minutes !== null
             ? new Date(
                 new Date(runningRaw.started_at).getTime() + (runningRaw.planned_minutes as number) * 60_000
               ).toISOString()
             : null,
-        seconds_left: secondsLeft ?? 0,
+        seconds_left: secondsLeft,
+        elapsed_seconds: elapsedSeconds,
       }
     : null;
 
@@ -68,13 +82,16 @@ export async function getToday(now: Date = new Date()): Promise<ExecutionResult<
   // status='completada'. Una tanda interrumpida o todavía en curso no se acredita como estudiada
   // (auditoría US2/US3): antes, tandas_today contaba las tres, así que el pie podía decir "1
   // tanda hoy" apenas se tocaba "Empezar tanda", sin haber estudiado un minuto.
+  //
+  // 004 (FR-F04, FR-F13, FR-F14a): completadas y unidades salen de tallyDay, la única regla de
+  // unidades del sistema; con él un cronómetro que cruza la medianoche solo aporta a hoy los
+  // minutos del tramo de hoy. El mapa de objetivos va vacío por ahora (T021 lo conecta).
   const readRes = await readTandas({ from: dateKey, to: dateKey }, now);
-  const completedTandas =
-    readRes.status === 'success' ? readRes.data!.tandas.filter((t) => t.status === 'completada') : [];
-  const completedToday = completedTandas.length;
-
-  // FR-T05: calcular unidades de hoy (suma de tandaUnits sobre las completadas).
-  const completedUnitsToday = completedTandas.reduce((sum, t) => sum + tandaUnits(t.actual_minutes), 0);
+  const todayTandas = readRes.status === 'success' ? readRes.data!.tandas : [];
+  const tally = tallyDay(dateKey, todayTandas, new Map(), cachedSplitByLocalDay());
+  const completedToday = tally.completadas;
+  // FR-T05: unidades de hoy, ahora según el tipo de sesión (FR-F04).
+  const completedUnitsToday = tally.unidades;
 
   const trigger = await resolveTodayTrigger(now);
 

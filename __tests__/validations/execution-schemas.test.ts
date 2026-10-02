@@ -100,12 +100,25 @@ describe('[001] Validación Zod — Módulo de Ejecución (Foundational)', () =>
   });
 
   describe('Tanda (tandas)', () => {
-    it('planned_minutes acepta de 10 a 60 minutos', () => {
+    // La 004 reemplaza la cota superior (spec 004, FR-F02: temporizador de 10 a 180): 61 ahora es
+    // válido y el rechazo pasa a 181. Un cronómetro no admite planned_minutes (FR-F01).
+    it('planned_minutes acepta de 10 a 180 minutos', () => {
       expect(TandaStartSchema.safeParse({ planned_minutes: 9 }).success).toBe(false);
-      expect(TandaStartSchema.safeParse({ planned_minutes: 61 }).success).toBe(false);
+      expect(TandaStartSchema.safeParse({ planned_minutes: 181 }).success).toBe(false);
+      expect(TandaStartSchema.safeParse({ planned_minutes: 12.5 }).success).toBe(false);
       expect(TandaStartSchema.safeParse({ planned_minutes: 10 }).success).toBe(true);
       expect(TandaStartSchema.safeParse({ planned_minutes: 60 }).success).toBe(true);
+      expect(TandaStartSchema.safeParse({ planned_minutes: 61 }).success).toBe(true);
+      expect(TandaStartSchema.safeParse({ planned_minutes: 180 }).success).toBe(true);
       expect(TandaStartSchema.safeParse({}).success).toBe(true); // opcional: 10 por defecto en el servicio
+    });
+
+    it('kind admite temporizador y cronometro; el cronómetro rechaza planned_minutes', () => {
+      expect(TandaStartSchema.safeParse({ kind: 'temporizador', planned_minutes: 45 }).success).toBe(true);
+      expect(TandaStartSchema.safeParse({ kind: 'cronometro' }).success).toBe(true);
+      expect(TandaStartSchema.safeParse({ kind: 'cronometro', planned_minutes: 30 }).success).toBe(false);
+      expect(TandaStartSchema.safeParse({ kind: 'otro' }).success).toBe(false);
+      expect(TandaStartSchema.safeParse({ objective_id: 'objetivo-1' }).success).toBe(true);
     });
 
     it('interrupt_reason acepta de 1 a 140 caracteres', () => {

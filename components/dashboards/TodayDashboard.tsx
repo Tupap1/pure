@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useToday } from '@/lib/hooks/useToday';
+import { useToday, type StartTandaInput } from '@/lib/hooks/useToday';
 import { usePureData } from '@/lib/hooks/usePureData';
 import { useWeeklyReport } from '@/lib/hooks/useWeeklyReport';
 import { usePushNotifications } from '@/lib/hooks/usePushNotifications';
@@ -7,7 +7,16 @@ import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import type { TodayRunningTanda } from '@/lib/execution/today';
-import { buildTodayFooterView, describeStartFailure, formatLocalTime, tandaDurationOptions } from '@/lib/execution/today-view';
+import {
+  buildTodayFooterView,
+  describeFinishFailure,
+  describeStartFailure,
+  formatElapsed,
+  formatLocalTime,
+  parseFreeMinutes,
+  tandaDurationOptions,
+} from '@/lib/execution/today-view';
+import { TANDA_MINUTES_MAX, TANDA_MINUTES_MIN } from '@/lib/execution/constants';
 import { SundayPlanning } from '@/components/dashboards/SundayPlanning';
 import { isoDayOfWeekForDateKey } from '@/lib/domain/execution';
 
@@ -19,10 +28,19 @@ function formatDayLine(dateKey: string, week: { number: number; total: number } 
   return week ? `${capitalized} · Semana ${week.number} de ${week.total}` : capitalized;
 }
 
+type SessionMode = 'temporizador' | 'cronometro';
+
+const SESSION_MODES: { id: SessionMode; label: string }[] = [
+  { id: 'temporizador', label: 'Temporizador' },
+  { id: 'cronometro', label: 'Cronómetro' },
+];
+
 /**
  * Pantalla Hoy (US1-US3, FR-041): primera pantalla de Pure. Cubre la tanda de 10 minutos en un
  * toque (US1), el único disparador si-entonces vigente (US2) y los checks de hábitos del día con
- * el pie "N tandas hoy · Día cumplido" (US3).
+ * el pie "N tandas hoy · Día cumplido" (US3). Desde la 004 (US-F1, FR-F05/FR-F09) la sesión puede
+ * ser un temporizador (10, 25, 40, 60 o un campo libre de 10 a 180, cuenta atrás) o un cronómetro
+ * (una acción, Empezar; cuenta hacia arriba). Empezar sigue siendo un toque (FR-008).
  */
 export const TodayDashboard: React.FC = () => {
   const {
@@ -31,8 +49,10 @@ export const TodayDashboard: React.FC = () => {
     isOffline,
     secondsLeft,
     countdown,
+    elapsedSeconds,
     refresh,
     start,
+    finish,
     interrupt,
     tagSubject,
     respondTrigger,
@@ -42,8 +62,13 @@ export const TodayDashboard: React.FC = () => {
   const { report, setNote } = useWeeklyReport();
   const { state: pushState, subscribe: subscribeToPush } = usePushNotifications();
 
+  const [mode, setMode] = useState<SessionMode>('temporizador');
+  const [freeMinutes, setFreeMinutes] = useState('');
+  const [freeError, setFreeError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
   const [interruptOpen, setInterruptOpen] = useState(false);
   const [interruptReason, setInterruptReason] = useState('');
   const [justFinished, setJustFinished] = useState<TodayRunningTanda | null>(null);
@@ -62,6 +87,13 @@ export const TodayDashboard: React.FC = () => {
     }
     prevRunningRef.current = today.running_tanda;
   }, [today]);
+
+  // El aviso de CRONOMETRO_MUY_CORTO deja de ser cierto en cuanto el cronómetro cumple su primer
+  // minuto: se retira al cambiar el minuto transcurrido en vez de quedarse en pantalla desactualizado.
+  const elapsedMinute = elapsedSeconds != null ? Math.floor(elapsedSeconds / 60) : null;
+  useEffect(() => {
+    setFinishError(null);
+  }, [elapsedMinute]);
 
   if (isOffline) {
     return (
@@ -84,7 +116,10 @@ export const TodayDashboard: React.FC = () => {
   }
 
   const running = today.running_tanda;
+  const isCronometro = running?.kind === 'cronometro';
+  // aria-live: el texto solo cambia una vez por minuto (un entero de minutos), nunca por segundo.
   const minutesLeft = running && secondsLeft != null ? Math.ceil(secondsLeft / 60) : null;
+  const minutesElapsed = isCronometro ? elapsedMinute : null;
   const footer = buildTodayFooterView({
     pending_checks: today.pending_checks,
     tandas_today: today.tandas_today,
@@ -100,19 +135,51 @@ export const TodayDashboard: React.FC = () => {
   const principal = opciones.find((o) => o.isDefault);
   const alternativas = opciones.filter((o) => !o.isDefault);
 
-  const handleStart = async (routine_slot_id?: string, planned_minutes?: number) => {
+  /** Devuelve true si el servidor aceptó el inicio (para limpiar el campo libre). */
+  const handleStart = async (input: StartTandaInput): Promise<boolean> => {
     setIsStarting(true);
     setStartError(null);
+    setFinishError(null);
     try {
-      const data = {
-        ...(routine_slot_id && { routine_slot_id }),
-        ...(planned_minutes && { planned_minutes }),
-      };
-      const result = await start(Object.keys(data).length > 0 ? (data as any) : undefined);
+      const result = await start(input);
       const error = describeStartFailure(result);
       setStartError(error);
+      return error === null;
     } finally {
       setIsStarting(false);
+    }
+  };
+
+  const handleFreeSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const parsed = parseFreeMinutes(freeMinutes);
+    if (!parsed.ok) {
+      setStartError(null);
+      setFreeError(parsed.error);
+      return;
+    }
+    setFreeError(null);
+    const started = await handleStart({ kind: 'temporizador', planned_minutes: parsed.minutes });
+    if (started) setFreeMinutes('');
+  };
+
+  const handleModeChange = (next: SessionMode) => {
+    setMode(next);
+    setFreeError(null);
+    setStartError(null);
+  };
+
+  // FR-F07: el servidor rechaza terminar un cronómetro de menos de 1 minuto (CRONOMETRO_MUY_CORTO)
+  // y la sesión sigue en curso; su mensaje se muestra tal cual.
+  const handleFinish = async () => {
+    if (!running) return;
+    setIsFinishing(true);
+    setFinishError(null);
+    try {
+      const result = await finish(running.id);
+      setFinishError(describeFinishFailure(result));
+    } finally {
+      setIsFinishing(false);
     }
   };
 
@@ -157,7 +224,7 @@ export const TodayDashboard: React.FC = () => {
         {running ? (
           <>
             <div className="text-5xl font-mono font-bold tabular-nums text-slate-900 dark:text-slate-100">
-              {countdown ?? '00:00'}
+              {isCronometro ? formatElapsed(elapsedSeconds ?? 0) : (countdown ?? '00:00')}
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               <span>Empezó a las <span className="font-mono">{formatLocalTime(running.started_at)}</span></span>
@@ -169,9 +236,15 @@ export const TodayDashboard: React.FC = () => {
               )}
             </p>
             {/* Anuncio para lectores de pantalla: solo cambia de texto una vez por minuto
-                (minutesLeft es un entero de minutos), así aria-live no interrumpe cada segundo. */}
+                (un entero de minutos), así aria-live no interrumpe cada segundo. */}
             <span className="sr-only" aria-live="polite">
-              {minutesLeft != null ? `Quedan ${minutesLeft} minuto${minutesLeft === 1 ? '' : 's'} de la tanda.` : ''}
+              {isCronometro
+                ? minutesElapsed != null && minutesElapsed > 0
+                  ? `Lleva ${minutesElapsed} minuto${minutesElapsed === 1 ? '' : 's'} en el cronómetro.`
+                  : 'Cronómetro en marcha.'
+                : minutesLeft != null
+                  ? `Quedan ${minutesLeft} minuto${minutesLeft === 1 ? '' : 's'} de la tanda.`
+                  : ''}
             </span>
 
             {pushState === 'activable' && (
@@ -181,6 +254,23 @@ export const TodayDashboard: React.FC = () => {
               >
                 Avísame al terminar
               </button>
+            )}
+
+            {isCronometro && (
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={handleFinish}
+                disabled={isFinishing}
+                className="min-h-[44px] px-10"
+              >
+                Terminar
+              </Button>
+            )}
+            {finishError && (
+              <p className="text-sm text-amber-600 dark:text-amber-500" role="alert">
+                {finishError}
+              </p>
             )}
 
             {!interruptOpen ? (
@@ -225,35 +315,96 @@ export const TodayDashboard: React.FC = () => {
           </>
         ) : (
           <div className="flex flex-col items-center gap-3 w-full">
-            <p className="text-sm text-slate-600 dark:text-slate-300">Empezar tanda de</p>
-            {principal && (
+            {/* Selector segmentado sobrio: el modo activo se marca con fondo gris sutil, sin color
+                ni ícono (DESIGN.md). Es solo el tipo de sesión; empezar sigue siendo un toque. */}
+            <div
+              role="group"
+              aria-label="Tipo de sesión"
+              className="inline-flex gap-0.5 p-0.5 rounded-lg border border-surface-border"
+            >
+              {SESSION_MODES.map((option) => {
+                const isActive = mode === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => handleModeChange(option.id)}
+                    className={cn(
+                      'min-h-[44px] px-4 rounded-md text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-black/[0.06] dark:bg-white/[0.09] text-slate-900 dark:text-slate-100'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {mode === 'temporizador' ? (
+              <>
+                <p className="text-sm text-slate-600 dark:text-slate-300">Empezar tanda de</p>
+                {principal && (
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    onClick={() => handleStart({ kind: 'temporizador', planned_minutes: principal.minutes })}
+                    disabled={isStarting}
+                    className="min-h-[44px] px-10"
+                  >
+                    {principal.minutes} min
+                  </Button>
+                )}
+                <div className="flex gap-2 justify-center">
+                  {alternativas.map((option) => (
+                    <Button
+                      key={option.minutes}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleStart({ kind: 'temporizador', planned_minutes: option.minutes })}
+                      disabled={isStarting}
+                      className="min-h-[44px]"
+                    >
+                      {option.minutes} min
+                    </Button>
+                  ))}
+                </div>
+                <form onSubmit={handleFreeSubmit} noValidate className="flex gap-2 justify-center">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={freeMinutes}
+                    onChange={(e) => {
+                      setFreeMinutes(e.target.value.slice(0, 4));
+                      setFreeError(null);
+                    }}
+                    placeholder={`Otro (${TANDA_MINUTES_MIN}–${TANDA_MINUTES_MAX})`}
+                    aria-label={`Otro, de ${TANDA_MINUTES_MIN} a ${TANDA_MINUTES_MAX} minutos`}
+                    aria-invalid={freeError ? true : undefined}
+                    className="w-36 min-h-[44px] px-3 py-2 rounded-lg border border-surface-border bg-surface text-sm tabular-nums text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                  />
+                  <Button type="submit" variant="ghost" size="sm" disabled={isStarting} className="min-h-[44px]">
+                    Empezar
+                  </Button>
+                </form>
+              </>
+            ) : (
               <Button
                 variant="primary"
                 size="lg"
-                onClick={() => handleStart(undefined, principal.minutes)}
+                onClick={() => handleStart({ kind: 'cronometro' })}
                 disabled={isStarting}
                 className="min-h-[44px] px-10"
               >
-                {principal.minutes} min
+                Empezar
               </Button>
             )}
-            <div className="flex gap-2 justify-center">
-              {alternativas.map((option) => (
-                <Button
-                  key={option.minutes}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleStart(undefined, option.minutes)}
-                  disabled={isStarting}
-                  className="min-h-[44px]"
-                >
-                  {option.minutes} min
-                </Button>
-              ))}
-            </div>
-            {startError && (
+            {(freeError ?? startError) && (
               <p className="text-sm text-amber-600 dark:text-amber-500" role="alert">
-                {startError}
+                {freeError ?? startError}
               </p>
             )}
           </div>
@@ -271,7 +422,7 @@ export const TodayDashboard: React.FC = () => {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => handleStart(today.trigger!.id)}
+                onClick={() => handleStart({ routine_slot_id: today.trigger!.id })}
                 disabled={isStarting}
                 className="min-h-[44px]"
               >

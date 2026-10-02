@@ -471,6 +471,10 @@ export const RoutineSlotRehearseSchema = z
 // (FR-002). Al ser esquemas `.strict()`, cualquiera de esas dos claves cae en `unrecognized_keys`
 // y, por defecto, se traduce a DATOS_INVALIDOS.
 
+// 004 (FR-F01..FR-F02): `kind` es 'temporizador' por defecto (con `planned_minutes` entero de 10 a
+// 180) o 'cronometro' (sin duración planeada: pasar `planned_minutes` es DATOS_INVALIDOS).
+// `objective_id` solo se valida aquí como forma; que exista y no esté archivado lo resuelve
+// startTanda (US-F2-AS3).
 export const TandaStartSchema = z
   .object({
     subject_id: z.string().optional(),
@@ -478,9 +482,20 @@ export const TandaStartSchema = z
     deliverable_id: z.string().optional(),
     task_id: z.string().optional(),
     routine_slot_id: z.string().optional(),
+    kind: z.enum(['temporizador', 'cronometro']).optional(),
+    objective_id: z.string().min(1).optional(),
     planned_minutes: z.number().int().min(TANDA_MINUTES_MIN).max(TANDA_MINUTES_MAX).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.kind === 'cronometro' && data.planned_minutes !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['planned_minutes'],
+        message: 'Un cronómetro no tiene duración planeada: no envíes planned_minutes.',
+      });
+    }
+  });
 
 export const TandaFinishSchema = z
   .object({

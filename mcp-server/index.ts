@@ -308,11 +308,11 @@ export const TOOLS_LIST = [
   {
     name: 'manage_tandas',
     description:
-      'Módulo de Ejecución: tanda de estudio de 10 a 60 minutos (US1, US-T1), la unidad de ejecución de Pure. ' +
+      'Módulo de Ejecución: tanda de estudio temporizador (10–180 minutos, 10 por defecto) o cronómetro sin fin, la unidad de ejecución de Pure. ' +
       '"start" la empieza con la hora del servidor (rechaza started_at/ended_at del cliente: sin tandas retroactivas) y falla con TANDA_EN_CURSO si ya hay una en curso. ' +
-      '"finish" solo funciona si ya se cumplió el tiempo planeado; antes de eso usa "interrupt" con interrupt_reason (1-140 caracteres, obligatorio). ' +
-      '"current" devuelve la tanda en curso y los segundos restantes. "read" lista tandas con su resumen por día (incluye unidades). ' +
-      '"update" solo reclasifica una tanda ya cerrada (materia, tema, entregable, tarea, modo); nunca acepta tiempos. ' +
+      '"finish" en temporizador solo funciona si ya se cumplió el tiempo planeado; en cronómetro requiere ≥60 segundos transcurridos (antes rechaza con CRONOMETRO_MUY_CORTO); antes de eso usa "interrupt" con interrupt_reason (1-140 caracteres, obligatorio). ' +
+      '"current" devuelve los segundos restantes en temporizador (seconds_left) o los segundos transcurridos en cronómetro (elapsed_seconds). "read" lista tandas con su resumen por día, donde un cronómetro que cruza medianoche se reparte entre los días locales que abarca (incluye unidades y minutos). ' +
+      '"update" solo reclasifica una tanda ya cerrada (materia, tema, entregable, tarea, objetivo, modo); nunca acepta tiempos. ' +
       '"log_late" (US-T2) es la ÚNICA excepción del módulo que sí acepta started_at/ended_at del cliente: registra una sesión que se estudió sin darle iniciar, acotada a hoy (día local del servidor), hasta 6 horas atrás, 10-60 minutos, sin solaparse con otra tanda del día y máximo 3 por día; queda marcada late_logged=true y se cuenta aparte en el reporte semanal (registros_tardios). No está en la lista blanca de la web: solo se dispara por este agente.',
     inputSchema: {
       type: 'object',
@@ -321,10 +321,10 @@ export const TOOLS_LIST = [
         data: {
           type: 'object',
           description:
-            'start: { subject_id?, topic_id?, deliverable_id?, task_id?, routine_slot_id?, planned_minutes? (10-60, 10 por defecto) }. ' +
+            'start: { kind? (temporizador|cronometro, temporizador por defecto), planned_minutes? (10-180 solo temporizador, 10 por defecto), objective_id?, subject_id?, topic_id?, deliverable_id?, task_id?, routine_slot_id? }. ' +
             'finish: { id }. interrupt: { id, interrupt_reason (1-140) }. current: sin data. ' +
-            'read: { from?, to? (YYYY-MM-DD), subject_id? }. ' +
-            'update: { id, subject_id?, topic_id?, deliverable_id?, task_id?, mode?, interrupt_reason? }. ' +
+            'read: { from?, to? (YYYY-MM-DD), subject_id?, objective_id? }. ' +
+            'update: { id, subject_id?, topic_id?, deliverable_id?, task_id?, objective_id?, mode?, interrupt_reason? }. ' +
             'log_late: { subject_id, started_at (ISO, hoy, hasta 6h atrás), ended_at (ISO, <= ahora, > started_at), topic_id?, task_id? } -> REGISTRO_TARDIO_INVALIDO | LIMITE_REGISTRO_TARDIO.',
         },
       },
@@ -706,7 +706,7 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'manage_tandas',
-    'Módulo de Ejecución: tanda de estudio de 10 a 60 minutos (US1, US-T1). start/finish/interrupt/current/read/update/log_late. La hora siempre la fija el servidor; sin tandas retroactivas; interrupt exige una razón de 1-140 caracteres. log_late (US-T2) es la única excepción acotada que acepta started_at/ended_at del cliente (hoy, hasta 6h atrás, máx. 3/día, marcada late_logged y contada aparte en el reporte); no está disponible desde la web.',
+    'Módulo de Ejecución: tanda temporizador (10–180 minutos, 10 por defecto) o cronómetro sin fin. start/finish/interrupt/current/read/update/log_late. La hora siempre la fija el servidor; sin tandas retroactivas. Temporizador exige tiempo planeado en finish; cronómetro requiere ≥60 segundos transcurridos. interrupt exige una razón de 1-140 caracteres. current devuelve seconds_left (temporizador) o elapsed_seconds (cronómetro). read trae resumen por día (unidades, minutos); cronómetro que cruza medianoche se reparte. log_late es la única excepción acotada que acepta started_at/ended_at del cliente (hoy, hasta 6h atrás, 10-60 min, máx. 3/día, marcada late_logged y contada aparte en el reporte); no está disponible desde la web.',
     {
       action: z.enum(['start', 'finish', 'interrupt', 'current', 'read', 'update', 'log_late']),
       data: z.any().optional(),

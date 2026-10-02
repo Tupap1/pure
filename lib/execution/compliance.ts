@@ -5,6 +5,7 @@
 // semanal (US6); get_compliance_report (T055) lo expone tal cual por MCP.
 
 import { addDays, localParts } from './time';
+import { cachedSplitByLocalDay } from './tandas';
 import {
   fetchHabitsFromDb,
   fetchDailyChecksFromDb,
@@ -25,12 +26,12 @@ import {
   isHabitActive,
   evaluateDay,
   describeDay,
-  tandaUnits,
   isTandaBeforeCutoff,
   isoDayOfWeekForDateKey,
   DayEvaluation,
   DayBreakdown,
 } from '../domain/execution';
+import { tallyDay, type SplitByLocalDay } from '../domain/focus';
 
 export interface ComplianceInput {
   /** YYYY-MM-DD, inicio del rango que se quiere reportar (p. ej. el lunes de la semana). */
@@ -122,19 +123,20 @@ function evaluateOneDay(
   weeks: ProgramWeekRecord[],
   tandas: TandaRecord[],
   habits: HabitRecord[],
-  checks: DailyCheckRecord[]
+  checks: DailyCheckRecord[],
+  split: SplitByLocalDay
 ): ComplianceDay {
   const week = weeks.find((w) => w.starts_on <= dateKey && dateKey <= addDays(w.starts_on, 6)) ?? null;
-  const completedThatDay = tandas.filter((t) => t.local_date === dateKey && t.status === 'completada');
-  const completedCount = completedThatDay.length;
-  // FR-T05: calcular unidades (suma de tandaUnits sobre las completadas).
-  const completedUnits = completedThatDay.reduce((sum, t) => sum + tandaUnits(t.actual_minutes), 0);
+  // 004 (FR-F04, FR-F13, FR-F14a): el recuento del día sale de tallyDay sobre los TRAMOS del día,
+  // no sobre `t.local_date === dateKey`: un cronómetro que cruza la medianoche aporta a cada día
+  // solo sus minutos. El mapa de objetivos va vacío por ahora (T021 lo conecta).
+  const tally = tallyDay(dateKey, tandas, new Map(), split);
   const checksForDate = checks.filter((c) => c.date === dateKey);
   const evaluationInput = {
     dateKey,
     minTandasDia: week ? week.min_tandas_dia : null,
-    completedTandas: completedCount,
-    completedUnits,
+    completedTandas: tally.completadas,
+    completedUnits: tally.unidades,
     habits,
     checks: checksForDate.map((c) => ({ habit_id: c.habit_id, status: c.status })),
   };
@@ -174,9 +176,10 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
 
   const allDays: ComplianceDay[] = [];
   const MAX_DAYS = 400; // salvaguarda: un programa de 10 semanas nunca se acerca a este límite
+  const split = cachedSplitByLocalDay(); // un reparto por cronómetro, no uno por (día × cronómetro)
   let cursor = loopStart;
   while (cursor <= input.to && allDays.length < MAX_DAYS) {
-    allDays.push(evaluateOneDay(cursor, weeks, tandasBeforeCutoff, habits, allChecks));
+    allDays.push(evaluateOneDay(cursor, weeks, tandasBeforeCutoff, habits, allChecks, split));
     cursor = addDays(cursor, 1);
   }
 

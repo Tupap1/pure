@@ -264,7 +264,7 @@ arrancar un temporizador de 45 min y dejar que se cierre solo.
 
 ### Tests (RED)
 
-- [ ] T011 [P] [US-F1] P2 TEST — Crear `__tests__/mcp/execution-foco-sesiones.test.ts`, vía
+- [x] T011 [P] [US-F1] P2 TEST — Crear `__tests__/mcp/execution-foco-sesiones.test.ts`, vía
       `handleManageTandas`, `handleGetToday`, `handleGetComplianceReport` y `runExecutionTick`:
       - `US-F1-AS1`: cronómetro en curso, `kind = 'cronometro'`, `planned_minutes = null`,
         `ends_at = null`; con `planned_minutes` → `DATOS_INVALIDOS`;
@@ -282,7 +282,7 @@ arrancar un temporizador de 45 min y dejar que se cierre solo.
         temporizador de 23:30 a 00:30 cuenta entero (6 unidades) para su día de inicio;
       - `US-F1-AS11`: un cronómetro que empezó el lunes y se termina el martes a las 04:00 queda
         con `edited_after_lock = true`.
-- [ ] T012 [P] [US-F1] P2 TEST — En `__tests__/mcp/execution-tandas-variables.test.ts`, reescribir
+- [x] T012 [P] [US-F1] P2 TEST — En `__tests__/mcp/execution-tandas-variables.test.ts`, reescribir
       los dos tests de `US-T1-AS3`:
       - renombrarlos `US-T1-AS3 · US-F1-AS3 · …`;
       - 9 sigue rechazado;
@@ -293,7 +293,7 @@ arrancar un temporizador de 45 min y dejar que se cierre solo.
 
 ### Implementation (GREEN)
 
-- [ ] T013 [US-F1] P2 IMPL — Rango y esquema de `start`:
+- [x] T013 [US-F1] P2 IMPL — Rango y esquema de `start`:
       - `constants.ts`: `TANDA_MINUTES_MAX = 180` (comentario: FR-F02);
       - `schemas.ts` (P2 la toma en serie, tras terminar P1): `TandaStartSchema` agrega
         `kind?: z.enum(['temporizador','cronometro'])` y `objective_id?`, con `planned_minutes`
@@ -301,7 +301,7 @@ arrancar un temporizador de 45 min y dejar que se cierre solo.
         'cronometro'`.
 
       T012 y US-F1-AS3 en verde.
-- [ ] T014 [US-F1] P2 IMPL — `lib/execution/tandas.ts`:
+- [x] T014 [US-F1] P2 IMPL — `lib/execution/tandas.ts`:
       - `startTanda`:
         - guarda `kind`;
         - en el cronómetro deja `planned_minutes: null` y devuelve `ends_at: null`;
@@ -320,7 +320,7 @@ arrancar un temporizador de 45 min y dejar que se cierre solo.
         - arma `por_dia` con `tallyDay(…, new Map(), splitByLocalDay)`. Por ahora sin objetivos:
           eso es T021;
         - `por_dia.minutos` = `minutos_foco`.
-- [ ] T015 [US-F1] P2 IMPL — `lib/execution/today.ts` y `lib/execution/compliance.ts`:
+- [x] T015 [US-F1] P2 IMPL — `lib/execution/today.ts` y `lib/execution/compliance.ts`:
       - reemplazar los cálculos propios de unidades (`today.ts:74`, `compliance.ts:131`) por
         `tallyDay`, con `splitByLocalDay` y un mapa de objetivos vacío;
       - en `compliance.ts`, `evaluateOneDay` usa los tramos del día, no `t.local_date ===
@@ -331,7 +331,7 @@ arrancar un temporizador de 45 min y dejar que se cierre solo.
 
       `lib/execution/checks.ts` hereda el cambio a través de `readTandas().por_dia`. Verificar que
       sus tests siguen verdes. T011 en verde, y toda la suite de la 001–003 también.
-- [ ] T016 [US-F1] P3 IMPL — `mcp-server/index.ts`:
+- [x] T016 [US-F1] P3 IMPL — `mcp-server/index.ts`:
       - actualizar la descripción de `manage_tandas` en el descriptor y en `mcpServer.tool`: tipos,
         10–180, cronómetro sin fin, `CRONOMETRO_MUY_CORTO`;
       - actualizar el esquema de `start` en la descripción de `data`.
@@ -340,7 +340,7 @@ arrancar un temporizador de 45 min y dejar que se cierre solo.
 
 ### UI (P4, en paralelo con T013–T016: archivos disjuntos)
 
-- [ ] T017 [P] [US-F1] P4 TEST — En `__tests__/domain/today-view.test.ts`:
+- [x] T017 [P] [US-F1] P4 TEST — En `__tests__/domain/today-view.test.ts`:
       - reescribir `US-T1-AS11` como `US-T1-AS11 · US-F1-AS8 · …`: los presets siguen siendo
         `[10, 25, 40, 60]` con 10 primaria, y ahora existe el campo libre;
       - agregar `US-F1-AS8`: `parseFreeMinutes('45')` → 45; `'9'`, `'181'`, `'12.5'` y `''` → error
@@ -349,7 +349,7 @@ arrancar un temporizador de 45 min y dejar que se cierre solo.
         - `elapsedSeconds(startedAtIso, offsetMs, clientNowMs)` con desfase de reloj;
         - `formatElapsed(3725)` → `'1:02:05'` y `formatElapsed(59)` → `'0:00:59'`;
         - el temporizador sigue usando `secondsLeft` y `formatCountdown`.
-- [ ] T018 [US-F1] P4 IMPL — `lib/execution/today-view.ts`:
+- [x] T018 [US-F1] P4 IMPL — `lib/execution/today-view.ts`:
       - `parseFreeMinutes`, `elapsedSeconds` y `formatElapsed`;
       - el comentario de `tandaDurationOptions` cita FR-F05.
 

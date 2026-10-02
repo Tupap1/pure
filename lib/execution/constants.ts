@@ -2,11 +2,12 @@
 // (lib/validations/schemas.ts) como en los servicios (lib/execution/*), para no repetir los
 // números mágicos de spec.md en dos lugares distintos.
 
-/** FR-T01: la pantalla de inicio usa 10 minutos; el rango 10-60 permite tandas más largas.
+/** FR-T01 / FR-F02: la pantalla de inicio usa 10 minutos; el temporizador acepta de 10 a 180.
+ * El tope pasó de 60 a 180 en la 004 (FR-F02); `log_late` tiene sus propias cotas (LATE_LOG_*).
  * TANDA_DURATION_OPTIONS se usa en la UI (10, 25, 40, 60 minutos, cada uno iniciando la tanda). */
 export const TANDA_MINUTES_DEFAULT = 10;
 export const TANDA_MINUTES_MIN = 10;
-export const TANDA_MINUTES_MAX = 60;
+export const TANDA_MINUTES_MAX = 180;
 export const TANDA_UNIT_MINUTES = 10;
 export const TANDA_DURATION_OPTIONS = [10, 25, 40, 60] as const;
 
