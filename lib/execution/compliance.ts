@@ -76,6 +76,11 @@ export interface RegistrosTardios {
   minutos: number;
 }
 
+export interface Correcciones {
+  total: number;
+  minutos_recortados: number;
+}
+
 export interface ComplianceResult {
   dias: ComplianceDay[];
   days_fulfilled: number;
@@ -92,6 +97,11 @@ export interface ComplianceResult {
    * minutos: 0 }): un reporte silencioso sobre el registro tardío sería tan invisible como el
    * incidente que esta historia soluciona. */
   registros_tardios: RegistrosTardios;
+  /** US-F4/FR-F23: sesiones corregidas (manage_tandas:correct) cuya corrección cayó en el rango, y
+   * los minutos que recortaron (Σ original_minutes − actual_minutes). Se cuentan por la semana
+   * local de `corrected_at`, no por la del inicio de la sesión. Siempre números explícitos, nunca
+   * null ni ausente (ceros cuando no hubo ninguna), por la misma razón que `registros_tardios`. */
+  correcciones: Correcciones;
 }
 
 export function summarizePlanOpenings(
@@ -164,9 +174,8 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
   const weeks = (Array.isArray(weeksRaw) ? weeksRaw : []) as ProgramWeekRecord[];
   const habits = (Array.isArray(habitsRaw) ? habitsRaw : []) as HabitRecord[];
   const allChecks = (Array.isArray(checksRaw) ? checksRaw : []) as DailyCheckRecord[];
-  const tandasBeforeCutoff = ((Array.isArray(tandasRaw) ? tandasRaw : []) as TandaRecord[]).filter((t) =>
-    isTandaBeforeCutoff(t.started_at, cutoff)
-  );
+  const allTandas = (Array.isArray(tandasRaw) ? tandasRaw : []) as TandaRecord[];
+  const tandasBeforeCutoff = allTandas.filter((t) => isTandaBeforeCutoff(t.started_at, cutoff));
   const slots = (Array.isArray(slotsRaw) ? slotsRaw : []) as RoutineSlotRecord[];
   const outcomes = (Array.isArray(outcomesRaw) ? outcomesRaw : []) as SlotOutcomeRecord[];
   const planViews = (Array.isArray(planViewsRaw) ? planViewsRaw : []) as PlanViewRecord[];
@@ -228,6 +237,31 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
     minutos: registrosTardiosEnRango.reduce((sum, t) => sum + (t.actual_minutes ?? 0), 0),
   };
 
+  // US-F4/FR-F23: el criterio es la fecha local de la CORRECCIÓN (`corrected_at`), no la del inicio
+  // de la sesión: una sesión del domingo corregida el lunes cuenta en la semana del lunes. Por eso
+  // parte de todas las tandas y no de `tandasInRange`. Frente al `cutoff` del reporte congelado
+  // cuenta solo lo corregido a más tardar en el corte (`corrected_at <= cutoff`): el reporte
+  // congelado es una foto al domingo 19:00 y no se reescribe (spec.md, casos borde); una corrección
+  // posterior aparece en el get_compliance_report de esa semana (cuyo corte es `now`) y en el
+  // resumen de foco. Una sesión corregida a más tardar en el corte también empezó antes de él, así
+  // que este filtro nunca incluye una tanda que `tandasBeforeCutoff` excluiría.
+  const correccionesEnRango = allTandas.filter((t) => {
+    if (!t.corrected || !t.corrected_at) return false;
+    const correctedAt = new Date(t.corrected_at);
+    if (correctedAt.getTime() > cutoff.getTime()) return false;
+    const dateKey = localParts(correctedAt).dateKey;
+    return dateKey >= input.from && dateKey <= input.to;
+  });
+  const correcciones: Correcciones = {
+    total: correccionesEnRango.length,
+    // Una corrección solo acorta, así que cada resta es >= 0; el Math.max protege la suma de una
+    // fila inconsistente (p. ej. editada a mano) en vez de dejar que reste minutos al total.
+    minutos_recortados: correccionesEnRango.reduce(
+      (sum, t) => sum + Math.max(0, (t.original_minutes ?? 0) - (t.actual_minutes ?? 0)),
+      0
+    ),
+  };
+
   const outcomesInRange = outcomes.filter((o) => o.date >= input.from && o.date <= input.to);
   const hecho = outcomesInRange.filter((o) => o.outcome === 'hecho').length;
   const no = outcomesInRange.filter((o) => o.outcome === 'no').length;
@@ -260,5 +294,6 @@ export async function getCompliance(input: ComplianceInput): Promise<ComplianceR
     horizonte,
     aperturas_plan,
     registros_tardios,
+    correcciones,
   };
 }

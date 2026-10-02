@@ -62,6 +62,11 @@ export interface BuildReportPayloadInput {
    * cuando no hubo ninguno. Opcional para compatibilidad con payloads congelados antes de esta
    * feature (esos, al leerse de vuelta, simplemente no traen esta sección). */
   registros_tardios?: { total: number; minutos: number };
+  /** US-F4/FR-F23: sesiones corregidas (manage_tandas:correct) por la semana local en que se hizo la
+   * corrección, y los minutos que recortaron, con ceros explícitos cuando no hubo ninguna.
+   * Opcional por compatibilidad con payloads congelados antes de la 004 (al leerse de vuelta no
+   * traen esta sección). */
+  correcciones?: { total: number; minutos_recortados: number };
 }
 
 export interface ReportPayload extends BuildReportPayloadInput {
@@ -217,6 +222,10 @@ export function renderReportText(payload: ReportPayload): string {
   // semanas sería ruido, no una señal (spec.md, "Qué construir" #8).
   if (payload.registros_tardios && payload.registros_tardios.total > 0) {
     lines.push(`Registros tardíos: ${payload.registros_tardios.total} (${payload.registros_tardios.minutos} min)`);
+  }
+  // US-F4/FR-F23: igual que los registros tardíos, solo cuando hubo al menos una corrección.
+  if (payload.correcciones && payload.correcciones.total > 0) {
+    lines.push(`Correcciones: ${payload.correcciones.total} (${payload.correcciones.minutos_recortados} min recortados)`);
   }
   for (const item of payload.friccion_retiradas ?? []) {
     const label = FRICTION_LABELS[item.measure_key] ?? item.measure_key;

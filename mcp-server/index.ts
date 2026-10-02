@@ -315,11 +315,12 @@ export const TOOLS_LIST = [
       '"finish" en temporizador solo funciona si ya se cumplió el tiempo planeado; en cronómetro requiere ≥60 segundos transcurridos (antes rechaza con CRONOMETRO_MUY_CORTO); antes de eso usa "interrupt" con interrupt_reason (1-140 caracteres, obligatorio). ' +
       '"current" devuelve los segundos restantes en temporizador (seconds_left) o los segundos transcurridos en cronómetro (elapsed_seconds). "read" lista tandas con su resumen por día, donde un cronómetro que cruza medianoche se reparte entre los días locales que abarca (incluye unidades y minutos). ' +
       '"update" solo reclasifica una tanda ya cerrada (materia, tema, entregable, tarea, objetivo, modo); nunca acepta tiempos. ' +
-      '"log_late" (US-T2) es la ÚNICA excepción del módulo que sí acepta started_at/ended_at del cliente: registra una sesión que se estudió sin darle iniciar, acotada a hoy (día local del servidor), hasta 6 horas atrás, 10-60 minutos, sin solaparse con otra tanda del día y máximo 3 por día; queda marcada late_logged=true y se cuenta aparte en el reporte semanal (registros_tardios). No está en la lista blanca de la web: solo se dispara por este agente.',
+      '"log_late" (US-T2) es la primera de las dos excepciones del módulo (la otra es "correct") que aceptan instantes del cliente: acepta started_at/ended_at para registrar una sesión que se estudió sin darle iniciar, acotada a hoy (día local del servidor), hasta 6 horas atrás, 10-60 minutos, sin solaparse con otra tanda del día y máximo 3 por día; queda marcada late_logged=true y se cuenta aparte en el reporte semanal (registros_tardios). No está en la lista blanca de la web: solo se dispara por este agente. ' +
+      '"correct" (US-F4) corrige o cierra un cronómetro olvidado y es la SEGUNDA excepción acotada del módulo (después de log_late) que acepta un instante del cliente (ended_at). Solo acorta: en una sesión cerrada el fin nuevo debe ser anterior al registrado y al menos 1 minuto posterior al inicio; en un cronómetro en curso lo cierra como completado con un fin entre inicio + 1 minuto y ahora; un temporizador en curso no se corrige (para cortarlo usa "interrupt"). Fuera de esas cotas responde CORRECCION_INVALIDA y no cambia nada. Exige una razón de 1-140 caracteres, conserva el fin y los minutos originales de antes de la primera corrección (original_ended_at, original_minutes), marca corrected=true con corrected_at del servidor y se cuenta en el reporte (correcciones: { total, minutos_recortados }). Está disponible en cualquier momento, también después del cierre del día. No está en la lista blanca de la web: solo se dispara por este agente.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['start', 'finish', 'interrupt', 'current', 'read', 'update', 'log_late'] },
+        action: { type: 'string', enum: ['start', 'finish', 'interrupt', 'current', 'read', 'update', 'log_late', 'correct'] },
         data: {
           type: 'object',
           description:
@@ -327,7 +328,8 @@ export const TOOLS_LIST = [
             'finish: { id }. interrupt: { id, interrupt_reason (1-140) }. current: sin data. ' +
             'read: { from?, to? (YYYY-MM-DD), subject_id?, objective_id? }. ' +
             'update: { id, subject_id?, topic_id?, deliverable_id?, task_id?, objective_id?, mode?, interrupt_reason? }. ' +
-            'log_late: { subject_id, started_at (ISO, hoy, hasta 6h atrás), ended_at (ISO, <= ahora, > started_at), topic_id?, task_id? } -> REGISTRO_TARDIO_INVALIDO | LIMITE_REGISTRO_TARDIO.',
+            'log_late: { subject_id, started_at (ISO, hoy, hasta 6h atrás), ended_at (ISO, <= ahora, > started_at), topic_id?, task_id? } -> REGISTRO_TARDIO_INVALIDO | LIMITE_REGISTRO_TARDIO. ' +
+            'correct: { id, ended_at (ISO), reason (1-140) } -> CORRECCION_INVALIDA.',
         },
       },
       required: ['action'],
@@ -746,9 +748,9 @@ export function createMcpServerInstance() {
 
   mcpServer.tool(
     'manage_tandas',
-    'Módulo de Ejecución: tanda temporizador (10–180 minutos, 10 por defecto) o cronómetro sin fin. start/finish/interrupt/current/read/update/log_late. La hora siempre la fija el servidor; sin tandas retroactivas. Temporizador exige tiempo planeado en finish; cronómetro requiere ≥60 segundos transcurridos. interrupt exige una razón de 1-140 caracteres. current devuelve seconds_left (temporizador) o elapsed_seconds (cronómetro). read trae resumen por día (unidades, minutos); cronómetro que cruza medianoche se reparte. log_late es la única excepción acotada que acepta started_at/ended_at del cliente (hoy, hasta 6h atrás, 10-60 min, máx. 3/día, marcada late_logged y contada aparte en el reporte); no está disponible desde la web.',
+    'Módulo de Ejecución: tanda temporizador (10–180 minutos, 10 por defecto) o cronómetro sin fin. start/finish/interrupt/current/read/update/log_late/correct. La hora siempre la fija el servidor; sin tandas retroactivas. Temporizador exige tiempo planeado en finish; cronómetro requiere ≥60 segundos transcurridos. interrupt exige una razón de 1-140 caracteres. current devuelve seconds_left (temporizador) o elapsed_seconds (cronómetro). read trae resumen por día (unidades, minutos); cronómetro que cruza medianoche se reparte. log_late y correct son las dos excepciones acotadas que aceptan instantes del cliente; ninguna está disponible desde la web. log_late: started_at/ended_at (hoy, hasta 6h atrás, 10-60 min, máx. 3/día, marcada late_logged y contada aparte en el reporte). correct (US-F4, la segunda excepción, después de log_late): corrige o cierra un cronómetro olvidado con { id, ended_at ISO, reason 1-140 }; solo acorta (fin anterior al registrado, o entre inicio + 1 min y ahora si el cronómetro sigue en curso; un temporizador en curso no se corrige, usa interrupt), exige razón, conserva el fin y los minutos originales y se cuenta en el reporte (correcciones); fuera de cotas, CORRECCION_INVALIDA.',
     {
-      action: z.enum(['start', 'finish', 'interrupt', 'current', 'read', 'update', 'log_late']),
+      action: z.enum(['start', 'finish', 'interrupt', 'current', 'read', 'update', 'log_late', 'correct']),
       data: z.any().optional(),
     },
     async ({ action, data }) => {

@@ -595,7 +595,7 @@ el reporte.
 
 ### Tests (RED)
 
-- [ ] T035 [P] [US-F4] P2 TEST — Crear `__tests__/mcp/execution-foco-correccion.test.ts`:
+- [x] T035 [P] [US-F4] P2 TEST — Crear `__tests__/mcp/execution-foco-correccion.test.ts`:
       - `US-F4-AS1`: un cronómetro en curso desde las 14:00 se corrige a las 22:00 con fin 15:10 →
         70 min, `corrected`, `original_ended_at` 22:00, `original_minutes` 480, sin
         `running_lock`;
@@ -617,7 +617,7 @@ el reporte.
 
 ### Implementation (GREEN)
 
-- [ ] T036 [US-F4] P2 IMPL — En `lib/execution/tandas.ts`, `correctTanda({ id, ended_at, reason },
+- [x] T036 [US-F4] P2 IMPL — En `lib/execution/tandas.ts`, `correctTanda({ id, ended_at, reason },
       now)` según [contracts/mcp-tools.md](./contracts/mcp-tools.md) § `correct`:
       - cotas;
       - `original_*` solo si son nulos;
@@ -627,7 +627,7 @@ el reporte.
 
       Comentario de cabecera equivalente al de `logLateTanda`: segunda excepción acotada al
       Principio III, referencia a `plan.md` § Complexity Tracking.
-- [ ] T037 [US-F4] P2 IMPL — `lib/execution/compliance.ts`: `correcciones: { total,
+- [x] T037 [US-F4] P2 IMPL — `lib/execution/compliance.ts`: `correcciones: { total,
       minutos_recortados }`, con las tandas `corrected` cuyo `localParts(corrected_at).dateKey`
       cae en `[from, to]` y `minutos_recortados = Σ (original_minutes − actual_minutes)`; nunca
       ausente.
@@ -639,7 +639,7 @@ el reporte.
       - el campo `correcciones` en el payload;
       - la línea `Correcciones: N (M min recortados)` solo si N > 0, igual que `registros_tardios`
         (L218).
-- [ ] T038 [US-F4] P3 IMPL — `lib/execution/handlers.ts`:
+- [x] T038 [US-F4] P3 IMPL — `lib/execution/handlers.ts`:
       - `case 'correct'` en `handleManageTandas` con `TandaCorrectSchema`;
       - en `handlers.ts:416`, donde se arma el payload de vista previa del reporte, agregar
         `correcciones: compliance.correcciones` junto a `registros_tardios`. **No** se agrega a `ALLOWED_ACTIONS`. `mcp-server/index.ts`:
@@ -694,12 +694,12 @@ misma frase el mismo día.
 
 ### UI (P4)
 
-- [ ] T042 [P] [US-F5] P4 TEST — En `__tests__/domain/today-view.test.ts`, agregar `US-F5-AS7`:
+- [x] T042 [P] [US-F5] P4 TEST — En `__tests__/domain/today-view.test.ts`, agregar `US-F5-AS7`:
       - `quoteLineView(frase)` → `{ latin, detail }`, con `detail = 'traducción · fuente'`;
       - sin traducción → `detail = fuente`;
       - sin ninguna de las dos → `detail = null`;
       - `quoteLineView(null)` → `null`.
-- [ ] T043 [US-F5] P4 IMPL — Implementar `quoteLineView` en `today-view.ts`. En
+- [x] T043 [US-F5] P4 IMPL — Implementar `quoteLineView` en `today-view.ts`. En
       `TodayDashboard.tsx`:
       - el latín va en cursiva (`<p lang="la">`) y debajo `detail` en texto secundario;
       - sin ícono, sin animación, sin color de acento (constitución 1.1.0);

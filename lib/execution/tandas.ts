@@ -612,3 +612,115 @@ export async function logLateTanda(
 
   return { status: 'success', data: tanda };
 }
+
+export interface TandaCorrectInput {
+  id: string;
+  /** ISO 8601. Segunda excepción acotada del módulo: un instante aportado por el cliente (ver el
+   * comentario de correctTanda más abajo). */
+  ended_at: string;
+  /** 1-140 caracteres, ya recortada por el esquema Zod. */
+  reason: string;
+}
+
+/**
+ * US-F4/FR-F20..FR-F24: `correct` es la SEGUNDA entrada del módulo (después de `log_late`) que
+ * acepta un instante del cliente (`ended_at`) -- una excepción deliberada y acotada al Principio III
+ * de la Constitución ("todo instante registrado DEBE salir del reloj del servidor"), documentada en
+ * specs/004-foco-cronometro/plan.md § Complexity Tracking. El cronómetro no tiene tope por decisión
+ * de Andres; sin una forma de corregirlo, un olvido de 8 horas quedaría como 8 horas de estudio para
+ * siempre. La corrección es la red que hace aceptable esa decisión, y por eso solo puede REDUCIR
+ * datos: nunca alarga una sesión ni crea una (FR-T15 sigue vigente).
+ *
+ * Cotas (cada una tiene su propia prueba; si alguna se relaja, la excepción deja de estar acotada):
+ * - sesión cerrada (completada o interrumpida): `inicio + 60 s <= ended_at < ended_at registrado`;
+ *   conserva su estado y recalcula `actual_minutes = floor((ended_at - inicio) / 60 s)`;
+ * - cronómetro en curso: `inicio + 60 s <= ended_at <= now`; queda `completada` y libera el
+ *   `running_lock` (marca `edited_after_lock` si `now` pasa de `locked_at`, igual que `finish`);
+ * - temporizador en curso: CORRECCION_INVALIDA (para cortarlo existe `interrupt`).
+ * Fuera de cota: CORRECCION_INVALIDA y no se escribe nada.
+ *
+ * Deja constancia: `corrected = true`, `corrected_at = now` (hora del servidor, de la ÚLTIMA
+ * corrección; el reporte cuenta por ella) y `correction_reason`. `original_ended_at` y
+ * `original_minutes` se escriben solo si estaban nulos, así una segunda corrección conserva lo de
+ * antes de la primera; en un cronómetro en curso el original es `now` y los minutos hasta `now`.
+ * Está disponible siempre, sin mirar `locked_at` (US-F4-AS5), y sobre una sesión cerrada no toca
+ * `edited_after_lock`. Es solo MCP: no está en la lista blanca de app/api/execution/route.ts.
+ */
+export async function correctTanda(
+  input: TandaCorrectInput,
+  now: Date = new Date()
+): Promise<ExecutionResult<TandaRecord>> {
+  await finalizeElapsed(now);
+
+  const existing = await findTandaById(input.id);
+  if (!existing) {
+    return { status: 'error', code: 'NO_ENCONTRADO', message: `No existe la sesión ${input.id}.` };
+  }
+
+  const running = existing.status === 'en_curso';
+  if (running && existing.kind !== 'cronometro') {
+    return {
+      status: 'error',
+      code: 'CORRECCION_INVALIDA',
+      message: 'Un temporizador en curso no se corrige: para cortarlo usa interrupt.',
+    };
+  }
+
+  const newEndMs = new Date(input.ended_at).getTime();
+  if (Number.isNaN(newEndMs)) {
+    return { status: 'error', code: 'CORRECCION_INVALIDA', message: 'ended_at debe ser una fecha ISO 8601 válida.' };
+  }
+
+  const startMs = new Date(existing.started_at).getTime();
+  if (newEndMs < startMs + CRONOMETRO_MIN_FINISH_SECONDS * 1_000) {
+    return {
+      status: 'error',
+      code: 'CORRECCION_INVALIDA',
+      message: 'El fin corregido debe quedar al menos 1 minuto después del inicio de la sesión.',
+    };
+  }
+
+  // `registeredEndMs` es el fin vigente que la corrección no puede alargar: el registrado en una
+  // sesión cerrada, o `now` en un cronómetro en curso (todavía no tiene fin).
+  const registeredEndMs = running ? now.getTime() : existing.ended_at ? new Date(existing.ended_at).getTime() : null;
+  if (registeredEndMs === null) {
+    return {
+      status: 'error',
+      code: 'CORRECCION_INVALIDA',
+      message: 'La sesión cerrada no tiene un fin registrado que acortar.',
+    };
+  }
+  // Cerrada: estrictamente antes del fin registrado (igual no acorta nada). En curso: hasta `now`
+  // inclusive, que es cerrar el cronómetro en este instante dejando constancia.
+  if (running ? newEndMs > registeredEndMs : newEndMs >= registeredEndMs) {
+    return {
+      status: 'error',
+      code: 'CORRECCION_INVALIDA',
+      message: running
+        ? 'El fin corregido no puede quedar en el futuro: una corrección solo acorta.'
+        : 'El fin corregido debe ser anterior al fin registrado: una corrección solo acorta.',
+    };
+  }
+
+  const newEnd = new Date(newEndMs);
+  const originalEndedAt = existing.original_ended_at ?? new Date(registeredEndMs).toISOString();
+  const originalMinutes =
+    existing.original_minutes ??
+    existing.actual_minutes ??
+    Math.max(0, Math.floor((registeredEndMs - startMs) / 60_000));
+
+  const updated = await saveTandaToDb({
+    ...existing,
+    ended_at: newEnd.toISOString(),
+    actual_minutes: Math.floor((newEndMs - startMs) / 60_000),
+    status: running ? 'completada' : existing.status,
+    running_lock: null,
+    edited_after_lock: running ? lockedEditFlag(existing, now) : existing.edited_after_lock,
+    corrected: true,
+    corrected_at: now.toISOString(),
+    original_ended_at: originalEndedAt,
+    original_minutes: originalMinutes,
+    correction_reason: input.reason,
+  });
+  return { status: 'success', data: updated };
+}

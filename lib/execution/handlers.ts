@@ -18,6 +18,7 @@ import {
   TandaReadSchema,
   TandaUpdateSchema,
   TandaLogLateSchema,
+  TandaCorrectSchema,
   RoutineSlotSchema,
   RoutineSlotReadSchema,
   RoutineSlotDeleteSchema,
@@ -50,7 +51,16 @@ import {
   type ExecutionResult,
 } from '../validations/schemas';
 import { initProgram, readProgram, updateProgramWeek, upsertHabit, retireHabit } from './program';
-import { startTanda, finishTanda, interruptTanda, currentTanda, readTandas, updateTanda, logLateTanda } from './tandas';
+import {
+  startTanda,
+  finishTanda,
+  interruptTanda,
+  currentTanda,
+  readTandas,
+  updateTanda,
+  logLateTanda,
+  correctTanda,
+} from './tandas';
 import { createObjective, readObjectives, updateObjective, archiveObjective } from './objectives';
 import { getToday } from './today';
 import { getFocusSummary } from './focus';
@@ -151,15 +161,16 @@ export async function handleManageProgram(
   }
 }
 
-export type ManageTandasAction = 'start' | 'finish' | 'interrupt' | 'current' | 'read' | 'update' | 'log_late';
+export type ManageTandasAction = 'start' | 'finish' | 'interrupt' | 'current' | 'read' | 'update' | 'log_late' | 'correct';
 
 /**
  * `manage_tandas` (US1, US-T1, US-T2): la tanda de estudio, de 10 a 60 minutos. `start`/`finish`/
  * `interrupt`/`update` validan su forma con los esquemas Zod estrictos de schemas.ts (que ya
  * rechazan `started_at`/`ended_at` del cliente por ser claves no reconocidas) y delegan las
  * reglas de negocio en lib/execution/tandas.ts. `current` no tiene esquema propio: no recibe
- * `data`. `log_late` (US-T2) es la única excepción acotada que sí acepta instantes del cliente;
- * no entra en la lista blanca de app/api/execution/route.ts (FR-T15): solo se dispara por MCP.
+ * `data`. `log_late` (US-T2) y `correct` (US-F4, corrige o cierra un cronómetro olvidado) son las
+ * dos excepciones acotadas que aceptan instantes del cliente; ninguna entra en la lista blanca de
+ * app/api/execution/route.ts (FR-T15, FR-F20): solo se disparan por MCP.
  */
 export async function handleManageTandas(
   action: ManageTandasAction,
@@ -206,6 +217,11 @@ export async function handleManageTandas(
         const parsed = TandaLogLateSchema.safeParse(data ?? {});
         if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
         return await logLateTanda(parsed.data, now);
+      }
+      case 'correct': {
+        const parsed = TandaCorrectSchema.safeParse(data ?? {});
+        if (!parsed.success) return zodErrorToExecutionResult(parsed.error);
+        return await correctTanda(parsed.data, now);
       }
       default:
         return {
@@ -445,6 +461,7 @@ async function assembleReportInput(
     aperturas_plan: { total: compliance.aperturas_plan.total, con_razon: compliance.aperturas_plan.con_razon, libres_usadas: compliance.aperturas_plan.libres_usadas },
     friccion_retiradas: friccionRetiradas,
     registros_tardios: compliance.registros_tardios,
+    correcciones: compliance.correcciones,
   };
 }
 
